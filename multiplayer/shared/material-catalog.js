@@ -1,7 +1,7 @@
 // Shared labels and finite recipe data; legacy `gems` remains the Crystal wire key.
 // No second wood type: physical logs pay Wood directly.
 // New keys append at the end: saves without them restore as 0 (restoreMaterials), so order stays save-compatible.
-export const MATERIAL_KEYS=Object.freeze(['wood','stone','iron','mithril','gems','starMetal','ironOre','mithrilOre','starOre','copper','gold','copperOre','goldOre']);
+export const MATERIAL_KEYS=Object.freeze(['wood','stone','iron','mithril','gems','starMetal','ironOre','mithrilOre','starOre','copper','gold','copperOre','goldOre','salt']);
 export const MATERIAL_CATALOG=Object.freeze(Object.fromEntries(Object.entries({
  wood:{label:'Wood',use:'Frames, ammunition shafts and repairs.',source:'Fell trees, gather Wood or deliver trunks to a Logging Yard.',recipes:['storehouse','loggingYard','timberline','palisade'],color:0xa76b37},
  stone:{label:'Stone',use:'Foundations, walls and heavy ammunition.',source:'Mine boulders, golem remains or newly emerged seams.',recipes:['storehouse','watchtower','launcher'],color:0x92938c},
@@ -16,7 +16,9 @@ export const MATERIAL_CATALOG=Object.freeze(Object.fromEntries(Object.entries({
  copper:{label:'Copper',use:'Wiring, bells and warm fittings for coming inventions.',source:'Refine copper ore from the green-streaked lodes along the mountain foot.',recipes:[],groundwork:true,color:0xd08a5a},
  gold:{label:'Gold',use:'Inlay, enchanting foci and fine mechanisms for coming inventions.',source:'Recover impacted golden Siegebird bolts or refine gold ore from mountain-foot quartz seams.',recipes:[],groundwork:true,color:0xf2c75a},
  copperOre:{label:'Copper ore',use:'Forge feedstock: one ore makes one Copper.',source:'Mine the glinting green lodes along the mountain foot.',recipes:['refineCopper'],color:0x4f9a7c},
- goldOre:{label:'Gold ore',use:'Forge feedstock: one ore makes one Gold.',source:'Mine the glinting quartz seams up on the mountain foot.',recipes:['refineGold'],color:0xe0b44a}
+ goldOre:{label:'Gold ore',use:'Forge feedstock: one ore makes one Gold.',source:'Mine the glinting quartz seams up on the mountain foot.',recipes:['refineGold'],color:0xe0b44a},
+ // Brinedeep rock salt (shared/salt-mines.js): sold, not smelted. The Gold mill pays more for it than for gold ore.
+ salt:{label:'Salt',use:'Prized in every kitchen and tavern: the Gold mill pays handsomely for it.',source:'Mine the glowing rock-salt seams deep in the Brinedeep salt mines, or crack it off Saltback crabs.',recipes:[],color:0xf2a9bd}
 }).map(([key,value])=>[key,Object.freeze({...value,recipes:Object.freeze(value.recipes)})])));
 // groundwork: a mined and refined metal whose first recipes are still to be designed.
 export const materialKey=key=>key==='crystal'?'gems':key;
@@ -38,7 +40,11 @@ export const DEPOSIT_CATALOG=Object.freeze({
  // Mountain-foot vein kinds (shared/ore-veins.js); iron and mithril veins reuse the seams above.
  copper:Object.freeze({label:'Copper lode',maxHits:4,resource:'copperOre',amount:4,color:0x4f9a7c}),
  gold:Object.freeze({label:'Gold seam',maxHits:5,resource:'goldOre',amount:3,color:0xe0b44a}),
- star:Object.freeze({label:'Star vein',maxHits:6,resource:'starOre',amount:3,color:0xf2b95c})
+ star:Object.freeze({label:'Star vein',maxHits:6,resource:'starOre',amount:3,color:0xf2b95c}),
+ // Brinedeep salt mine deposits (shared/salt-mine-rules.js).
+ salt:Object.freeze({label:'Rock salt seam',maxHits:4,resource:'salt',amount:3,color:0xf2a9bd}),
+ saltHeart:Object.freeze({label:'Salt heart',maxHits:6,resource:'salt',amount:10,color:0xff7fa3}),
+ saltRubble:Object.freeze({label:'Salt rubble',maxHits:2,resource:'salt',amount:2,color:0xd9b7b9})
 });
 export const depositReward=kind=>{const d=Object.hasOwn(DEPOSIT_CATALOG,kind)?DEPOSIT_CATALOG[kind]:null;return d?{kind:d.resource,amount:d.amount}:null;};
 export const emptyMaterials=()=>Object.fromEntries(MATERIAL_KEYS.map(key=>[key,0]));

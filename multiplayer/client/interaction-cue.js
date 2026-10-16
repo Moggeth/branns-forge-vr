@@ -176,9 +176,9 @@ function homeCue(self, snapshot, keys, make) {
   const mill = base.mill, owed = mill?.queue?.find(q => q.id === self.id)?.gold || 0;
   if (at(millAt(base.side, MILL.crank), MILL.crankReach)) return mill?.queue?.length ? make('home', 'ready', 'mill-crank', 'Mill capstan', 'Crank', keys.crank || keys.collect, 'hold to grind three times as fast') : make('home', 'full', 'mill-crank', 'Mill capstan', 'Nothing grinding', '');
   if (at(millAt(base.side, MILL.hopper), MILL.reach)) {
-    const r = self.resources || {}, worth = (r.goldOre || 0) * 2 + (r.copperOre || 0) + Math.floor((r.stone || 0) / 4);
+    const r = self.resources || {}, worth = Object.entries(MILL.rates).reduce((n, [k, rate]) => { const have = r[k] || 0; return n + (k === 'stone' ? have - have % 4 : have) * rate; }, 0); // shared/home-mill.js: stone grinds in fours
     return worth ? make('home', 'ready', 'mill', 'Gold mill', 'Tip it in', keys.collect, `about ${worth} Gold${owed ? ` · ${owed} still grinding` : ''}`)
-      : make('home', 'full', 'mill', 'Gold mill', owed ? `${owed} Gold grinding` : 'Bring ore', '', 'gold ore, copper ore or stone');
+      : make('home', 'full', 'mill', 'Gold mill', owed ? `${owed} Gold grinding` : 'Bring ore', '', 'salt, gold ore, copper ore or stone');
   }
   // Back town (shared/home-workshop.js): the Workshop smelts ore from your pack on its own; the Stores banks your haul.
   if (at(backTownSpot(base.side, 'workshop', WORKSHOP.anvil), WORKSHOP.reach)) {

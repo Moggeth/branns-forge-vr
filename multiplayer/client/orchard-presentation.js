@@ -1,4 +1,5 @@
-import {terrainEditScale,terrainFrameKey,terrainDirtyEdits} from '../shared/terrain.js';
+import {terrainEditScale,terrainFrameKey,terrainDirtyEdits,unminedHeight} from '../shared/terrain.js';
+import {mineCarve} from '../shared/salt-mines.js';
 import {loadDeliveredTexture} from './texture-delivery.js';
 // Orchard environment presentation: warm golden meadow ground, worn paths, slope soil/stone,
 // hazy sky, far-only silhouette backdrop and a fixed-budget follow shadow.
@@ -432,11 +433,12 @@ function createSkirt(material, height, segments = 96, rings = 7, outer = 104) {
   const rebuild = () => {
     for (let s = 0; s < segments; s++) {
       const a = s / segments * Math.PI * 2, cx = Math.cos(a), cz = Math.sin(a), k = (GROUND_HALF - .25) / Math.max(Math.abs(cx), Math.abs(cz));
-      const edge = height(cx * k, cz * k) - .03;
+      // Over a salt mine's hall the skirt keeps to the whole mountain above the cave (client/salt-mine-view.js).
+      const ex = cx * k, ez = cz * k, edge = (mineCarve(ex, ez) > 0 ? unminedHeight(ex, ez) : height(ex, ez)) - .03;
       for (let r = 0; r < rings; r++) {
         const t = r / (rings - 1), dist = k + (outer - k) * t * t;
         const lift = t * t * (2.2 + 3 * valueNoise(cx * 3 + 7, cz * 3 - 2));
-        const x = cx * dist, z = cz * dist, carve = keepCarve(x, z); // tucked under the keeps' carved back towns
+        const x = cx * dist, z = cz * dist, carve = keepCarve(x, z, false); // tucked under the keeps' carved back towns
         positions.set([x, carve ? (edge * (1 - t) + lift) * (1 - carve) + (height(x, z) - 2) * carve : edge * (1 - t) + lift, z], (s * rings + r) * 3);
       }
     }

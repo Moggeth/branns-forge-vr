@@ -138,7 +138,8 @@ export function createDayNightWeather({scene, orchard, quality = 'high', preview
     env.hemiI = a.hemiI + (b.hemiI - a.hemiI) * t; env.exposure = a.exposure + (b.exposure - a.exposure) * t; env.envI = a.env + (b.env - a.env) * t;
   }
 
-  function update({tick = 0, seed = 41, override = null, time = 0, dt = 0, camera, groundY = 0, rts = false} = {}) {
+  // shelter: 0 out in the open .. 1 deep under rock (a salt mine): no weather, mist, sky shafts or sun haze reach in there.
+  function update({tick = 0, seed = 41, override = null, time = 0, dt = 0, camera, groundY = 0, rts = false, shelter = 0} = {}) {
     camera_ = camera; let clock = worldClock(tick, seed, override);
     if (preview) {
       const phase = preview.phase ?? clock.phase;
@@ -174,13 +175,13 @@ export function createDayNightWeather({scene, orchard, quality = 'high', preview
     const lowSun = 1 - smooth(.08, .5, Math.abs(env.skySunDir.y)), dawn = clock.phase < .2 ? 1 - smooth(.04, .2, clock.phase) : 0;
     env.fogScale *= .86 - lowSun * .14 - night * .1;
     orchard.applyEnvironment(env);
-    atmosphere({clock, w, e, sunUp, moonUp, overcast, night, lowSun, dawn, dt, time, groundY, rts});
+    atmosphere({clock, w, e, sunUp, moonUp, overcast, night, lowSun, dawn, dt, time, groundY, rts, shelter});
 
     // Particles follow the viewer; from the god camera they fill a taller, wider column toward the board.
     camera.getWorldPosition(center);
     if (rts) { camera.getWorldDirection(dir); center.addScaledVector(dir, 14); }
     const scale = rts ? 2.2 : 1;
-    const rainW = Math.min(1, w.rain + w.storm), snowW = w.snow;
+    const open = 1 - Math.min(1, Math.max(0, shelter)), rainW = Math.min(1, w.rain + w.storm) * open, snowW = w.snow * open;
     rain.mesh.visible = rainW > .02;
     if (rain.mesh.visible) {
       const u = rain.mesh.material.uniforms; u.uTime.value = time; u.uCenter.value.copy(center); u.uBox.value.set(26 * scale, 18 * scale, 26 * scale);
@@ -196,7 +197,7 @@ export function createDayNightWeather({scene, orchard, quality = 'high', preview
     }
     // Night resonance sparks, and by day a sparse drift of fae lights (fewer, softer) so the meadow always feels alive.
     const dayMotes = (1 - night) * (1 - Math.min(1, rainW * 1.2 + w.storm)) * .5;
-    const moteW = (night * (1 - Math.min(1, rainW * .8 + w.fog * .3)) + dayMotes) * (rts ? .6 : 1);
+    const moteW = (night * (1 - Math.min(1, rainW * .8 + w.fog * .3)) + dayMotes) * (rts ? .6 : 1) * open;
     motes.mesh.visible = moteW > .02;
     if (motes.mesh.visible) {
       const u = motes.mesh.material.uniforms; u.uTime.value = time; u.uCenter.value.copy(center); u.uGround.value = groundY; u.uOpacity.value = moteW * .9; u.uDay.value = 1 - night;
@@ -213,7 +214,8 @@ export function createDayNightWeather({scene, orchard, quality = 'high', preview
 
   // Ground mist, sun glow in the haze, wet ground and settling snow (every material), shafts through the canopy, and
   // on desktop the screen-space shafts, glow and grade. Weather-driven surfaces ease in and out over real time.
-  function atmosphere({clock, w, e, sunUp, moonUp, overcast, night, lowSun, dawn, dt, time, groundY, rts}) {
+  function atmosphere({clock, w, e, sunUp, moonUp, overcast, night, lowSun, dawn, dt, time, groundY, rts, shelter = 0}) {
+    const open = 1 - Math.min(1, Math.max(0, shelter));
     const first = frames === 1 || !(dt > 0), step = Math.min(dt || 0, .25), rainW = Math.min(1, w.rain + w.storm);
     wet = first ? rainW : approach(wet, rainW, step, 14, 80);
     snowCover = first ? w.snow : approach(snowCover, w.snow, step, 40, 110);
@@ -222,25 +224,26 @@ export function createDayNightWeather({scene, orchard, quality = 'high', preview
     mistBase = mistBase == null || first ? groundY : approach(mistBase, groundY, step, 6, 6);
     A.bfMistBase.value = Math.min(mistBase, 1.5) - .4;
     A.bfMistHeight.value = 2.2 + w.fog * 2.6 + rainW * 1.2 + (rts ? 1.5 : 0);
-    A.bfMist.value = (.012 + dawn * .042 + lowSun * .014 + night * .016 + w.fog * .085 + rainW * .022 + w.snow * .014) * (rts ? .55 : 1);
+    A.bfMist.value = (.012 + dawn * .042 + lowSun * .014 + night * .016 + w.fog * .085 + rainW * .022 + w.snow * .014) * (rts ? .55 : 1) * open;
     A.bfWind.value.set(.35 + w.storm * 1.2, .12 + w.storm * .5);
     const sunSide = e >= 0;
     lightDir.copy(sunSide ? env.skySunDir : env.moonDir);
     A.bfSunDir.value.copy(lightDir);
     scatter.copy(env.skySun).multiplyScalar((sunSide ? sunUp * (.4 + lowSun * .4) : moonUp * .12) * (1 - overcast * .75));
-    A.bfSunScatter.value.copy(scatter);
+    A.bfSunScatter.value.copy(scatter).multiplyScalar(open);
     // Shafts falling through the crowns: golden in low sun, a faint cool silver under a clear moon, gone under cloud.
     const clear = (1 - overcast) ** 2;
-    const beamStrength = sunSide ? sunUp * clear * (.22 + lowSun * .5 + dawn * .2) : moonUp * clear * .1;
+    const beamStrength = (sunSide ? sunUp * clear * (.22 + lowSun * .5 + dawn * .2) : moonUp * clear * .1) * open;
     if (sunSide) beamColor.copy(env.skySun); else beamColor.setRGB(.55, .68, 1);
     if (beams && camera_) beams.update({camera: camera_, light: lightDir, strength: beamStrength * (rts ? .5 : 1), color: beamColor, time});
     if (post) {
       rayColor.copy(env.skySun).multiplyScalar(sunSide ? 1.3 : .5);
       lift.setRGB(.008 + .004 * lowSun, .01, .018 + .03 * night);
       gain.setRGB(1 + .05 * lowSun * sunUp, 1, 1 - .05 * lowSun * sunUp + .03 * night);
-      post.set({sun: lightDir, rays: (sunSide ? sunUp * (.7 + lowSun * .6) : moonUp * .25) * (1 - overcast * .8), rayColor,
-        bloom: .3 + night * .22 + w.storm * .1, bloomThreshold: .95, vignette: .2 + night * .14 + w.fog * .06,
-        lift, gain, saturation: 1.06 - night * .14 - overcast * .1 + w.snow * .12, contrast: 1.04 + lowSun * .03 + w.snow * .1 + w.fog * .05});
+      // Under rock the salt's own glow blooms instead of sky shafts.
+      post.set({sun: lightDir, rays: (sunSide ? sunUp * (.7 + lowSun * .6) : moonUp * .25) * (1 - overcast * .8) * open, rayColor,
+        bloom: (.3 + night * .22 + w.storm * .1) * open + .4 * (1 - open), bloomThreshold: .95 - .07 * (1 - open), vignette: (.2 + night * .14 + w.fog * .06) * open + .34 * (1 - open),
+        lift, gain, saturation: 1.06 - night * .14 - overcast * .1 + w.snow * .12, contrast: (1.04 + lowSun * .03 + w.snow * .1 + w.fog * .05) * open + 1.12 * (1 - open)});
     }
   }
   let camera_ = null;

@@ -1,0 +1,274 @@
+{
+  "file": "salt-mine-kit.glb",
+  "bytes": 1027616,
+  "triangles": 17970,
+  "materials": [
+    "Timber",
+    "Iron",
+    "SaltRock",
+    "SaltCrystal",
+    "Brass",
+    "LanternGlow"
+  ],
+  "images": [
+    [
+      "image/jpeg",
+      "SaltMineTimber"
+    ]
+  ],
+  "pieces": {
+    "MinePortal": {
+      "triangles": 5016,
+      "vertices": 9384,
+      "materials": [
+        "Timber",
+        "Iron",
+        "SaltRock",
+        "SaltCrystal"
+      ],
+      "bbox_min": [
+        -4.038,
+        -0.299,
+        -1.5
+      ],
+      "bbox_max": [
+        4.117,
+        5.652,
+        0.707
+      ],
+      "colour_range": [
+        0.0028,
+        1.0
+      ],
+      "glow_mask_max": 1.0
+    },
+    "TimberSet": {
+      "triangles": 716,
+      "vertices": 1283,
+      "materials": [
+        "Timber",
+        "Iron",
+        "SaltRock",
+        "SaltCrystal"
+      ],
+      "bbox_min": [
+        -2.153,
+        -0.098,
+        -0.302
+      ],
+      "bbox_max": [
+        2.147,
+        3.545,
+        0.317
+      ],
+      "colour_range": [
+        0.0034,
+        0.9686
+      ],
+      "glow_mask_max": 0.55
+    },
+    "RailStraight": {
+      "triangles": 240,
+      "vertices": 328,
+      "materials": [
+        "Timber",
+        "Iron"
+      ],
+      "bbox_min": [
+        -0.486,
+        -0.01,
+        -1.0
+      ],
+      "bbox_max": [
+        0.486,
+        0.2,
+        1.0
+      ],
+      "colour_range": [
+        0.0151,
+        0.23
+      ],
+      "glow_mask_max": 0.0
+    },
+    "MineCart": {
+      "triangles": 3508,
+      "vertices": 4768,
+      "materials": [
+        "Timber",
+        "Iron",
+        "SaltRock",
+        "SaltCrystal"
+      ],
+      "bbox_min": [
+        -0.55,
+        0.174,
+        -0.961
+      ],
+      "bbox_max": [
+        0.55,
+        1.434,
+        0.961
+      ],
+      "colour_range": [
+        0.0024,
+        1.0
+      ],
+      "glow_mask_max": 0.62
+    },
+    "Lantern": {
+      "triangles": 1110,
+      "vertices": 1177,
+      "materials": [
+        "Iron",
+        "Brass",
+        "LanternGlow"
+      ],
+      "bbox_min": [
+        -0.143,
+        -0.509,
+        -0.143
+      ],
+      "bbox_max": [
+        0.143,
+        -0.0,
+        0.177
+      ],
+      "colour_range": [
+        0.0092,
+        1.0
+      ],
+      "glow_mask_max": 0.0
+    },
+    "SaltCluster": {
+      "triangles": 1754,
+      "vertices": 3892,
+      "materials": [
+        "SaltRock",
+        "SaltCrystal"
+      ],
+      "bbox_min": [
+        -0.762,
+        -0.144,
+        -0.795
+      ],
+      "bbox_max": [
+        0.811,
+        1.197,
+        0.843
+      ],
+      "colour_range": [
+        0.0392,
+        1.0
+      ],
+      "glow_mask_max": 1.0
+    },
+    "SaltClusterSmall": {
+      "triangles": 326,
+      "vertices": 742,
+      "materials": [
+        "SaltRock",
+        "SaltCrystal"
+      ],
+      "bbox_min": [
+        -0.262,
+        -0.044,
+        -0.298
+      ],
+      "bbox_max": [
+        0.27,
+        0.414,
+        0.26
+      ],
+      "colour_range": [
+        0.0431,
+        1.0
+      ],
+      "glow_mask_max": 1.0
+    },
+    "FiredampVent": {
+      "triangles": 1364,
+      "vertices": 1427,
+      "materials": [
+        "SaltRock",
+        "SaltCrystal"
+      ],
+      "bbox_min": [
+        -0.618,
+        -0.03,
+        -0.601
+      ],
+      "bbox_max": [
+        0.615,
+        0.371,
+        0.598
+      ],
+      "colour_range": [
+        0.0039,
+        0.9922
+      ],
+      "glow_mask_max": 0.45
+    },
+    "RubblePile": {
+      "triangles": 1156,
+      "vertices": 2848,
+      "materials": [
+        "Timber",
+        "SaltRock"
+      ],
+      "bbox_min": [
+        -0.793,
+        -0.137,
+        -0.763
+      ],
+      "bbox_max": [
+        0.733,
+        0.666,
+        0.881
+      ],
+      "colour_range": [
+        0.0045,
+        0.9686
+      ],
+      "glow_mask_max": 0.62
+    },
+    "BrineRim": {
+      "triangles": 2780,
+      "vertices": 3813,
+      "materials": [
+        "SaltRock",
+        "SaltCrystal"
+      ],
+      "bbox_min": [
+        -1.114,
+        -0.16,
+        -1.129
+      ],
+      "bbox_max": [
+        1.125,
+        0.191,
+        1.105
+      ],
+      "colour_range": [
+        0.1608,
+        1.0
+      ],
+      "glow_mask_max": 0.6
+    }
+  },
+  "anchors": {
+    "MinePortal": {
+      "lanternHook": [
+        2.1,
+        2.4943,
+        0.664
+      ]
+    }
+  },
+  "rail": {
+    "railTopY": 0.2,
+    "gauge": 0.6,
+    "length": 2.0
+  },
+  "glow_mask": "TEXCOORD_1.x (0..1) on SaltCrystal and SaltRock; 0 elsewhere",
+  "seconds": 3.7
+}

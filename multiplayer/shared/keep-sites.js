@@ -4,6 +4,8 @@ import {movedList, movedTable} from './map-layout.js';
 // out past the old map edge. Shared by the terrain (shared/terrain.js), movement and the keep rules
 // (shared/home-bases.js). Pure data and maths. Larimar Cove (shared/larimar-cove.js) opens off each back town's yard.
 import {coveCarve} from './larimar-cove.js';
+// The Brinedeep salt mines (shared/salt-mines.js) are cut into the two open corners between the keeps.
+import {mineCarve, mineWalkable} from './salt-mines.js';
 export const HOME_SITES = Object.freeze({party: Object.freeze([-34, -34]), rivals: Object.freeze([34, 34])});
 export const KEEP_CARVE = Object.freeze({
   bowl: 20, bowlBlend: 3,          // flat to 20 m from the heart, cliffs rise over the next 3 m
@@ -17,8 +19,8 @@ export const KEEP_CARVE = Object.freeze({
 export const WORLD_EXTENT = 70;
 const smooth = t => { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); };
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-/** 1 where a keep has cut the mountains away, 0 where they stand, smooth between. */
-export function keepCarve(x, z) {
+/** 1 where a keep (or a salt mine, unless `mines` is false) has cut the mountains away, 0 where they stand. */
+export function keepCarve(x, z, mines = true) {
   let carve = 0;
   for (const [sx, sz] of Object.values(HOME_SITES)) {
     const g = Math.sign(sx), u = x * g, v = z * g; // distances toward this keep's corner
@@ -35,11 +37,13 @@ export function keepCarve(x, z) {
     const town = 1 - smooth(edge / T.blend);
     carve = Math.max(carve, bowl, pass, town);
   }
-  return Math.max(carve, coveCarve(x, z));
+  carve = Math.max(carve, coveCarve(x, z));
+  return mines && carve < 1 ? Math.max(carve, mineCarve(x, z)) : carve;
 }
-/** True on a keep's carved floor (bowl, pass or town), where walkers may go past the open meadow's edge. */
+/** True on a keep's carved floor (bowl, pass or town) or inside a salt mine's walls, where walkers may go past the
+ * open meadow's edge. */
 export function onKeepGround(x, z) {
-  return Math.abs(x) <= WORLD_EXTENT && Math.abs(z) <= WORLD_EXTENT && keepCarve(x, z) > .5;
+  return Math.abs(x) <= WORLD_EXTENT && Math.abs(z) <= WORLD_EXTENT && (keepCarve(x, z, false) > .5 || mineWalkable(x, z));
 }
 /** Clamp a ground point to the world: inside ±limit on the open map, or anywhere on a keep's carved floor. */
 export function clampToWorld(x, z, limit = 55) {

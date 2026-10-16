@@ -33,6 +33,7 @@ export const RESOURCES = [
   ['starMetal', 'Star metal', 'Rarest alloy for master inventions', 'star'],
   ['copper', 'Copper', 'Wiring, bells and warm fittings for coming inventions', 'ingot'],
   ['gold', 'Gold', 'Inlay and enchanting foci for coming inventions', 'ingot'],
+  ['salt', 'Salt', 'Sell at the Gold mill for Gold', 'salt'],
 ];
 export const ORES = [
   ['ironOre', 'Iron ore', 'iron', 'Refine at the forge into Iron'],
@@ -43,7 +44,7 @@ export const ORES = [
 ];
 const RES_NAME = Object.fromEntries([...RESOURCES.map(r => [r[0], r[1]]), ...ORES.map(o => [o[0], o[1]])]);
 const RES_ICO = Object.fromEntries([...RESOURCES.map(r => [r[0], r[3]]), ...ORES.map(o => [o[0], 'ore'])]);
-const ALIAS = { star_metal: 'starMetal', starmetal: 'starMetal', stars: 'starMetal', gems: 'crystal', iron_ore: 'ironOre', mithril_ore: 'mithrilOre', star_ore: 'starOre', copper_ore: 'copperOre', gold_ore: 'goldOre' };
+const ALIAS = { star_metal: 'starMetal', starmetal: 'starMetal', stars: 'starMetal', gems: 'crystal', iron_ore: 'ironOre', mithril_ore: 'mithrilOre', star_ore: 'starOre', copper_ore: 'copperOre', gold_ore: 'goldOre', rock_salt: 'salt' };
 const key = k => ALIAS[k] || k;
 
 const S = 'fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"';
@@ -56,6 +57,7 @@ const ICON = {
   mithril: '<path d="M6 10h12l3 7H3z"/><path d="M12 2.5l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6-2.6-.9 2.6-.9z"/>',
   crystal: '<path d="M12 2l5 6-5 14-5-14z"/><path d="M7 8h10M12 2v20" fill="none" stroke="var(--ip-ink,#1a120b)" stroke-width="1"/>',
   star: '<path d="M4 13h16l2 6H2z"/><path d="M12 2l1.6 3.4 3.7.4-2.8 2.5.8 3.6L12 10l-3.3 1.9.8-3.6L6.7 5.8l3.7-.4z"/>',
+  salt: '<path d="M12 3l6 3-6 3-6-3z"/><path d="M6 7l5.5 2.8V16L6 13.2zM18 7l-5.5 2.8V16l5.5-2.8z" opacity=".75"/><path d="M3 15.5l3.2-1.6 3.2 1.6-3.2 1.6zM3 16.2l2.9 1.5V21L3 19.5zM9.4 16.2l-2.9 1.5V21l2.9-1.5z"/><path d="M14.6 15.5l3.2-1.6 3.2 1.6-3.2 1.6zM14.6 16.2l2.9 1.5V21l-2.9-1.5zM21 16.2l-2.9 1.5V21l2.9-1.5z"/>',
   ore: '<path d="M4 17l2-7 5-4 6 1 3 6-2 5-8 1z"/><circle cx="10" cy="12" r="1.4" fill="var(--ip-ink,#1a120b)"/><circle cx="14.5" cy="14.5" r="1.1" fill="var(--ip-ink,#1a120b)"/><circle cx="13" cy="9.5" r=".9" fill="var(--ip-ink,#1a120b)"/>',
   storehouse: `<path d="M3 11l9-7 9 7v9H3z" ${S}/><path d="M9 20v-6h6v6M9 14l6 6M15 14l-6 6" ${S} stroke-width="1.2"/>`,
   axe: `<path d="M5 20L16 9" ${S} stroke-width="2"/><path d="M13 4c3 0 6 2 7 5l-4 4c-1-3-3-4-5-4z"/>`,

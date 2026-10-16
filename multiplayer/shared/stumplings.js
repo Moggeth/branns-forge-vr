@@ -160,7 +160,7 @@ export function dropStumplingLoot(state, e, ctx, events) {
 // ---- Strict save validation.
 const finite = n => typeof n === 'number' && Number.isFinite(n);
 export function validStumpling(e, saved) {
- if (!isStumpling(e)) return e.home === undefined;
+ if (!isStumpling(e)) return e.home === undefined || e.kind === 'saltback'; // Saltback crabs keep their pool as home
  const cut = (saved.harvestedTrees || []).find(h => h.id === e.treeId);
  return !!cut && cut.cuts === 3 && e.size === undefined && e.treeHeight === undefined && Number.isInteger(e.variant) && e.variant >= 0 && e.variant <= 2 &&
   Number.isSafeInteger(e.wakeTick) && e.wakeTick >= 0 && e.wakeTick <= saved.tick && saved.tick < e.wakeTick + STUMPLING.lifeTicks + STUMPLING.burrowTicks &&

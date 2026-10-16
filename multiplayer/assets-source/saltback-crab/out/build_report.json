@@ -1,0 +1,131 @@
+{
+  "rest_bounds_m": {
+    "x": [
+      -0.367,
+      0.367
+    ],
+    "y": [
+      0.0,
+      0.575
+    ],
+    "z": [
+      -0.401,
+      0.505
+    ]
+  },
+  "triangles": 8838,
+  "triangles_by_part": {
+    "body": 2024,
+    "mouth": 96,
+    "crystal": 2066,
+    "stalk": 288,
+    "eye": 1048,
+    "arm": 528,
+    "palm": 772,
+    "finger": 624,
+    "leg": 1392
+  },
+  "vertices": 6029,
+  "materials": [
+    "CrabShell",
+    "CrabBody",
+    "CrabEye"
+  ],
+  "bones": 23,
+  "clip_checks": {
+    "Idle": {
+      "min_height": -0.0,
+      "keys": 61
+    },
+    "Scuttle": {
+      "min_height": -0.0,
+      "keys": 19
+    },
+    "Pinch": {
+      "min_height": -0.0,
+      "keys": 23
+    },
+    "Hurt": {
+      "min_height": 0.0,
+      "keys": 12
+    },
+    "Death": {
+      "min_height": -0.0,
+      "keys": 37
+    },
+    "Emerge": {
+      "min_height": -0.5279,
+      "keys": 37
+    }
+  },
+  "bytes": 341964,
+  "glb": {
+    "materials": [
+      "CrabShell",
+      "CrabBody",
+      "CrabEye"
+    ],
+    "triangles": 8838,
+    "animations": {
+      "Idle": 2.0,
+      "Scuttle": 0.6,
+      "Pinch": 0.7,
+      "Hurt": 0.35,
+      "Death": 1.2,
+      "Emerge": 1.2
+    },
+    "primitives": {
+      "CrabShell": {
+        "vertices": 3764,
+        "rgb_mean": [
+          0.705,
+          0.448,
+          0.473
+        ],
+        "alpha_range": [
+          0.0,
+          1.0
+        ],
+        "alpha_mean": 0.357
+      },
+      "CrabBody": {
+        "vertices": 3038,
+        "rgb_mean": [
+          0.689,
+          0.244,
+          0.121
+        ],
+        "alpha_range": [
+          1.0,
+          1.0
+        ],
+        "alpha_mean": 1.0
+      },
+      "CrabEye": {
+        "vertices": 552,
+        "rgb_mean": [
+          0.556,
+          0.548,
+          0.524
+        ],
+        "alpha_range": [
+          1.0,
+          1.0
+        ],
+        "alpha_mean": 1.0
+      }
+    },
+    "pinch_has_hit_key": true,
+    "channels": {
+      "Idle": 23,
+      "Scuttle": 23,
+      "Pinch": 23,
+      "Hurt": 25,
+      "Death": 26,
+      "Emerge": 26
+    },
+    "anim_crosscheck_max_error": 3.5762786865234375e-07,
+    "joints": 23
+  },
+  "seconds": 6.7
+}
