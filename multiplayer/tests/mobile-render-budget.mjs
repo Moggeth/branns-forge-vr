@@ -50,3 +50,9 @@ globalThis.requestAnimationFrame=fn=>setTimeout(fn,0);
 await warmRender({renderer,scene,camera});assert.deepEqual(viewport.toArray(),[0,0,640,360]);assert.equal(mesh.layers.mask,4);assert.equal(mesh.frustumCulled,true);
 renderer.render=()=>{throw Error('draw failure')};await assert.rejects(warmRender({renderer,scene,camera}),/draw failure/);
 assert.equal(mesh.layers.mask,4,'failed preparation restores layers');assert.equal(mesh.frustumCulled,true);mesh.geometry.dispose();mesh.material.dispose();
+
+// HDR startup must prepare the same target/color variants used during play.
+const hdr={name:'actual-hdr'},priorTarget={name:'previous'},targets=[];target=priorTarget;
+renderer.render=()=>targets.push(target);renderer.domElement.width=640;renderer.domElement.height=360;
+await warmRender({renderer,scene,camera,target:hdr});
+assert.deepEqual(targets,[hdr]);assert.equal(target,priorTarget,'HDR warmup restores prior target');

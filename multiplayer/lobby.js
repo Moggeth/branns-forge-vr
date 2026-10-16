@@ -54,6 +54,7 @@ import {createQuartermasterUI} from './client/quartermaster-ui.js';
 import {insideTavern} from './shared/taverns.js';
 import './client/hero-progress.css';
 import './client/quartermaster.css';
+import './client/ui-polish.css';
 
 // ---------------------------------------------------------------- helpers
 const $ = id => document.getElementById(id);
@@ -67,6 +68,11 @@ const hudHeaderObserver = new ResizeObserver(() => {
   syncFieldHudLayout();
 });
 hudHeaderObserver.observe(hudHeader);
+// Bottom HUD lane: anything that floats above the hotbar (the dragon call) sits on top of this stack, never over it.
+const hudBottom = document.querySelector('.hud-bottom');
+function syncBottomLane(){const top=hudBottom?.getBoundingClientRect().top;if(top>0)document.documentElement.style.setProperty('--hud-bottom-clear',`${Math.ceil(innerHeight-top)}px`);}
+const hudBottomObserver = hudBottom ? new ResizeObserver(syncBottomLane) : null;
+hudBottomObserver?.observe(hudBottom); addEventListener('resize', syncBottomLane);
 function syncFieldHudLayout(){const tools=$('heroTools');if(tools)$('hud').style.setProperty('--field-tools-bottom',`${Math.ceil(tools.getBoundingClientRect().bottom)}px`);}
 const fieldToolsObserver=new ResizeObserver(syncFieldHudLayout);fieldToolsObserver.observe($('heroTools'));
 const NAME_KEY = 'branns-forge.player-name';
@@ -189,7 +195,10 @@ $('lobbyForm').addEventListener('submit', event => {
   if (!event.submitter && document.activeElement === nameInput && !roomInput.value.trim()) { $('create').focus(); return; }
   joinFromForm();
 });
-$('create').addEventListener('click', () => quickPlay());
+// The local map editor's Play button opens /?solo on the dev server: Play then starts a solo world on this
+// computer, no room service needed. Builds ignore it (import.meta.env.DEV is false there).
+const devSolo = import.meta.env?.DEV && new URLSearchParams(location.search).has('solo');
+$('create').addEventListener('click', () => devSolo ? start({create: true, solo: true}) : quickPlay());
 
 // Quick play: join the fullest open world in your region, or start one if none has room.
 // A world that turns out full or gone is skipped; after three misses we just light a new one.
@@ -395,7 +404,7 @@ async function start(attempt) {
   // The next player takes the world over by themselves, so a host leaving shows nothing unless
   // the switch is unusually slow; then a quiet note explains the pause.
   next.addEventListener('owner_lost', mine(detail => {
-    if (!detail.recoverySaved) notice('owner', 'The host left. A recovery copy could not be saved in this browser. Keep this tab open; use Menu to download a backup if available.', null, 'warn');
+    if (detail.recoveryAvailable && !detail.recoverySaved) notice('owner', 'The host left. A recovery copy could not be saved in this browser. Keep this tab open; use Menu to download a backup if available.', null, 'warn');
   }));
   next.addEventListener('continue_world_offer', mine(() => { removeNotice('waiting'); }));
   next.addEventListener('continue_offer_expired', mine(() => removeNotice('continue')));
@@ -575,7 +584,7 @@ function onSnapshot(snapshot) {
     resourceBar ??= createResourceBar(document.querySelector('.hud-bottom')||$('hud'));
     resourceBar.update(self.resources, snapshot.inventions?.stockpiles?.[self.side==='rivals'?'rivals':'party']);
     for(const b of document.querySelectorAll('[data-equip]'))b.setAttribute('aria-pressed',String(b.dataset.equip===(self.tool||'axe')));
-    const weaponText={axe:'Axe · click to chop · Q sundering strike',pick:'Stonewhisper · click to mine · hold Q to aim crystal wall',hammer:'Sunfall · click to strike · Q ground slam',crossbow:`Siegebird · click to fire · songbirds bring each bolt · golden bird ${(siegebirdGoldenChance(self.siegebird?.hits||0,!!self.talents?.crossbow?.includes('flock'))*100).toFixed(1)}%`,bow:'Emberwing · hold attack to draw, release to fire · right click then aim to curve · Q phoenix flare',limb:'Bone · click to strike · G drop · X throw',wyrmspout:`Wyrmspout · hold to spray sticky fire · Q: Gout · Tank ${Math.round((1-(self.heat||0))*100)}%${self.overheatUntil>snapshot.tick?' · Refilling':''}`,stormreel:'Stormreel · hold to charge, release to fire · + and \u2212 bolts in one foe close the circuit · G spikes it · Q reels in',flask:mobile?.enabled?'Emberdew · attack: hurl a lit bottle · Special: Cinder Cluster':'Emberdew · click to toss fuel · hold right click to light and aim · hold Q for Cinder Cluster'}[self.tool||'axe'];if($('weaponHint'))setText($('weaponHint'),weaponText);
+    const weaponText={staff:'Sunthread · hold click for a sun-thread · Q Radiant Nova',axe:'Axe · click to chop · Q sundering strike',pick:'Stonewhisper · click to mine · hold Q to aim crystal wall',hammer:'Sunfall · click to strike · Q ground slam',crossbow:`Siegebird · click to fire · songbirds bring each bolt · golden bird ${(siegebirdGoldenChance(self.siegebird?.hits||0,!!self.talents?.crossbow?.includes('flock'))*100).toFixed(1)}%`,bow:'Emberwing · hold attack to draw, release to fire · right click then aim to curve · Q phoenix flare',limb:'Bone · click to strike · G drop · X throw',wyrmspout:`Wyrmspout · hold to spray sticky fire · Q: Gout · Tank ${Math.round((1-(self.heat||0))*100)}%${self.overheatUntil>snapshot.tick?' · Refilling':''}`,stormreel:'Stormreel · hold to charge, release to fire · + and \u2212 bolts in one foe close the circuit · G spikes it · Q reels in',flask:mobile?.enabled?'Emberdew · attack: hurl a lit bottle · Special: Cinder Cluster':'Emberdew · click to toss fuel · hold right click to light and aim · hold Q for Cinder Cluster'}[self.tool||'axe'];if($('weaponHint'))setText($('weaponHint'),weaponText);
     meter('hp', self.hp, self.maxHp ?? self.hpMax ?? self.maxHealth ?? 100);
     heroProgress.update(self, {role: currentRole});
     quartermaster.update(self, {role: currentRole, tavern: insideTavern(snapshot, self.position), tick: snapshot.tick ?? 0});
@@ -960,6 +969,7 @@ const quartermaster=createQuartermasterUI({mount:body,hudSelf:document.querySele
   onBuy:item=>command('action',{action:'homeShop',buy:item}),onSell:item=>command('action',{action:'homeShop',sell:item}),onDrink:()=>command('action',{action:'drinkDraught'}),
   onOpen:()=>{shopOpen=true;closeQuickBuild();holdOverlays?.close();game?.clearControls();if(document.pointerLockElement)document.exitPointerLock?.();syncActive();},
   onClose:()=>{shopOpen=false;syncActive();}});
+if(/acceptanceProbe/.test(location.search))window.__qaUI={quartermaster,heroProgress,patchNotes:null};
 function openTalents(){if(phase!=='game'||!connected||currentRole!=='hero'||xrActive)return;heroProgress.toggle();}
 const patchNotes=createPatchNotes({entries:PATCH_NOTE_ENTRIES,mount:body,onOpen:()=>{patchNotesOpen=true;game?.clearControls();if(document.pointerLockElement)document.exitPointerLock?.();syncActive();},onClose:()=>{patchNotesOpen=false;syncActive();}});
 const isTyping = target => target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
@@ -1069,7 +1079,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) try {
 // Phones often skip beforeunload; pagehide is the last chance to tell the room we left.
 window.addEventListener('pagehide', () => { try { session?.dispose(); } catch { /* closing */ } });
 window.addEventListener('pageshow', event => { if (event.persisted && phase === 'game') location.reload(); });
-window.addEventListener('beforeunload', () => { try { directory.dispose(); roomBrowser.dispose(); battlePanel.dispose(); voice?.dispose(); voiceControls.dispose(); quietHud?.dispose(); quickBuild?.dispose();forgePanel?.dispose();spellbook?.dispose();holdOverlays?.dispose();fieldOverlays?.dispose();fieldBuildTag.dispose();fieldToolsObserver.disconnect();hudHeaderObserver.disconnect(); mobile?.dispose(); game?.dispose(); session?.dispose(); } catch { /* closing */ } });
+window.addEventListener('beforeunload', () => { try { directory.dispose(); roomBrowser.dispose(); battlePanel.dispose(); voice?.dispose(); voiceControls.dispose(); quietHud?.dispose(); quickBuild?.dispose();forgePanel?.dispose();spellbook?.dispose();holdOverlays?.dispose();fieldOverlays?.dispose();fieldBuildTag.dispose();fieldToolsObserver.disconnect();hudHeaderObserver.disconnect();hudBottomObserver?.disconnect(); mobile?.dispose(); game?.dispose(); session?.dispose(); } catch { /* closing */ } });
 
 // Read-only diagnostic evidence for browser QA; excludes reconnect credentials.
 window.brannHarness = Object.freeze({

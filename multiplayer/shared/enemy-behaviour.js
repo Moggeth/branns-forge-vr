@@ -21,7 +21,7 @@ const radius=e=>e.kind==='ent'?entSpec(e).radius:e.kind==='stumpling'?STUMPLING.
 
 // Home-base Stormspires (b.home) belong to the base, so roaming foes never march across the map for them.
 export function stepEnemies(state,{ground,resolve,damageHero,damageStructure,damageEnemy,damageBase,events}){
- const heroes=state.players.filter(p=>p.role==='hero'),defenders=(state.inventions?.defenders||[]).filter(d=>d.hp>0),buildings=(state.inventions?.structures||[]).filter(b=>b.type!=='forge'&&!b.home&&b.hp>0),targets=[...heroes,...defenders,...buildings],grid=new Map(),cell=2;
+ const heroes=state.players.filter(p=>p.role==='hero'),defenders=(state.inventions?.defenders||[]).filter(d=>d.hp>0),buildings=(state.inventions?.structures||[]).filter(b=>b.type!=='forge'&&b.type!=='stormspire'&&!b.home&&b.hp>0),targets=[...heroes,...defenders,...buildings],grid=new Map(),cell=2;
  const battleBots=state.enemies.filter(battleBot),baseTargets=battleObjectives(state),pendingHits=[];
  const originals=state.enemies.map(e=>({id:e.id,position:[...e.position],radius:radius(e),yaw:e.yaw,side:e.side}));
  for(const e of originals){const k=`${Math.floor(e.position[0]/cell)},${Math.floor(e.position[2]/cell)}`;if(!grid.has(k))grid.set(k,[]);grid.get(k).push(e);}
@@ -102,7 +102,7 @@ export function stepEnemies(state,{ground,resolve,damageHero,damageStructure,dam
    const victim=[...foes,...baseTargets.filter(b=>b.side!==e.side)].find(p=>p.id===e.attackTarget);if(!victim)continue;
    const d=flat(e.position,victim.position),dot=(-Math.sin(e.yaw)*(victim.position[0]-e.position[0])-Math.cos(e.yaw)*(victim.position[2]-e.position[2]))/Math.max(d,.001);
    if(d<((buildings.includes(victim)||baseTargets.includes(victim))?3.5:ent?ent.strike:2)&&dot>.65&&Math.abs(e.position[1]-victim.position[1])<1.8&&(e.hurtTick??-1000)<e.attackTick&&(e.flinchTick??-1000)<e.attackTick&&((buildings.includes(victim)||baseTargets.includes(victim))||!blocked(e.position,victim.position))){
-    const arms=e.missingParts.filter(p=>p.endsWith('Arm')).length;const amount=(ent?ent.damage:e.kind==='golem'?22:10)*(arms===2?.25:arms===1?.65:1);if(baseTargets.includes(victim))pendingHits.push(()=>damageBase?.(victim.id,amount,e.side));else if(battleBots.includes(victim))pendingHits.push(()=>damageEnemy?.(victim,amount,events,e.side));else if(buildings.includes(victim))damageStructure?.(victim.id,amount,events,e.side);else if(defenders.includes(victim))victim.hp=Math.max(0,victim.hp-amount);else{const start=events.length;damageHero(state,victim,amount,events);if(ent)for(let i=start;i<events.length;i++)if(events[i].kind==='hit')events[i].sourceMaterial='wood';}
+    const arms=e.missingParts.filter(p=>p.endsWith('Arm')).length;const amount=(ent?ent.damage:e.kind==='golem'?22:10)*(arms===2?.25:arms===1?.65:1);if(baseTargets.includes(victim))pendingHits.push(()=>damageBase?.(victim.id,amount,e.side));else if(battleBots.includes(victim))pendingHits.push(()=>damageEnemy?.(victim,amount,events,e.side));else if(buildings.includes(victim))damageStructure?.(victim.id,amount,events,e.side);else if(defenders.includes(victim))victim.hp=Math.max(0,victim.hp-amount);else{const start=events.length;damageHero(state,victim,amount,events,e.position);if(ent)for(let i=start;i<events.length;i++)if(events[i].kind==='hit')events[i].sourceMaterial='wood';}
    }
   }
  }

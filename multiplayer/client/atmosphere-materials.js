@@ -15,6 +15,7 @@ export const ATMOSPHERE = {
   bfSunScatter: {value: new THREE.Color(0, 0, 0)}, // haze glow toward the sun (already scaled)
   bfWet: {value: 0},
   bfSnow: {value: 0},
+  bfSparkle: {value: 1},                    // glitter on settled snow and wet ground
 };
 
 const VERTEX_PARS = /* glsl */`
@@ -51,7 +52,7 @@ const FRAGMENT_PARS = /* glsl */`
 #endif
 #ifdef BF_ATMOS
 	varying vec3 vBfWorld;
-	uniform float bfTime, bfMist, bfMistBase, bfMistHeight, bfMistNoise, bfWet, bfSnow;
+	uniform float bfTime, bfMist, bfMistBase, bfMistHeight, bfMistNoise, bfWet, bfSnow, bfSparkle;
 	uniform vec2 bfWind;
 	uniform vec3 bfSunDir, bfSunScatter;
 	float bfHash( vec2 p ) { return fract( sin( dot( p, vec2( 127.1, 311.7 ) ) ) * 43758.5453 ); }
@@ -108,6 +109,15 @@ const SURFACE = /* glsl */`
 			roughnessFactor = mix( roughnessFactor, 0.75, bfSnowAmt );
 			metalnessFactor = mix( metalnessFactor, 0.0, bfSnowAmt );
 		#endif
+		// Glitter: tiny cells on snow (and on puddles) flash as the view moves across them, ice-blue and warm.
+		if ( bfSparkle > 0.0 && bfSnowAmt + bfPuddle > 0.05 ) {
+			vec3 bfCell = floor( vBfWorld * 9.0 );
+			float bfSeed = bfHash( bfCell.xz + bfCell.y * 7.13 );
+			vec3 bfView = normalize( cameraPosition - vBfWorld );
+			float bfFacet = fract( bfSeed * 91.7 + dot( bfView, vec3( 3.1, 1.7, 2.3 ) ) * 2.0 + bfTime * 0.05 );
+			float bfGlitter = step( 0.93, bfSeed ) * smoothstep( 0.9, 1.0, bfFacet ) * smoothstep( 25.0, 4.0, distance( vBfWorld, cameraPosition ) );
+			totalEmissiveRadiance += mix( vec3( 0.7, 0.88, 1.25 ), vec3( 1.25, 1.0, 0.7 ), step( 0.97, bfSeed ) ) * bfGlitter * bfSparkle * ( bfSnowAmt + bfPuddle * 0.6 ) * 2.2;
+		}
 	}
 #endif`;
 

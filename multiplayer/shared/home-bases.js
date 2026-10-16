@@ -1,6 +1,7 @@
 import {heroMaxHp} from './hero-progress.js';
 import {restoreMill} from './home-mill.js';
 import {HOME_SITES} from './keep-sites.js';
+import {movedPlaced, movedTable} from './map-layout.js';
 // Always-on home bases (battle v2): Dawnhold (party) in the south-west corner and
 // Grumblekeep (rivals) in the north-east. Each sits under a shield dome held up by
 // three pylons, with a heart forge, barracks, fountain, two crystal spires and two
@@ -44,7 +45,8 @@ const polar = (deg, r) => P(+(Math.sin(deg * Math.PI / 180) * r).toFixed(3), +(M
 // face: the base-local point a building's front (+Z of its model) looks toward.
 const piece = (at, face) => Object.freeze({at: Object.freeze(at), face: Object.freeze(face)});
 const HEART = P(0, 0);
-export const HOME_LAYOUT = Object.freeze({
+// Every entry can be moved by the local map editor (shared/map-layout.js); both keeps mirror the move.
+export const HOME_LAYOUT = movedTable('keep', {
   barracks: P(-14, .5), fountain: P(-6.5, 6.5),
   // Two pylons flank the gate; the third guards the mouth of the pass.
   pylons: Object.freeze([P(9, 13), P(-9, 13), P(0, -16)]),
@@ -58,9 +60,9 @@ export const HOME_LAYOUT = Object.freeze({
   tavern: piece(P(-10.6, -10.6), HEART),
   mill: piece(P(10.6, -10.6), HEART),
   quartermaster: piece(P(14, .5), HEART),
-});
+}, ['bellPost']);
 // The shared tavern ("The Muddled Mug") stands off the lane south of the Forge, its front toward the centre.
-export const NEUTRAL_TAVERN = Object.freeze({at: Object.freeze([6, -28]), yaw: Math.atan2(-6, 28)});
+export const NEUTRAL_TAVERN = movedPlaced('mug', Object.freeze({at: Object.freeze([6, -28]), yaw: Math.atan2(-6, 28)}));
 
 const flat = (a, b) => Math.hypot(a[0] - b[0], a[2] - b[2]);
 const sideKey = side => side === 'rivals' ? 'rivals' : 'party';
@@ -220,7 +222,7 @@ export function stepHomeBases(state, ctx, events) {
       turret.readyTick = state.tick + spec.cooldown;
       const hero = heroes.includes(best);
       events.push({kind: 'home_turret_fire', id: turret.id, turret: turret.kind, side: base.side, targetId: best.id, from: [...turret.position], to: [...best.position], tick: state.tick});
-      if (hero) ctx.damageHero(state, best, spec.heroDamage ?? spec.damage, events);
+      if (hero) ctx.damageHero(state, best, spec.heroDamage ?? spec.damage, events, turret.position);
       else ctx.damageEnemy(best, spec.damage, events, base.side);
     }
   }
@@ -317,6 +319,25 @@ export function resolveHomeStructures(state, position, radius = .3) {
   const n = NEUTRAL_TAVERN.at;
   if (Math.abs(position[0] - n[0]) < 9 * TAVERN_SCALE && Math.abs(position[2] - n[1]) < 9 * TAVERN_SCALE) pushOut(position, neutralTavern(), TOWN_SOLIDS.neutralTavern, radius);
   return position;
+}
+
+/** The same solids as plain shapes (the Stormreel cable routes round them): circles {id, x, z, r} and boxes
+ *  {id, x, z, yaw, at: [u, v], half: [hu, hv]} whose corners are pieceWorld({x, z, yaw}, [u ± hu, v ± hv]). */
+export function homeSolids(side) {
+  const out = [], tag = `home-${sideKey(side)}`;
+  for (const [n, {at, r}] of SOLIDS.entries()) { const [x, z] = homePoint(side, at); out.push({id: `${tag}-s${n}`, x, z, r}); }
+  const [bx, bz] = homePoint(side, HOME_LAYOUT.barracks);
+  out.push({id: `${tag}-barracks`, x: bx, z: bz, yaw: barracksYaw(side), at: [0, 0], half: BARRACKS.half});
+  const [px, pz] = bellPostAt(side); out.push({id: `${tag}-bell`, x: px, z: pz, r: .3});
+  for (const name of ['tavern', 'quartermaster', 'mill']) {
+    const placed = homePiece(side, name);
+    for (const [n, sol] of TOWN_SOLIDS[name].entries()) {
+      const id = `${tag}-${name}${n}`;
+      if (sol.r !== undefined) { const [x, z] = pieceWorld(placed, sol.at); out.push({id, x, z, r: sol.r}); }
+      else out.push({id, x: placed.x, z: placed.z, yaw: placed.yaw, at: sol.at, half: sol.half});
+    }
+  }
+  return out;
 }
 
 /** Squad for one barracks wave: forgeling-style allies for Dawnhold, skeletons then golems for Grumblekeep. */

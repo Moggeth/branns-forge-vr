@@ -8,6 +8,7 @@ import * as oc from './outcrop-art.js';
 import {GEODES} from '../shared/geode-outcrop.js';
 import * as wa from './watch-arch-art.js';
 import {BEACON_HEARTH} from '../shared/watch-beacon.js';
+import {shiftPath, shiftSite, siteShift} from '../shared/map-layout.js';
 
 export const STARTING_SITES = [
   { id: 'sanctuary', name: 'Ancient Stone Sanctuary', x: -25, z: 8, radius: 7.5,
@@ -16,14 +17,14 @@ export const STARTING_SITES = [
     goal: 'Mine glowing crystal for the Forge', footprints: [] },
   { id: 'watcharch', name: 'Ruined Watch-Arch', x: -11, z: -1.5, radius: 6.5, // brought in from behind the Mug to beside the Forge 2026-10-09
     goal: 'Recover the bronze beacon', footprints: [] },
-];
+].map(site => shiftSite(site)); // the local map editor can shift a landmark (shared/map-layout.js)
 
 // Paths start just outside the forge plaza (r ~ 6) so the centre stays clear.
 export const PATHS = [
   { id: 'to-sanctuary', width: 1.6, points: [[-5, 4], [-12, 7], [-18, 7.5]] },
   { id: 'to-outcrop', width: 1.6, points: [[5, 4], [11, 1.5], [16.7, -4.2]] },
   { id: 'to-watcharch', width: 1.6, points: [[-5, -1], [-8, 2.5], [-10.5, 4.5]] },
-];
+].map(p => ({...p, points: shiftPath(p.points, siteShift(p.id.replace(/^to-/, '')))}));
 
 const TRI_CAP = 64000; // ~15k code-built, ~45k with the landmark kit; the cap guards against runaway layouts
 

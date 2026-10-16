@@ -23,7 +23,7 @@ try {
     $shipped = Join-Path "$static/assets" $relative
     if (!(Test-Path -LiteralPath $shipped) -or (Get-FileHash -LiteralPath $asset.FullName).Hash -ne (Get-FileHash -LiteralPath $shipped).Hash) { throw "Staged asset mismatch: $relative" }
   }
-  '{"version":3,"routes":[{"src":"/.*","headers":{"Permissions-Policy":"xr-spatial-tracking=(self)","X-Content-Type-Options":"nosniff","Referrer-Policy":"no-referrer"},"continue":true},{"handle":"filesystem"}]}' | Set-Content -Encoding utf8 -LiteralPath "$stage/.vercel/output/config.json"
+  '{"version":3,"routes":[{"src":"/assets/packed/.*","headers":{"Cache-Control":"public,max-age=31536000,immutable"},"continue":true},{"src":"/.*","headers":{"Permissions-Policy":"xr-spatial-tracking=(self)","X-Content-Type-Options":"nosniff","Referrer-Policy":"no-referrer"},"continue":true},{"handle":"filesystem"}]}' | Set-Content -Encoding utf8 -LiteralPath "$stage/.vercel/output/config.json"
   if ($StageOnly) { Write-Host "Verified deployment stage: $stage"; return }
   npx --yes vercel@62.1.0 deploy --prebuilt --prod --yes --scope moggeths-projects --cwd $stage
   if ($LASTEXITCODE -ne 0) { throw 'Deployment failed' }

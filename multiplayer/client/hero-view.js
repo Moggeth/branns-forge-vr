@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {cloneSkinnedAsset as clone} from './clone-skinned-asset.js';
 import {setWeaponGrip, updateWeaponPresentation} from './asset-pose.js';
 import {SIEGEBIRD_RELOAD} from './siegebird-reload.js';
+import {createHeroHurtFlash} from './hero-hurt-flash.js';
 
 // Remote Hero body (opus-player-character). Presentation only: reads snapshot
 // position/yaw/role/hp/tool/head/hands and attributed events, never writes input, physics or network state.
@@ -18,7 +19,7 @@ export const HERO_LOD_DISTANCE = 16;
 // Remote equipment. Same canonical asset-pose contract as the local XR weapon (setWeaponGrip(visual, true, tool)),
 // re-expressed in the authored WeaponGrip socket frame. Bow is a left-hand weapon locally, so it is here too.
 // 'limb' (held bone) is presented by combat-view's detached part, so the grip stays empty.
-export const HERO_WEAPONS = Object.freeze({tools: ['axe', 'pick', 'hammer', 'crossbow', 'bow', 'wyrmspout', 'flask', 'stormreel'], leftHand: ['bow'], none: ['limb'], melee: ['axe', 'pick', 'hammer', 'limb']});
+export const HERO_WEAPONS = Object.freeze({tools: ['axe', 'pick', 'hammer', 'crossbow', 'bow', 'wyrmspout', 'flask', 'stormreel', 'staff'], leftHand: ['bow'], none: ['limb'], melee: ['axe', 'pick', 'hammer', 'limb']});
 // Bounded VR body: the neck carries part of the head turn; the torso lags but never more than torsoLag behind.
 export const HERO_HEADLOOK = Object.freeze({yaw: 1.2, pitchUp: .6, pitchDown: .8, roll: .35, neckShare: .4, torsoLag: .75, torsoRate: 4, movingTorsoRate: 10});
 export const HERO_CROUCH = Object.freeze({deadband: .04, maxDrop: .45, lean: .28, rate: 10});
@@ -104,7 +105,7 @@ export function createHeroView({lodDistance = HERO_LOD_DISTANCE, resolveWeapon =
     group.userData = {hero: true, placeholder: false, variant, model, high, low, head, bones, rest, posed: false, sockets, heroMixer: mixer, heroActions: actions,
       speed: 0, last: null, hp: data.hp, lod: false, firstPerson, clock: 0, attackAt: -Infinity, embedAt: -Infinity, recoil: 0,
       legs:['L','R'].map(s=>[bones[`UpperLeg${s}`],bones[`LowerLeg${s}`],bones[`Foot${s}`]]),
-      weapons: new Map(), weapon: null, weaponTool: null, crouch: 0, torsoYaw: null};
+      weapons: new Map(), weapon: null, weaponTool: null, crouch: 0, torsoYaw: null, hurtFlash: createHeroHurtFlash([...high, low].filter(Boolean))};
     if (firstPerson) setFirstPerson(group, true);
     setLod(group, false);
     live.add(group);
@@ -141,7 +142,7 @@ export function createHeroView({lodDistance = HERO_LOD_DISTANCE, resolveWeapon =
     const want = HERO_WEAPONS.tools.includes(tool) ? tool : null;
     if (want === u.weaponTool && (u.weapon || !want)) return;
     const visual = want ? weaponFor(u, want) : null;
-    if (want && !visual && want === u.weaponTool) return;
+    if (want && !visual) return; // Keep the current authored item until the replacement is prepared.
     u.weapon?.removeFromParent(); u.weapon = null; u.weaponTool = want; u.recoil = 0;
     if (!visual) return;
     const socket = u.sockets[HERO_WEAPONS.leftHand.includes(want) ? 'L' : 'R'] || u.sockets.R;
@@ -181,6 +182,8 @@ export function createHeroView({lodDistance = HERO_LOD_DISTANCE, resolveWeapon =
     u.attackAt = u.clock;
     a.reset().setEffectiveWeight(1).fadeIn(special ? .06 : .03).play();
     if (strike) a.time = HERO_ATTACK_EVIDENCE.strikeFrame;                  // the event is post-contact: show strike + recovery, not a late wind-up
+    // The blow catches for a moment on what it hit (strike-feel.js does the same in first person): longest in wood.
+    u.attackHold = strike ? (ev.kind === 'wood_hit' ? .08 : .05) : 0;
     return special ? 'special' : 'strike';
   }
 
@@ -285,7 +288,8 @@ export function createHeroView({lodDistance = HERO_LOD_DISTANCE, resolveWeapon =
   function update(group, data, root, dt, cameraPosition) {
     const u = group.userData; u.clock += dt;
     if (cameraPosition) { const far = root.getWorldPosition(_v).distanceToSquared(cameraPosition) > lodDistance * lodDistance; if (far !== u.lod) setLod(group, far); }
-    if (data.hp !== undefined && u.hp !== undefined && data.hp < u.hp) trigger(group, 'Hit');   // derived from authoritative HP drop
+    if (data.hp !== undefined && u.hp !== undefined && data.hp < u.hp) { trigger(group, 'Hit'); u.hurtFlash.strike(); }   // derived from authoritative HP drop
+    u.hurtFlash.update(dt);
     u.hp = data.hp;
     syncWeapon(u, data);
     if (u.weapon) u.weapon.visible = !(u.lod && cameraPosition && root.getWorldPosition(_v).distanceToSquared(cameraPosition) > 4 * lodDistance * lodDistance);
@@ -314,6 +318,7 @@ export function createHeroView({lodDistance = HERO_LOD_DISTANCE, resolveWeapon =
     else { u.torsoYaw = null; u.crouch = 0; u.look = null; if (u.model.rotation.y || u.model.position.x || u.model.position.z) { u.model.rotation.y = 0; u.model.position.set(0, 0, 0); } }
     locomotion(u, u.model, dt);
     if (u.posed) { for (const [b, p, q] of u.rest) { b.position.copy(p); b.quaternion.copy(q); } u.posed = false; }
+    { const a = u.heroActions.Attack; if (a) a.timeScale = u.clock - u.attackAt < (u.attackHold || 0) ? .06 : 1; }
     u.heroMixer.update(dt);
     if (data.head) { u.model.updateMatrixWorld(true); u.posed = true;
       crouch(u);                                                                 // feet pinned, hips lowered: before the arms
@@ -327,6 +332,7 @@ export function createHeroView({lodDistance = HERO_LOD_DISTANCE, resolveWeapon =
     const u = group.userData;
     for (const visual of u.weapons.values()) disposeOwned(visual);
     u.weapons.clear(); u.weapon = null; u.weaponTool = null;
+    u.hurtFlash?.dispose();
     const m = u.heroMixer; m.stopAllAction(); m.uncacheRoot(u.model);
     group.traverse(n => n.skeleton?.dispose()); group.removeFromParent(); live.delete(group);
   }

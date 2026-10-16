@@ -1,4 +1,5 @@
 import {terrainEditScale,terrainFrameKey,terrainDirtyEdits} from '../shared/terrain.js';
+import {loadDeliveredTexture} from './texture-delivery.js';
 // Orchard environment presentation: warm golden meadow ground, worn paths, slope soil/stone,
 // hazy sky, far-only silhouette backdrop and a fixed-budget follow shadow.
 // Presentation only: never changes terrain height, collision, raycast targets or gameplay.
@@ -595,7 +596,7 @@ export function createOrchardPresentation({scene, renderer, ground, sun, hemisph
   if (textures) for (const [name, tex] of Object.entries(textures)) if (textureSlots[name]) setTex(textureSlots[name][0], tex, textureSlots[name][1]);
   if (loadTextures && !textures && typeof document !== 'undefined') {
     const loader = new THREE.TextureLoader();
-    for (const [name, [slot, srgb]] of Object.entries(textureSlots)) { pending++; loader.load(`${assetBase}${name}.png`, tex => { pending--; if (disposed) { tex.dispose(); return; } owned.push(tex); setTex(slot, tex, srgb); }, undefined, () => { pending--; console.warn(`[orchard] missing ${name}.png; flat fallback kept`); }); }
+    for (const [name, [slot, srgb]] of Object.entries(textureSlots)) { pending++; loadDeliveredTexture(loader, `${assetBase}${name}.png`, tex => { pending--; if (disposed) { tex.dispose(); return; } owned.push(tex); setTex(slot, tex, srgb); }, undefined, () => { pending--; console.warn(`[orchard] missing ${name}.png; flat fallback kept`); }); }
   }
 
   const sky = createSky(q === 'low' ? 2 : 3); scene.add(sky);

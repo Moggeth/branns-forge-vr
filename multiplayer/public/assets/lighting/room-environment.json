@@ -1,0 +1,45 @@
+{
+  "three": "0.186.1",
+  "source": "55f466192cc84298755a424c5e040345006b2ee1455589b3b54126c2ea4123f4",
+  "atmosphere": "c545672816536754632b1dc244222268b8b82cdc5a93bbf8ba40b321fba7ceea",
+  "sigma": 0.04,
+  "near": 0.1,
+  "far": 100,
+  "format": "BFEN v1; predicted half floats; gzip",
+  "variants": [
+    {
+      "size": 128,
+      "width": 384,
+      "height": 512,
+      "type": 1016,
+      "format": 1023,
+      "mapping": 306,
+      "colorSpace": "srgb-linear",
+      "minFilter": 1006,
+      "magFilter": 1006,
+      "bakeMs": 434.5,
+      "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3080 Ti (0x00002208) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "file": "room-128.bfenv.gz",
+      "bytes": 120146,
+      "pixelSha256": "3c450013ea7f5a61764aa93c6bb1671266d59bb7e6e4164337eb70f499587c21",
+      "encodedSha256": "a553d791cabcb90182b47cb19e5c354cd6763f51d4a636f394edcd8ff16ac72a"
+    },
+    {
+      "size": 256,
+      "width": 768,
+      "height": 1024,
+      "type": 1016,
+      "format": 1023,
+      "mapping": 306,
+      "colorSpace": "srgb-linear",
+      "minFilter": 1006,
+      "magFilter": 1006,
+      "bakeMs": 394.60000002384186,
+      "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3080 Ti (0x00002208) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "file": "room-256.bfenv.gz",
+      "bytes": 339214,
+      "pixelSha256": "618988bf92870cd877e6fbc89f7c4d546ae028664978c6c8d6c57fc11f207202",
+      "encodedSha256": "295d2c89a5430a7165747a6ae3294b56ce512d2e25e012482fd803658d6e6a76"
+    }
+  ]
+}

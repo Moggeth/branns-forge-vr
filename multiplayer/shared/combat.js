@@ -22,7 +22,7 @@ import {stepRemains,applyImpulse,partMass,linkRagdoll,wake,tear} from './remains
 import {beyondWorld} from './keep-sites.js';
 // Bounded deterministic combat state. Rendering supplies triangle contacts; the host
 // checks those contacts against its swept paths, reach and anatomical envelopes.
-export const TOOLS = Object.freeze(['axe','pick','hammer','crossbow','bow','limb','wyrmspout','flask','stormreel']);
+export const TOOLS = Object.freeze(['axe','pick','hammer','crossbow','bow','limb','wyrmspout','flask','stormreel','staff']);
 export const PARTS = Object.freeze(['head','torso','leftArm','rightArm','leftLeg','rightLeg']);
 export const COMBAT_LIMITS = Object.freeze({projectiles:96, embeds:192, detachedParts:96});
 const vec = (v,limit=200) => Array.isArray(v)&&v.length===3&&v.every(n=>Number.isFinite(n)&&Math.abs(n)<=limit);
@@ -38,6 +38,8 @@ const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 // within windowTicks of it, the next reload runs quick (45 ticks). VR hands that wind the crank themselves earn it
 // by latching before the bird seats the bolt (80%). A press outside the window forfeits it for this reload.
 export const SIEGEBIRD=Object.freeze({reloadTicks:60,acceptTicks:54,quickTicks:45,quickAcceptTicks:40,latch:.6,handLatch:.8,handMin:.3,windowTicks:6,damage:48,goldenMultiplier:4,goldenBase:.03,goldenPerHit:.0015,goldenMax:.15,hitCap:1e6});
+// Keep pylons, turrets and hearts take only this share from plain bolts and arrows; magic (golden bolts, spells, siege engines) and melee hit for full.
+export const KEEP_STONE=Object.freeze({plainShot:.25});
 export const siegebirdReloadTicks=quick=>quick?SIEGEBIRD.quickTicks:SIEGEBIRD.reloadTicks;
 // Judge a wind press `elapsed` ticks into a reload. window narrows for client-side prediction.
 export function siegebirdPerfect(elapsed,{quick=false,hand=false,window=SIEGEBIRD.windowTicks}={}){
@@ -250,7 +252,7 @@ export function projectileContact(state,m,ctx){
     const side=shot.side||state.players.find(p=>p.id===shot.ownerId)?.side||'party';
     if(!['arrow','bolt'].includes(shot.kind)||(rival.side||'party')===side||rival.id===shot.ownerId||Math.hypot(m.point[0]-rival.position[0],m.point[2]-rival.position[2])>1.2||m.point[1]<rival.position[1]-.3||m.point[1]>rival.position[1]+2.2)return fail('invalid_contact');
     if(tavernSafe(state,state.players.find(p=>p.id===shot.ownerId)))return fail('tavern_peace');
-    const events=[];state.projectiles.splice(state.projectiles.indexOf(shot),1);ctx.damageHero(state,rival,(shot.kind==='bolt'?40:28)*damageScale(state.players.find(p=>p.id===shot.ownerId)),events);return ok(events);
+    const events=[];state.projectiles.splice(state.projectiles.indexOf(shot),1);ctx.damageHero(state,rival,(shot.kind==='bolt'?40:28)*damageScale(state.players.find(p=>p.id===shot.ownerId)),events,shot.trail?.[0]||shot.previousPosition);return ok(events);
   }
   const home=findHomeTarget(state,m.targetId),base=home?.target||state.battle?.bases.find(b=>b.id===m.targetId);
   if(base){
@@ -259,7 +261,10 @@ export function projectileContact(state,m,ctx){
     const side=shot.side||state.players.find(p=>p.id===shot.ownerId)?.side,events=[];
     if(!side)return fail('not_joined');
     state.projectiles.splice(state.projectiles.indexOf(shot),1);
-    damageBattleBase(state,base.id,shot.kind==='bolt'?SIEGEBIRD.damage*(shot.golden?SIEGEBIRD.goldenMultiplier:1):38,side,events);
+    // Keep stonework shrugs off plain bolts and arrows (they only chip it); a golden bolt's magic bites for full.
+    const magic=shot.kind==='bolt'&&!!shot.golden,chip=!!home&&!magic,from=events.length;
+    damageBattleBase(state,base.id,(shot.kind==='bolt'?SIEGEBIRD.damage*(magic?SIEGEBIRD.goldenMultiplier:1):38)*(chip?KEEP_STONE.plainShot:1),side,events);
+    for(const e of events.slice(from))if(e.kind==='home_part_hit'||e.kind==='battle_base_hit'||e.kind==='home_shield_block'){e.at=m.point.map(v=>Math.round(v*100)/100);e.blow=chip?'chip':magic?'magic':'hit';}
     return ok(events);
   }
   const enemy=state.enemies.find(e=>e.id===m.targetId), detached=state.detachedParts.find(e=>e.id===m.targetId),shield=m.surface==='shield';

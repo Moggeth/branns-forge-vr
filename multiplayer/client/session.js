@@ -76,7 +76,7 @@ export class WorldSession extends EventTarget {
     for (const type of ['owner_lost','continue_world_offer']) on(type, ({detail}) => {
       this.simulation = null;
       const recoverySaved = this.autoSave(true);
-      this.emit(type, {...detail, recoverySaved});
+      this.emit(type, {...detail, recoverySaved, recoveryAvailable:!!this.latest});
       // Take the world over at once so nobody has to press anything. A page in the background
       // could not run it, so it passes and the room offers the next player instead.
       if (type === 'continue_world_offer' && this.autoContinue) {

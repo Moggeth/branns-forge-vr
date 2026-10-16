@@ -1,7 +1,7 @@
 # Brann's Forge VR — working agreements
 The active shipped game is multiplayer/ (Three.js, Vite, shared JavaScript simulation and WebXR). Start with docs/CLAUDE-HANDOFF-20261003.md. godot/ is the preserved native predecessor (Godot 4.7.2 + SteamVR OpenXR), not the browser runtime. service/ is its isolated Node forge/voice/bounty bridge. native/ preserves an unbuilt Unity draft; it is not the runnable project and is not on the critical path. Unity 6000.0.33f1 failed licensing on this machine. Do not retry Unity builds until that external state changes.
 
-Preserve C:/Users/mog/OneDrive/Documents/BomberWLAN unchanged. This child project is its own Git repository, with private `Moggeth/branns-forge-vr` as `origin`; follow the user's current Git/auth/publishing instructions and never push the unrelated BomberWLAN checkout. Global agreements from the task apply, including measured timings, small scoped commits, account/visibility checks before remote work, durable logging and README handoff.
+Preserve C:/Users/mog/OneDrive/Documents/BomberWLAN unchanged. This child project is its own Git repository, with `Moggeth/branns-forge-vr` as `origin`; follow the user's current Git/auth/publishing instructions and never push the unrelated BomberWLAN checkout. Global agreements from the task apply, including measured timings, small scoped commits, account/visibility checks before remote work, durable logging and README handoff.
 
 **Patch notes:** every PR that changes the browser game adds one player-facing entry file in multiplayer/patch-notes/ (see its README for format and tone; CI enforces it on pull requests).
 
@@ -39,3 +39,52 @@ WorkCodex: wrapper fails in a new non-Git directory without --skip-git-repo-chec
 Player-facing art and interaction rule (2026-10-03): Do not leave visible placeholder spheres, cubes, capsules or default primitives where a real object, creature, pickup, structure or magical entity is intended. Commission explicit Claude Opus 5.5 through the verified personal subscription for these replacements and visual/UI design. Primitives may be modelling building blocks inside finished authored assets; debug proxies belong only in developer modes. Frequent gameplay actions need direct world interactions, hotkeys or a compact quick-access tray; do not require nested menus for known build/equip/cast actions.
 
 Every player-facing failure must explain why and how to recover. Prefer authoritative structured reason/recourse and matching preview validation over generic Invalid placement or Failed messages.
+
+
+## Standing approval for fixes and releases (2026-10-15)
+
+The user authorizes routine fixes and improvements in this project to be pushed,
+merged and deployed as work is completed, without asking for approval each time.
+This approval explicitly includes the public `Moggeth/branns-forge-vr` repository
+and the existing production site `https://branns-forge-multiplayer.vercel.app`.
+Do not change repository visibility as a prerequisite. This project-specific
+approval overrides the global requirement to ask before publishing to a public
+repository for this project.
+
+Continue to verify the project-appropriate GitHub identity, preserve unrelated
+local work, create scoped commits, report commit hashes and pushed branches, and
+run appropriate checks before merging and releasing. Prefer a review PR and the
+existing CI/deployment workflow. Verify the actual live revision after release.
+The approval does not authorize unrelated projects, new publishing destinations,
+paid services, credential changes, or destructive actions.
+
+
+### Cold loading / browser cache verification (2026-10-15)
+
+Read docs/COLD-START-20261015.md before startup/performance work. Test packed assets
+against a production build; development intentionally loads original GLBs. Cache
+benchmarks must not use Playwright HTTP routes or stubUnavailableRooms, which
+disable caching. Stay on the welcome screen to avoid creating public rooms.
+Check startup.error is null as well as startup.ready; a caught preparation error
+can otherwise produce a misleading success and an expensive first draw. Preserve
+the actual HDR/direct render target and original object references during shader
+preparation; runtime userData may be circular. The handoff records exact fallback,
+variant, rotation, payload and cache checks plus measured limits.
+
+
+### Progressive startup (2026-10-15)
+
+Read docs/PROGRESSIVE-START-20261015.md alongside the cold-start handoff before loading changes. Keep initial world geometry complete; promote selected/restored/remote equipment without sending equip early. Background renderer target state must restore synchronously before awaiting. Never rebuild all scenery for one arriving decoration; prepare final and fading instanced variants before attaching. Use bounded observed-request waits in delayed-asset tests, not fixed 150 ms assumptions. Write JavaScript explicitly as UTF-8 on Windows.
+
+
+### WorkCodex review access observation (2026-10-15)
+
+The read-only progressive-loading review failed in 9 s before producing findings: Azure HTTP 401, principal lacks API/operation access. Do not repeat that review attempt unchanged; verify repaired access/configuration first. Local review and required tests remain available. See docs/PROGRESSIVE-START-20261015.md for the release evidence.
+
+### Fixed lighting and held effects (2026-10-15)
+
+Read docs/COLD-START-PICK-20261015.md before further startup/pick work. Prepare actual held readiness variants before publishing equipment and retain fixed effects across swaps; transient bones still release. Lighting is exact half-float CubeUV data with the original generator as fallback. Re-bake after fingerprint/parameter changes and verify both pixel hashes and rendered metallic/matte equality. Profile Vite routes by pathname and assert instrumentation exists. Use structured patches and separate execution/publishing commands rather than large grouped shell requests.
+
+### Lossless download packaging (2026-10-15)
+
+Read docs/LOSSLESS-DOWNLOADS-20261015.md before changing model/texture delivery. Source art stays unchanged; optimized containers must preserve scene semantics, exact geometry bytes, texture dimensions and decoded RGBA including transparent RGB. Keep build-time pixel guards and actual-browser GPU equality checks. Preserve original GLB/PNG fallbacks, self-contained model loading and all 39 initial models. Keep unhashed inventories outside immutable cache routes. JPEG-to-lossless-WebP trials grew payloads; do not repeat or substitute lossy conversions without a different approved art contract.

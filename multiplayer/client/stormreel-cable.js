@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import {trunkRadius} from '../shared/trees.js';
 
 export const CABLE = Object.freeze({points: 84, sides: 8, radius: .026, iterations: 12, gravity: 9.8, homeSeconds: .8, payOut: 40, wrapY: .8, arcStep: .2});
-const ARC_MAX = 24, WRAP_MAX = 12, RAW = CABLE.points + WRAP_MAX * (ARC_MAX + 2), CAP = RAW * 2;   // drawn: every span split once (Catmull-Rom)
+const ARC_MAX = 24, WRAP_MAX = 24, RAW = CABLE.points + WRAP_MAX * (ARC_MAX + 2), CAP = RAW * 2;   // drawn: every span split once (Catmull-Rom)
 const TAU = Math.PI * 2, wrapAngle = a => ((a % TAU) + TAU) % TAU;
 
 /** Rubber jacket: a faint moulded rib every 9 cm and a lighter pinstripe running along one side (so twist and motion read). */
@@ -62,9 +62,11 @@ export function createCableKit(ctx) {
   /** wraps: [{x, z, tree}] -> c.wraps: [{C, r, y, tin, tout, arc: Vector3[]}], the nominal path length. */
   function supports(c, a, b, wraps) {
     c.wraps.length = 0; if (!wraps?.length) return a.distanceTo(b);
-    const n = wraps.length, centres = wraps.map(w => new THREE.Vector3(w.x, (ctx.height(w.x, w.z)) + CABLE.wrapY, w.z));
+    // Trees: round the trunk above the root flare. Anything else (a building corner, a rock, the tower) is a peg the
+    // authority already set a hand's width off the surface, so the cable just bends round it low to the ground.
+    const n = wraps.length, centres = wraps.map(w => new THREE.Vector3(w.x, (ctx.height(w.x, w.z)) + (w.tree ? CABLE.wrapY : .3), w.z));
     for (let k = 0; k < n; k++) {
-      const w = wraps[k], C = centres[k], y = C.y, r = (w.tree ? trunkRadius(w.tree, CABLE.wrapY) : .3) + CABLE.radius + .012;   // above the root flare, clear of the bark ridges
+      const w = wraps[k], C = centres[k], y = C.y, r = (w.tree ? trunkRadius(w.tree, CABLE.wrapY) : .05) + CABLE.radius + .012;   // above the root flare, clear of the bark ridges
       const P = k ? centres[k - 1] : a, Nx = k < n - 1 ? centres[k + 1] : b;
       const out = v.set(C.x - P.x, 0, C.z - P.z).normalize().add(v2.set(C.x - Nx.x, 0, C.z - Nx.z).normalize());
       if (out.lengthSq() < 1e-4) out.set(-(Nx.z - P.z), 0, Nx.x - P.x); out.normalize();

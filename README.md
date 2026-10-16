@@ -1,5 +1,9 @@
 Mobile startup and adaptive rendering: [implementation, measurements and real-device limits](docs/MOBILE-RESPONSIVENESS-20261008.md).
 
+Cold opening release (2026-10-15): live code aea4f3c makes model downloads 39% smaller and avoids duplicate preparation. Hosted desktop check: 4.7 s cold, 2.3 s on reload; all 46 startup models reused from cache on reload. [Measurements, limits and recovery](docs/COLD-START-20261015.md).
+
+World recovery release (2026-10-15): live revision fb0ff46 reduces stalled-direct fallback from eight seconds to 250 ms and retries host departure immediately. [Measured checks, release evidence and handoff](docs/INSTANT-WORLD-RECOVERY-20261015.md). Routine fixes, merges and releases are authorized in AGENTS.md.
+
 Camera black-flash containment: [GPU findings and regression](docs/CAMERA-BLACK-FLASH-20261007.md).
 
 Room invitations: [QR sharing](docs/ROOM-QR.md).
@@ -1285,3 +1289,16 @@ Ability performance diagnosis and repeatable checks: [2026-10-05 pass](docs/ABIL
 Loading/crowd/host profiling and regression commands: [2026-10-05 performance pass](docs/WORLD-PERFORMANCE-20261005.md).
 
 Mobile crowd rendering and shader-transition performance (2026-10-06): see [measured results and reproduction](docs/MOBILE-PERFORMANCE-20261006.md).
+
+
+### Progressive opening (2026-10-15)
+
+See [progressive opening](docs/PROGRESSIVE-START-20261015.md) for the 39-model entry set, demand-prioritised equipment, incremental scenery fades, measured before/after timings and browser checks.
+
+
+### Faster cold opening and prepared pick (2026-10-15)
+
+See [measurements, exact lighting and first-pick verification](docs/COLD-START-PICK-20261015.md) for the complete-world loading improvement, held-effect reuse, cache fallback and reproduction commands.
+
+
+Lossless texture delivery (2026-10-15): see docs/LOSSLESS-DOWNLOADS-20261015.md for smaller first downloads, exact geometry/pixel checks, original-file fallbacks, browser acceptance, timings and release evidence.

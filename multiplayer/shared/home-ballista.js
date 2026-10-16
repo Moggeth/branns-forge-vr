@@ -166,20 +166,22 @@ function probe(state, shot, p, vols, c) {
   return null;
 }
 
+// Where a bolt came from, for the struck Hero's hurt cue: the ballista that loosed it.
+const shotFrom = shot => shot.o;
 function bodyDamage(state, shot, target, isHero, ctx, events) {
   const S = KEEP_BALLISTA[shot.style], power = shot.power || 1;
   if (shot.style === 'gnashjaw') {
-    if (isHero) ctx.damageHero(state, target, Math.round(S.hero * power), events); else ctx.damageEnemy(target, Math.round(S.damage * power), events, shot.side, shot.by);
+    if (isHero) ctx.damageHero(state, target, Math.round(S.hero * power), events, shotFrom(shot)); else ctx.damageEnemy(target, Math.round(S.damage * power), events, shot.side, shot.by);
     return;
   }
   const n = power * (isHero ? (shot.perfect ? S.perfectHero : lerp(S.hero[0], S.hero[1], shot.charge)) : (shot.perfect ? S.perfectDamage : lerp(S.damage[0], S.damage[1], shot.charge)));
-  if (isHero) ctx.damageHero(state, target, Math.round(n), events); else ctx.damageEnemy(target, Math.round(n), events, shot.side, shot.by);
+  if (isHero) ctx.damageHero(state, target, Math.round(n), events, shotFrom(shot)); else ctx.damageEnemy(target, Math.round(n), events, shot.side, shot.by);
 }
 
 function burst(state, shot, at, ctx, events) {
   const S = KEEP_BALLISTA.sunlance;
   for (const e of [...state.enemies]) if (e.hp > 0 && !(e.battleRun !== undefined && e.side === shot.side) && !shot.hits.includes(e.id) && flat(e.position, at) <= S.burst && Math.abs(e.position[1] - at[1]) < 3) ctx.damageEnemy(e, S.burstDamage, events, shot.side, shot.by);
-  for (const h of state.players) if (hostileHero(state, h, shot.side) && !shot.hits.includes(h.id) && flat(h.position, at) <= S.burst) ctx.damageHero(state, h, S.burstHero, events);
+  for (const h of state.players) if (hostileHero(state, h, shot.side) && !shot.hits.includes(h.id) && flat(h.position, at) <= S.burst) ctx.damageHero(state, h, S.burstHero, events, at);
   events.push({kind: 'keep_ballista_burst', id: shot.id, part: shot.part, side: shot.side, position: at.map(round)});
 }
 
@@ -261,7 +263,7 @@ function drag(state, part, target, metres, ctx) {
 }
 function chomp(state, part, target, ctx, events) {
   const G = KEEP_BALLISTA.gnashjaw, hero = !!part.hook.hero;
-  if (hero) ctx.damageHero(state, target, G.chompHero, events); else ctx.damageEnemy(target, G.chompDamage, events, part.side, part.operator || null);
+  if (hero) ctx.damageHero(state, target, G.chompHero, events, part.position); else ctx.damageEnemy(target, G.chompDamage, events, part.side, part.operator || null);
   events.push({kind: 'keep_ballista_chomp', part: part.id, side: part.side, target: target.id, hero, position: [...target.position].map(round)});
   release(state, part, 'chomp', events, target.position);
 }
@@ -271,7 +273,7 @@ function yank(state, part, ctx) {
   if (state.tick < (part.hook.yankAt ?? 0)) return fail('cooldown');
   part.hook.yankAt = state.tick + G.yankEvery;
   const d = drag(state, part, target, part.hook.hero ? G.yank : target.kind === 'golem' ? G.yank * .35 : G.yank, ctx);
-  if (part.hook.hero) ctx.damageHero(state, target, G.yankDamage, events); else ctx.damageEnemy(target, G.yankDamage, events, part.side, part.operator || null);
+  if (part.hook.hero) ctx.damageHero(state, target, G.yankDamage, events, part.position); else ctx.damageEnemy(target, G.yankDamage, events, part.side, part.operator || null);
   events.push({kind: 'keep_ballista_yank', part: part.id, side: part.side, target: target.id, position: [...target.position].map(round)});
   if (hooked(state, part) && d <= G.chomp) chomp(state, part, target, ctx, events);
   return ok(events);

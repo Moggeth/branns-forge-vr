@@ -14,7 +14,7 @@ export {MAX_PLAYERS} from './multiplayer-limits.js';
 import {STRUCTURES,createInventions,inventionAction,stepInventions,restoreInventions,resolveInventions,inventionFloor,damageInvention} from './inventions.js';
 import {MATERIAL_KEYS,emptyMaterials,restoreMaterials,DEPOSIT_CATALOG,depositReward} from './material-catalog.js';
 import {baseHeight,terrainHeight,moveOnTerrain,resolveTerrainBoundary,settleTerrainContents,createSunderRupture,validateTerrainRuptures,restoreTerrainEdit,hasActiveTerrain,validateWallSegment,PICK_WALL,RAISE_WALL,makeTerrainRoom,restoreTerrainBake} from './terrain.js';
-import {collapseMinedWall,stepCrystalWalls,WALL_DEPOSITS} from './weapon-specials.js';
+import {collapseMinedWall,stepCrystalWalls,WALL_DEPOSITS,RIDGE_KINDS} from './weapon-specials.js';
 import {castEarthLine,earthLineEdits} from './earth-spells.js';
 export {terrainHeight} from './terrain.js';
 import {stepEnemies} from './enemy-behaviour.js';
@@ -45,7 +45,9 @@ import {ENT,ENT_SPELLS,entTargets,createEnt,rememberAwakened,pruneAwakened,stepE
 import {hasTalent,heroMaxHp,damageScale,adoptProgress,grantXp,talentAction,validProgress,restoreProgress,restoreLedger,XP_REWARD} from './hero-progress.js';
 import {dragonAction,stepDragons,breakStreak,dismissDragon,validDragonFields} from './dragon-streak.js';
 import {WORLD_EXTENT,clampToWorld} from './keep-sites.js';
+import {resolveCoveLakes} from './larimar-cove.js';
 import {resolveBackTowns,stepWorkshops} from './home-workshop.js';
+import {resolveMapExtras} from './map-extras.js';
 export const HZ = 60;
 
 const BOUND = 55, MAX_WORLD = 64;
@@ -84,7 +86,7 @@ function spawn(state, ignored = '') {
     const theta = i * 2.3999632297, radius = 2.8 * Math.sqrt(i);
     const candidate = [clamp(origin[0] + Math.cos(theta) * radius, -BOUND, BOUND), 0, clamp(origin[1] + Math.sin(theta) * radius, -BOUND, BOUND)];
     candidate[1]=terrainHeight(state,candidate[0],candidate[2]);
-    resolveForge(candidate,forgeY);if(state.landmarks)resolveStartingWorld(candidate,(x,z)=>terrainHeight(state,x,z));resolveTrees(candidate,trees,cuts,(x,z)=>terrainHeight(state,x,z));resolveDeposits(state,candidate,.6);resolveHomeStructures(state,candidate);
+    resolveForge(candidate,forgeY);if(state.landmarks)resolveStartingWorld(candidate,(x,z)=>terrainHeight(state,x,z));resolveTrees(candidate,trees,cuts,(x,z)=>terrainHeight(state,x,z));resolveDeposits(state,candidate,.6);resolveHomeStructures(state,candidate);resolveMapExtras(candidate);
     if(candidate.some((v,k)=>k!==1&&Math.abs(v)>49.5))continue;
     const others = [...state.players.filter(p => p.role === 'hero' && p.id !== ignored), ...state.enemies];
     const hazards=state.fireCells.filter(c=>c.burning);
@@ -102,12 +104,13 @@ function damageEnemy(state, enemy, amount, events, ownerId, side) {
   return hitEnemyPart(state,enemy,'torso',amount,ownerId||side?{ownerId,side}:null,{nextId,terrainHeight},events);
 
 }
-function damageHero(state, hero, amount, events) {
+/** from: optional world position the blow came from; clients use it to point the hurt cue (client/hurt-feedback.js). */
+function damageHero(state, hero, amount, events, from) {
   if((hero.protectedUntil??0)>state.tick||hero.dragon)return; // a Hero on their dragon is out of reach
   if(tavernSafe(state,hero))return; // taverns are sanctuaries (shared/taverns.js)
   amount*=Math.max(0,1-itemBonus(hero,'armor')-aleArmor(state,hero)); // Shield-Charm and Hearty Ale
   hero.hp -= amount;
-  events.push({...event('hit', hero.position, hero.id),material:'flesh',sourceMaterial:'bone'});
+  events.push({...event('hit', hero.position, hero.id),material:'flesh',sourceMaterial:'bone',hero:true,damage:Math.round(amount*10)/10,...(Array.isArray(from)?{from:from.slice(0,3)}:{})});
   if (hero.hp <= 0) {
     if(hero.stats)hero.stats.deaths=Math.min(1e9,hero.stats.deaths+1);breakStreak(hero);
     events.push(event('death', hero.position, hero.id));
@@ -131,8 +134,8 @@ function newState({room = 'LOCAL', seed = 41, legacyBattle = false} = {}) {
 
 function instantiate(state) {
   let fireSampleProvider=null;
-  const fireContext={nextId,terrainHeight,fireSamples:e=>fireSampleProvider?.(e),damageHero:(s,p,n,events)=>{const start=events.length;damageHero(s,p,n,events);for(let i=start;i<events.length;i++)events[i].fire=true;},damageEnemy:(s,e,n,events,ownerId)=>{const start=events.length;damageEnemy(s,e,n,events,ownerId);for(let i=start;i<events.length;i++)events[i].fire=true;}};
-  const combatContext={nextId,terrainHeight,damageHero:(s,hero,n,ev)=>damageHero(s,hero,n,ev),playerVelocity:p=>p.role==='hero'?[p.velocity?.[0]||0,p.vy,p.velocity?.[2]||0]:[0,0,0],fireContact:(s,shot,hit)=>fireContact(s,shot,hit,fireContext),flareBurst:(s,point,ownerId)=>flareBurst(s,point,ownerId,fireContext),fruitStrike:(s,from,to,shot)=>fruitStrike(s,{nextId,terrainHeight},from,to,shot)};
+  const fireContext={nextId,terrainHeight,fireSamples:e=>fireSampleProvider?.(e),damageHero:(s,p,n,events,from)=>{const start=events.length;damageHero(s,p,n,events,from);for(let i=start;i<events.length;i++)events[i].fire=true;},damageEnemy:(s,e,n,events,ownerId)=>{const start=events.length;damageEnemy(s,e,n,events,ownerId);for(let i=start;i<events.length;i++)events[i].fire=true;}};
+  const combatContext={nextId,terrainHeight,damageHero:(s,hero,n,ev,from)=>damageHero(s,hero,n,ev,from),playerVelocity:p=>p.role==='hero'?[p.velocity?.[0]||0,p.vy,p.velocity?.[2]||0]:[0,0,0],fireContact:(s,shot,hit)=>fireContact(s,shot,hit,fireContext),flareBurst:(s,point,ownerId)=>flareBurst(s,point,ownerId,fireContext),fruitStrike:(s,from,to,shot)=>fruitStrike(s,{nextId,terrainHeight},from,to,shot)};
   const dragonContext={...combatContext,hitEnemyPart,ignite:(s,at,radius)=>{addFuel(s,at,radius,.35,true);applyHeat(s,at,radius,1,fireContext);}};
   const inventionContext={nextId,terrainHeight,createEnemy,damageEnemy,hitEnemyPart,chopTree,fruitSlice:(s,from,to,opts)=>fruitSlice(s,{nextId,terrainHeight},from,to,opts)};
   const player = id => state.players.find(p => p.id === id);
@@ -324,7 +327,7 @@ function instantiate(state) {
         if (supplied) {
           // Home-base PvP: heroes on opposite sides can strike each other; respawn is at their own heart forge.
           const rival=homeBattle(state)&&state.players.find(h=>h.id===message.targetId&&h.id!==p.id&&h.role==='hero'&&(h.side||'party')!==(p.side||'party'));
-          if(rival){if(tavernSafe(state,p))return fail('tavern_peace');if(inReach(rival)<Infinity){const wasAlive=rival.hp>0;damageHero(state,rival,(PVP_DAMAGE[requestedTool]||20)*damageScale(p),events);if(wasAlive&&events.some(e=>e.kind==='death'&&e.id===rival.id)&&p.stats)p.stats.kills=Math.min(1e9,p.stats.kills+1);}return ok(events);}
+          if(rival){if(tavernSafe(state,p))return fail('tavern_peace');if(inReach(rival)<Infinity){const wasAlive=rival.hp>0;damageHero(state,rival,(PVP_DAMAGE[requestedTool]||20)*damageScale(p),events,p.position);if(wasAlive&&events.some(e=>e.kind==='death'&&e.id===rival.id)&&p.stats)p.stats.kills=Math.min(1e9,p.stats.kills+1);}return ok(events);}
           if(state.battle.bases.some(b=>b.id===message.targetId)||findHomeTarget(state,message.targetId))return attackBattleBase(state,p,message.targetId,combatContext,{cooldown:false});
           const building=state.inventions.structures.find(b=>b.id===message.targetId);
           if(building){if(inReach(building)<Infinity&&Math.hypot(message.point[0]-building.position[0],message.point[2]-building.position[2])<4)damageInvention(state,building.id,requestedTool==='hammer'?55:25,p.id,events);return ok(events);}
@@ -429,7 +432,7 @@ function instantiate(state) {
           resolveTerrainBoundary(p.position);
         }
         p.vy -= 15 / HZ; p.position[1] += p.vy / HZ;
-        if(p.role==='hero'){resolveForge(p.position,forgeY);resolveInventions(state,p.position);if(state.landmarks)resolveStartingWorld(p.position,(x,z)=>terrainHeight(state,x,z));resolveTrees(p.position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z));resolveDeposits(state,p.position,.28,(x,z)=>terrainHeight(state,x,z));resolveHomeDomes(state,p.position,p.side||'party');resolveHomeStructures(state,p.position);resolveBackTowns(state,p.position);resolveTerrainBoundary(p.position);}
+        if(p.role==='hero'){resolveForge(p.position,forgeY);resolveInventions(state,p.position);if(state.landmarks)resolveStartingWorld(p.position,(x,z)=>terrainHeight(state,x,z));resolveTrees(p.position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z));resolveDeposits(state,p.position,.28,(x,z)=>terrainHeight(state,x,z));resolveHomeDomes(state,p.position,p.side||'party');resolveHomeStructures(state,p.position);resolveBackTowns(state,p.position);resolveCoveLakes(p.position);resolveMapExtras(p.position);resolveTerrainBoundary(p.position);}
         const floor = p.role==='hero'?inventionFloor(state,p.position[0],p.position[2],forgeFloor(p.position[0],p.position[2],forgeY,terrainHeight(state,p.position[0],p.position[2])),p.position[1]):terrainHeight(state,p.position[0],p.position[2]);
         if (p.position[1] <= floor) { p.position[1] = floor; p.vy = 0; }
         let vx=(p.position[0]-previousPosition[0])*HZ,vz=(p.position[2]-previousPosition[2])*HZ;
@@ -445,7 +448,7 @@ function instantiate(state) {
         state.pendingStarfalls.splice(state.pendingStarfalls.indexOf(pending), 1);
         const at = [pending.x, terrainHeight(state, pending.x, pending.z), pending.z];
         for (const e of [...state.enemies]) if (enemyHostileTo(e,pending.side) && distance(at, e.position) <= 6) damageEnemy(state, e, 90, events);
-        for (const p of state.players) if (p.role === 'hero' && (!battleSkirmish(state)||(p.side||'party')!==(pending.side||'party')) && distance(at, p.position) <= 5) damageHero(state, p, 18, events);
+        for (const p of state.players) if (p.role === 'hero' && (!battleSkirmish(state)||(p.side||'party')!==(pending.side||'party')) && distance(at, p.position) <= 5) damageHero(state, p, 18, events, at);
         for(const base of state.battle.bases)if(distance(base.position,at)<=5)damageBattleBase(state,base.id,90,pending.side||'party',events);
         for(const b of state.inventions.structures)if(distance(b.position,at)<=5)damageInvention(state,b.id,90,null,events,pending.side||'party');
         state.edits.push({id: pending.id, kind: 'starfall', x: pending.x, z: pending.z, radius: 5, height: -1});
@@ -460,7 +463,7 @@ function instantiate(state) {
       stepBattle(state,{createEnemy,terrainHeight,nextId,damageHero,damageEnemy:(enemy,n,ev,side,ownerId)=>hitEnemyPart(state,enemy,'torso',n,ownerId?{side,ownerId}:{side},{nextId,terrainHeight},ev)},events);
       stepEnemies(state,{
         ground:(x,z)=>inventionFloor(state,x,z,forgeFloor(x,z,forgeY,terrainHeight(state,x,z))),
-        resolve:(position,radius=.28,height=1.65)=>{resolveForge(position,forgeY,radius,height);resolveInventions(state,position,radius,height);if(state.landmarks)resolveStartingWorld(position,(x,z)=>terrainHeight(state,x,z),radius,height);resolveTrees(position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z),radius,height);resolveDeposits(state,position,radius,(x,z)=>terrainHeight(state,x,z));resolveHomeStructures(state,position,radius);resolveBackTowns(state,position,radius);resolveTerrainBoundary(position,radius);return position;},
+        resolve:(position,radius=.28,height=1.65)=>{resolveForge(position,forgeY,radius,height);resolveInventions(state,position,radius,height);if(state.landmarks)resolveStartingWorld(position,(x,z)=>terrainHeight(state,x,z),radius,height);resolveTrees(position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z),radius,height);resolveDeposits(state,position,radius,(x,z)=>terrainHeight(state,x,z));resolveHomeStructures(state,position,radius);resolveBackTowns(state,position,radius);resolveCoveLakes(position,radius);resolveMapExtras(position,radius);resolveTerrainBoundary(position,radius);return position;},
         damageHero,damageEnemy:(enemy,n,ev,side,ownerId)=>hitEnemyPart(state,enemy,'torso',n,ownerId?{side,ownerId}:{side},{nextId,terrainHeight},ev),damageBase:(id,n,side)=>damageBattleBase(state,id,n,side,events),damageStructure:(id,n,ev,side)=>damageInvention(state,id,n,null,ev,side),events
       });
       for(const e of state.enemies)if(e.hp>0&&e.battleRun!==undefined)resolveHomeDomes(state,e.position,e.side,.4);
@@ -478,7 +481,7 @@ function instantiate(state) {
       stepTrees(state,treeContext,treeIndex,events);
       stepSettlement(state,{nextId,terrainHeight,damageEnemy,collapseMinedWall,
         ground:(x,z)=>inventionFloor(state,x,z,forgeFloor(x,z,forgeY,terrainHeight(state,x,z))),
-        resolve:(position,radius=.24,height=1.65)=>{resolveForge(position,forgeY,radius,height);resolveInventions(state,position,radius,height);if(state.landmarks)resolveStartingWorld(position,(x,z)=>terrainHeight(state,x,z),radius,height);resolveTrees(position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z),radius,height);resolveDeposits(state,position,radius,(x,z)=>terrainHeight(state,x,z));resolveTerrainBoundary(position,radius);return position;}
+        resolve:(position,radius=.24,height=1.65)=>{resolveForge(position,forgeY,radius,height);resolveInventions(state,position,radius,height);if(state.landmarks)resolveStartingWorld(position,(x,z)=>terrainHeight(state,x,z),radius,height);resolveTrees(position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z),radius,height);resolveDeposits(state,position,radius,(x,z)=>terrainHeight(state,x,z));resolveCoveLakes(position,radius);resolveTerrainBoundary(position,radius);return position;}
       },events,adventureEvents);
       stepInventions(state,inventionContext,events);stepHeartstones(state);
       const expedition = stepAdventure(state.adventure, state, adventureEvents.concat(events)); adventureEvents.length = 0;
@@ -582,7 +585,7 @@ export function loadSimulation(saved) {
   const linkedWalls=new Set();
   for(const d of deposits) {
     if(d.special!==undefined&&!['axe_sunder',...WALL_DEPOSITS].includes(d.special))throw Error('Invalid special deposit');
-    if(d.special!==undefined&&d.kind!=='stone')throw Error('Invalid special material');
+    if(d.special!==undefined&&d.kind!=='stone'&&!(d.special==='pick_wall'&&RIDGE_KINDS.includes(d.kind)))throw Error('Invalid special material');
     if(WALL_DEPOSITS.includes(d.special)) {
       const edit=saved.edits.find(e=>e.id===d.editId);
       if(!validId(d.editId)||linkedWalls.has(d.editId)||(d.depleted?!!edit&&!(edit.wall&&edit.wall.expireTick<=saved.tick):!edit)||edit&&(edit.kind!==d.special||edit.x!==d.x||edit.z!==d.z)||d.special==='wall'&&edit&&!edit.wall)throw Error('Invalid wall linkage');

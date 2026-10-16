@@ -84,7 +84,7 @@ jobs:
           cp dist/index.html dist/manifest.webmanifest "$static/"
           cp -R dist/assets "$static/assets"
           diff -r dist/assets "$static/assets"
-          echo '{"version":3,"routes":[{"src":"/.*","headers":{"Permissions-Policy":"xr-spatial-tracking=(self)","X-Content-Type-Options":"nosniff","Referrer-Policy":"no-referrer"},"continue":true},{"handle":"filesystem"}]}' > "$stage/.vercel/output/config.json"
+          echo '{"version":3,"routes":[{"src":"/assets/packed/.*","headers":{"Cache-Control":"public,max-age=31536000,immutable"},"continue":true},{"src":"/.*","headers":{"Permissions-Policy":"xr-spatial-tracking=(self)","X-Content-Type-Options":"nosniff","Referrer-Policy":"no-referrer"},"continue":true},{"handle":"filesystem"}]}' > "$stage/.vercel/output/config.json"
           echo "STAGE=$stage" >> "$GITHUB_ENV"
       - name: Deploy to production
         if: steps.gate.outputs.go == 'true'

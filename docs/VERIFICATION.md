@@ -1,5 +1,9 @@
 # Verification and recovery evidence — 2026-09-12
 
+2026-10-15: [Cold opening](COLD-START-20261015.md) records byte-exact model packing, render-target preparation, browser fallback/rotation acceptance, measured bounds and failed-strategy lessons.
+
+2026-10-15: [Faster world recovery](INSTANT-WORLD-RECOVERY-20261015.md) records delays, fixes, measured browser acceptance, and verified worktree/browser-cache recovery paths.
+
 ## Mutable enemy surface geometry — 2026-10-02
 
 Mesh resource identity does not imply immutable triangles. Cached enemy contact
@@ -2339,3 +2343,16 @@ A queued RAF can predate async warm-up completion. Clamp frame dt on both sides 
 ### Mobile startup and sustained rendering (2026-10-08)
 
 See [mobile evidence and reproduction](MOBILE-RESPONSIVENESS-20261008.md). Prepare actual HDR target variants before the first draw; offscreen warm-up can compile the wrong variants. Yield between mining partitions and final texture uploads. Early orientation UI must not await an OS promise. Test rotation during warm-up, not only after readiness. Run frame benchmarks without concurrent builds/tests. A 32-player/32-bot emulated crowd remains CPU-bound; lowering image resolution cannot establish iPhone 12 60 FPS.
+
+
+### Progressive startup verification (2026-10-15)
+
+See [progressive startup verification](PROGRESSIVE-START-20261015.md) for the 39-model entry set, demand-prioritised equipment, incremental scenery fades, measured before/after timings and browser checks.
+
+
+### Faster cold opening and prepared pick (2026-10-15)
+
+See [measurements, exact lighting and first-pick verification](COLD-START-PICK-20261015.md) for the complete-world loading improvement, held-effect reuse, cache fallback and reproduction commands.
+
+
+Lossless texture delivery (2026-10-15): see docs/LOSSLESS-DOWNLOADS-20261015.md for smaller first downloads, exact geometry/pixel checks, original-file fallbacks, browser acceptance, timings and release evidence.

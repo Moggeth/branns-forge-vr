@@ -8,19 +8,21 @@ export const afterPaint = () => new Promise(resolve => {
 
 export function createAssetQueue({concurrency = 2, yieldTask = yieldToBrowser} = {}) {
   const pending = []; let running = 0, enabled = false, completed = 0;
-  let background = false;
+  let background = false, backgroundConcurrency = 1;
   async function pump() {
     while (enabled && running < concurrency) {
-      const index = pending.findIndex(job => background || job.essential);
+      let index = pending.findIndex(job => job.essential);
+      if(index<0 && background && pending.length && running<backgroundConcurrency)index=0;
       if (index < 0) return;
       const job = pending.splice(index, 1)[0]; running++;
       void (async () => { try { await yieldTask(); job.resolve(await job.run()); } catch (e) { job.reject(e); } finally { running--; completed++; pump(); } })();
     }
   }
   return {
-    add(run, essential = true) { return new Promise((resolve,reject) => { pending.push({run,essential,resolve,reject}); pump(); }); },
+    add(run, essential = true, key = null) { return new Promise((resolve,reject) => { pending.push({run,essential,key,resolve,reject}); pump(); }); },
+    prioritize(key) { const job=pending.find(job=>job.key===key);if(job){job.essential=true;pending.splice(pending.indexOf(job),1);pending.unshift(job);pump();} },
     start() { enabled = true; pump(); },
-    background() { background = true; pump(); },
+    background({concurrency:limit=1}={}) { background = true; backgroundConcurrency=Math.max(1,Math.min(concurrency,limit));pump(); },
     stats: () => ({pending: pending.length, running, completed, background}),
   };
 }
