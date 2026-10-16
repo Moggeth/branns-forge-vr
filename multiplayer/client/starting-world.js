@@ -225,16 +225,7 @@ export function createStartingWorld({ THREE, scene, height }) {
       P('stone', 'rock', ax + Math.cos(a) * d, az + Math.sin(a) * d, 0.1, [0.6 + r() * 0.5, 0.4, 0.6], [0, r() * 6, 0]); K({mat: 'kStone', geo: 'k:Rubble_' + 'ABC'[i % 3], y: 0.05, s: [2.2, 1.8, 2.2]}); }
   }
 
-  // Path stepping stones: bounded count, flattened rocks.
-  const pathStones = [];
-  { const r = rng(404);
-    for (const p of PATHS) for (let i = 0; i + 1 < p.points.length; i++) {
-      const [x0, z0] = p.points[i], [x1, z1] = p.points[i + 1], len = Math.hypot(x1 - x0, z1 - z0), n = Math.min(12, Math.floor(len / 1.3));
-      for (let k = 0; k < n; k++) { const t = (k + 0.5) / n;
-        pathStones.push({ x: x0 + (x1 - x0) * t + (r() - 0.5) * p.width * 0.5, z: z0 + (z1 - z0) * t + (r() - 0.5) * p.width * 0.5,
-          s: 0.45 + r() * 0.3, ry: r() * 6 }); }
-    } }
-  for (const s of pathStones) P('path', 'rock', s.x, s.z, 0.02, [s.s, 0.08, s.s * 0.85], [0, s.ry, 0]);
+  // The footpaths out to the landmarks are laid flagstones now (client/road-paving.js), not loose stepping rocks.
 
   const group = new THREE.Group(); group.name = 'StartingWorld';
   const meshes = {}; let tris = 0, dropped = 0, builds = 0, refits = 0;

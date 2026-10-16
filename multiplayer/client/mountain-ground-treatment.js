@@ -21,6 +21,9 @@ const GROUND_GLSL = /* glsl */`
   vec3 mFootCol = mix(mMoss, mScree, smoothstep(0.3, 0.75, orchardNoise(oXZ * 1.2 + 3.0) + mSteep * 0.4));
   oAlbedo = mix(oAlbedo, mFootCol, mFoot * (1.0 - mBare) * 0.85);
   oAlbedo = mix(oAlbedo, mix(mScree, mRock, max(mSteep, smoothstep(6.0, 10.0, vOrchardWorld.y))), mBare);
+  // Past the keep corners' crest (keep-corner-ground.js rolls the ground down behind the ridge) nobody walks: dress it
+  // as the massif's back slope (rock, moss, conifer belt, snow) instead of a flat scree plain seen from the God view.
+  oAlbedo = mix(oAlbedo, mRock, smoothstep(70.5, 73.0, mS + mJit));
 }
 `;
 
@@ -35,7 +38,7 @@ export function applyMountainGroundTreatment(material) {
     shader.fragmentShader = f.replace('#include <common>', '#include <common>\n' + MOUNTAIN_ROCK_GLSL)
       .replace(MOUNTAIN_GROUND_ANCHOR, GROUND_GLSL + MOUNTAIN_GROUND_ANCHOR);
   };
-  material.customProgramCacheKey = () => `${previousKey ? previousKey() : ''}|mountain-ground-v2`;
+  material.customProgramCacheKey = () => `${previousKey ? previousKey() : ''}|mountain-ground-v3`;
   material.userData.mountainTreatment = {patched: null};
   material.needsUpdate = true;
   return material;

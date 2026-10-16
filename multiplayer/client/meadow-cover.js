@@ -11,6 +11,9 @@ import {ORCHARD_LAYOUT, valueNoise, hash2, dryness, disturbanceAt} from './orcha
 import {STARTING_SITES, STARTING_PATHS} from '../shared/starting-world.js';
 import {STRUCTURES} from '../shared/inventions.js';
 import {FOUNDATION_HALF} from '../shared/terrain.js';
+import {HOME_LAYOUT, HOME_SCALE, TAVERN_SCALE, homePiece, homePoint, neutralTavern, pieceLocal} from '../shared/home-bases.js';
+import {backTownPiece} from '../shared/keep-sites.js';
+import {pavingClearance} from './road-paving.js';
 
 export const MEADOW_VERSION = 1;
 export const MEADOW_QUALITY = Object.freeze({
@@ -30,6 +33,30 @@ export function meadowWear(x, z, layout = ORCHARD_LAYOUT) {
   for (const [cx, cz, r, w] of layout.clearings) wear = Math.max(wear, w * smooth(r * 1.45, r * .55, Math.hypot(wx - cx, wz - cz)));
   for (const [ax, az, bx, bz, hw, w] of layout.paths) wear = Math.max(wear, w * smooth(hw * 1.9, hw * .45, segDist(wx, wz, ax, az, bx, bz)));
   return Math.min(1, wear);
+}
+// Floors grass never grows through (2026-10-17: tufts stood on the tavern boards and the keep plinths): each building's
+// whole footprint in its own frame, plus the heart and fountain plinths. Boxes {placed, at, half} or circles {x, z, r}.
+const FLOORS = (() => {
+  const out = [], T = TAVERN_SCALE ?? 1, box = (placed, at, half) => out.push({placed, at, half});
+  for (const side of ['party', 'rivals']) {
+    box(homePiece(side, 'tavern'), [0, -.1], [4.4 * T, 3.3 * T]);
+    box(homePiece(side, 'quartermaster'), [0, 0], [2.7, 1.95]);
+    const mill = homePiece(side, 'mill'); out.push({x: mill.x, z: mill.z, r: 2.9});
+    for (const [name, at, half] of [['workshop', [0, -.1], [3.1, 2.5]], ['stores', [0, .2], [2.7, 2.05]], ['cottage', [0, 0], [2.35, 2.1]], ['cottage2', [0, 0], [2.35, 2.1]]]) box(backTownPiece(side, name), at, half);
+    const [hx, hz] = homePoint(side, [0, 0]), [fx, fz] = homePoint(side, HOME_LAYOUT.fountain);
+    // the heart stands on a stone plaza disc (client/home-base-art.js, r 9.5); the fountain sits on its own plinth
+    out.push({x: hx, z: hz, r: 9.4}, {x: fx, z: fz, r: 2.1 * HOME_SCALE});
+  }
+  box(neutralTavern(), [0, -.1], [5.9 * T, 4.3 * T]);
+  return out;
+})();
+export function onFloor(x, z) {
+  for (const f of FLOORS) {
+    if (f.r !== undefined) { if (Math.hypot(x - f.x, z - f.z) < f.r) return true; continue; }
+    const [u, v] = pieceLocal(f.placed, [x, z]);
+    if (Math.abs(u - f.at[0]) < f.half[0] && Math.abs(v - f.at[1]) < f.half[1]) return true;
+  }
+  return false;
 }
 const landmarkBoxes = STARTING_SITES.flatMap(s => s.footprints.map(b => ({...b, c: Math.cos(b.rotY), s: Math.sin(b.rotY)})));
 // Distance outside the nearest landmark path ribbon (negative inside) and whether a footprint covers the point.
@@ -60,6 +87,7 @@ export function bakeCellStatic(ci, cj, cfg, landmarks) {
     if (Math.max(Math.abs(x), Math.abs(z)) > EXTENT - (valueNoise(x * .37 + 5, z * .37) - .5) * 1.6 - .8) continue; // thin out into the mountain-foot moss band
     if (Math.hypot(x, z) < 4.4) continue; // forge plaza stays bare
     const wear = meadowWear(x, z); if (wear > .6) continue; // bare foot-worn earth
+    if (pavingClearance(x, z, .5) < .12 || onFloor(x, z)) continue; // never through the flagstones or a building's floor
     const lm = landmarks ? landmarkClearance(x, z) : {path: Infinity, inside: false};
     if (lm.inside || lm.path < .15) continue;
     const trodden = Math.max(smooth(.12, .5, wear), lm.path < 1 ? 1 - lm.path : 0);

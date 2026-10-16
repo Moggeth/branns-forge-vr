@@ -27,6 +27,44 @@ export function prepareHomeKit(gltf) {
   return {nodes, mats};
 }
 
+// Forge-mouth fire, sized to the kit's mouth panel (1.05 x .62 m). Linear output, kept under the bloom threshold except the hottest tips.
+const HEARTH_FRAG = `
+uniform float uTime; varying vec2 vUv;
+float h21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float vn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f);
+  return mix(mix(h21(i), h21(i + vec2(1, 0)), f.x), mix(h21(i + vec2(0, 1)), h21(i + vec2(1, 1)), f.x), f.y); }
+float fbm(vec2 p) { float a = .5, s = 0.; for (int i = 0; i < 4; i++) { s += a * vn(p); p = p * 2.03 + 7.1; a *= .5; } return s; }
+void main() {
+  vec2 uv = vUv; float t = uTime;
+  // coal bed: lumpy cells along the floor, each breathing on its own beat
+  vec2 cg = vec2(uv.x * 9., uv.y * 5.); vec2 ci = floor(cg), cf = fract(cg) - .5;
+  float lump = smoothstep(.5, .15, length(cf * vec2(1., 1.3))), beat = .55 + .45 * sin(t * (1.3 + h21(ci) * 1.7) + h21(ci + 3.) * 6.28);
+  float bed = smoothstep(.34, .1, uv.y + (vn(vec2(uv.x * 7., 1.)) - .5) * .08);
+  float coal = bed * mix(.25, 1., lump * beat);
+  // tongues: noise rising faster than it drifts, pinched towards the top and the sides
+  float n = fbm(vec2(uv.x * 4.2, uv.y * 2.6 - t * 1.9)) + .35 * fbm(vec2(uv.x * 9. + t * .3, uv.y * 5. - t * 3.1));
+  float spread = 1. - pow(abs(uv.x - .5) * 2., 2.2) * .55;
+  float heat = clamp((1. - uv.y * 1.35) * spread * 1.2 + (n - .66) * 1.4, 0., 1.);
+  float flame = smoothstep(.3, .85, heat);
+  vec3 soot = vec3(.035, .012, .006) * (1. - .6 * uv.y);
+  vec3 fire = mix(vec3(.32, .035, .005), vec3(.85, .2, .02), smoothstep(.0, .55, flame));
+  fire = mix(fire, vec3(1.25, .62, .16), smoothstep(.7, 1., flame));
+  vec3 coals = mix(vec3(.12, .015, .004), vec3(.95, .26, .04), coal);
+  vec3 col = mix(soot, coals, bed * .92);
+  col = mix(col, fire, flame);
+  // the arch throws a soft shadow round the opening
+  float edge = smoothstep(0., .07, uv.x) * smoothstep(1., .93, uv.x) * smoothstep(1., .86, uv.y);
+  gl_FragColor = vec4(col * mix(.45, 1., edge), 1.);
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+}`;
+function hearthFire() {
+  const material = new THREE.ShaderMaterial({uniforms: {uTime: {value: 0}}, fragmentShader: HEARTH_FRAG,
+    vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }'});
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1.05, .62), material); mesh.name = 'hearth-fire';
+  return {mesh, uniforms: material.uniforms, dispose() { mesh.geometry.dispose(); material.dispose(); }};
+}
+
 function mergeMeshes(meshes, into) {
   // Bake world-placed kit meshes (sharing materials) into one indexed geometry per material.
   const byMat = new Map();
@@ -82,6 +120,10 @@ export function buildKitBase(kit, data, ctx) {
   const core = clone('HeartCrystal'), ringA = clone('HeartRingA'), ringB = clone('HeartRingB'); heart.add(core, ringA, ringB);
   tag(heartPivot, data.id);
   const light = new THREE.PointLight(ctx.glowColor, 6, 16, 2); heart.add(light);
+  // Dawnhold's forge mouth: a living fire (licking tongues over a bed of breathing coals, soot round the edges)
+  // drawn over the kit's flat ember panel. One quad, no light; Grumblekeep's cauldron keeps its ooze.
+  const hearth = side === 'rivals' ? null : hearthFire();
+  if (hearth) { heartPivot.add(hearth.mesh); hearth.mesh.position.set(0, 1.48, .49); }
 
   const barracks = place(clone('Barracks'), HOME_LAYOUT.barracks, barracksYaw(side) - yaw0, staticRoot);
   const bellPivot = new THREE.Group(); bellPivot.position.copy(worldAt(HOME_LAYOUT.barracks));
@@ -130,5 +172,5 @@ export function buildKitBase(kit, data, ctx) {
   // The heart's plinth stays hittable through a hidden proxy (the merged mesh is shared decor).
   const proxy = new THREE.Mesh(new THREE.CylinderGeometry(3.3, 3.3, 5.5, 8), new THREE.MeshBasicMaterial({visible: false}));
   place(proxy, [0, 0]); proxy.position.y += 2.75 * K; proxy.userData.targetId = data.id;
-  return {group, heart: {group: heartPivot, heart, core, rings: [ringA, ringB], light, heartY: coreAt.y, kit: true, proxy}, fountain, parts, bell, water, baked: merged, draws: merged.length};
+  return {group, heart: {group: heartPivot, heart, core, rings: [ringA, ringB], light, heartY: coreAt.y, kit: true, proxy, hearth}, fountain, parts, bell, water, baked: merged, draws: merged.length};
 }

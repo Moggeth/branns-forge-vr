@@ -102,9 +102,25 @@ const PROPS = {
   },
   sacks: () => merge([part(SPH, 0xd8c08e, [0, .25, 0], [.26, .28, .22]), part(SPH, 0xcdb27c, [.38, .22, .08], [.24, .24, .2]), part(SPH, 0xe0caa0, [.18, .5, .02], [.22, .2, .19]), ...[[0, .5, 0], [.38, .44, .08]].map(p => part(CYL_LO, 0x8a6a3e, p, [.07, .06, .07]))]),
 };
-const LANTERN_POST = () => merge([part(CYL_LO, WOOD_D, [0, 1.15, 0], [.07, 2.3, .07]), part(BOX, WOOD_D, [0, .06, 0], [.34, .12, .34]), part(BOX, WOOD_D, [0, 2.28, .25], [.06, .06, .62]),
-  part(CYL_LO, IRON, [0, 2.2, .52], [.015, .1, .015]), part(CONE, IRON, [0, 2.15, .52], [.15, .1, .15]), part(CYL_LO, IRON, [0, 1.84, .52], [.13, .03, .13])]);
-const LANTERN_GLASS = () => merge([part(CYL_LO, 0xffffff, [0, 1.97, .52], [.1, .22, .1])]);
+// Road lantern (2026-10-17 uplift): a dressed stone footing, a tapered octagonal post banded in iron, a braced arm
+// with a scroll, and a square iron lantern with a pyramid cap, corner rods and a drip tray round the glowing pane.
+const STONE = 0xa29a8c, STONE_D = 0x857d70;
+const OCT = new THREE.CylinderGeometry(1, 1, 1, 8), POST = new THREE.CylinderGeometry(.82, 1, 1, 8), SQ = new THREE.CylinderGeometry(1, 1, 1, 4),
+  PYR = new THREE.ConeGeometry(1, 1, 4), SCROLL = new THREE.TorusGeometry(1, .16, 4, 10, Math.PI * 1.3);
+const LANTERN_POST = () => {
+  const P = [part(OCT, STONE_D, [0, .07, 0], [.27, .14, .27]), part(OCT, STONE, [0, .2, 0], [.2, .14, .2]), part(OCT, STONE_D, [0, .285, 0], [.15, .04, .15]),
+    part(POST, WOOD_D, [0, 1.3, 0], [.072, 2.04, .072]), part(PYR, WOOD_D, [0, 2.42, 0], [.085, .14, .085], [0, Math.PI / 4, 0]),
+    ...[.55, 2.1].map(y => part(OCT, IRON, [0, y, 0], [.081, .045, .081])),
+    // arm, brace and scroll reaching over the road to the lamp
+    part(BOX, WOOD_D, [0, 2.27, .27], [.07, .075, .62]), part(BOX, WOOD_D, [0, 2.06, .14], [.05, .05, .36], [-.86, 0, 0]),
+    part(SCROLL, IRON, [0, 2.15, .36], [.07, .07, .07], [0, Math.PI / 2, 0]), part(CYL_LO, IRON, [0, 2.2, .52], [.012, .1, .012]), part(TORUS, IRON, [0, 2.14, .52], [.025, .025, .025], [0, Math.PI / 2, 0]),
+    // the lantern: cap, rim, four corner rods, drip tray and finial
+    part(PYR, IRON, [0, 2.07, .52], [.15, .11, .15], [0, Math.PI / 4, 0]), part(SQ, IRON, [0, 2.0, .52], [.13, .025, .13], [0, Math.PI / 4, 0]),
+    part(SQ, IRON, [0, 1.84, .52], [.12, .03, .12], [0, Math.PI / 4, 0]), part(PYR, IRON, [0, 1.8, .52], [.06, .06, .06], [Math.PI, Math.PI / 4, 0])];
+  for (const [x, z] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) P.push(part(BOX, IRON, [x * .072, 1.92, .52 + z * .072], [.016, .16, .016]));
+  return merge(P);
+};
+const LANTERN_GLASS = () => merge([part(SQ, 0xffffff, [0, 1.92, .52], [.095, .16, .095], [0, Math.PI / 4, 0])]);
 const LAMP_HEIGHT = 1.97, LAMP_REACH = .52;
 
 // A soft round glow, built in code so it also works headless.

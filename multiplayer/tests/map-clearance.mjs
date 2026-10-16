@@ -1,5 +1,5 @@
 // Map clearance: nothing placed on the map clips through anything else. Every keep part (pylons, spires, ballistas,
-// heart, barracks, fountain, gate), town and back-town building, landmark footprint, starting tree and ore deposit,
+// heart, barracks, fountain, gate), town and back-town building, landmark footprint, starting tree, landform and ore deposit,
 // and every town-life prop, lantern post and townsperson is a footprint circle; no two from different groups may
 // overlap, and nothing may stand on a cliff (more than `slope` of rise across its footprint).
 // `node tests/map-clearance.mjs --list` prints every overlap and steep placement instead of failing on the first.
@@ -8,10 +8,11 @@ import {HOME_LAYOUT, HOME_SCALE, TOWN_SOLIDS, homePiece, homePoint, neutralTaver
 import {BACK_TOWN, BACK_TOWN_LANTERNS, MAIN_ROAD, backTownPiece, backTownPoint, inKeepApproach, mainRoadDistance} from '../shared/keep-sites.js';
 import {BACK_TOWN_SOLIDS} from '../shared/home-workshop.js';
 import {STARTING_SITES} from '../shared/starting-world.js';
-import {baseTrees} from '../shared/world-content.js';
+import {baseTrees, TERRAIN_FORMATIONS} from '../shared/world-content.js';
 import {createSimulation} from '../shared/simulation.js';
 import {baseHeight} from '../shared/terrain.js';
 import {townLifeLayout} from '../client/town-life.js';
+import {pavingClearance} from '../client/road-paving.js';
 
 const LIST = process.argv.includes('--list');
 const items = [];
@@ -38,6 +39,7 @@ for (const side of ['party', 'rivals']) {
 solids('mug', 'tavern', neutralTavern(), TOWN_SOLIDS.neutralTavern);
 for (const s of STARTING_SITES) s.footprints.forEach((f, i) => add(`site-${s.id}`, `${f.kind}-${i}`, f.x, f.z, Math.hypot(f.w, f.d) / 2, {box: [f.rotY, f.w / 2, f.d / 2], sign: 1}));
 baseTrees.forEach(([x, z], i) => add('trees', `tree-${i}`, x, z, .8));
+TERRAIN_FORMATIONS.forEach(f => add('formations', `${f.asset}-${f.id}`, f.x, f.z, f.r));
 createSimulation({seed: 3}).adventureWorld().deposits.forEach(d => add('deposits', `${d.kind}-${d.id}`, d.x, d.z, 1.3, {cliff: true}));
 const L = townLifeLayout();
 L.props.forEach((p, i) => add('town-life', `${p.kind}-${i}`, p.x, p.z, p.kind === 'bench' ? .7 : .45, {decor: true}));
@@ -79,6 +81,12 @@ for (const it of items) {
   const gap = it.box ? Math.min(...roadSamples.map(([x, z]) => boxCircle(it, x, z, 0))) : mainRoadDistance(it.x, it.z) - it.r;
   if (gap < MAIN_ROAD.half - .05) overlaps.push(`main road x ${it.group}/${it.name}: ${(MAIN_ROAD.half - gap).toFixed(2)} m onto the road at [${it.x.toFixed(1)}, ${it.z.toFixed(1)}]`);
 }
+// Nothing solid stands on the laid stones of any road or footpath either (lanterns and townsfolk may).
+for (const it of items) {
+  if (it.folk || it.decor || it.group.startsWith('keep-') || it.group.startsWith('site-') || it.group === 'mug') continue;
+  const gap = pavingClearance(it.x, it.z) - it.r;
+  if (gap < -.05) overlaps.push(`paving x ${it.group}/${it.name}: ${(-gap).toFixed(2)} m onto the stones at [${it.x.toFixed(1)}, ${it.z.toFixed(1)}]`);
+}
 // Props inside the buildings they dress are fine only when they sit outside every solid of another building.
 const steep = [];
 for (const it of items.filter(i => i.cliff)) {
@@ -86,6 +94,8 @@ for (const it of items.filter(i => i.cliff)) {
   for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2, h = baseHeight(it.x + Math.cos(a) * it.r, it.z + Math.sin(a) * it.r); lo = Math.min(lo, h); hi = Math.max(hi, h); }
   if (hi - lo > Math.max(.6, it.r * .45)) steep.push(`${it.group}/${it.name} sits on a ${(hi - lo).toFixed(2)} m slope at [${it.x.toFixed(1)}, ${it.z.toFixed(1)}]`);
 }
+// Landforms stay out of the keeps' fronts and the lane too, whatever the layout file moves them to.
+for (const f of TERRAIN_FORMATIONS) if (inKeepApproach(f.x, f.z)) overlaps.push(`${f.id} (${f.asset}) stands in a keep's approach at [${f.x}, ${f.z}]`);
 // Rocks that rise on their own (mountain-foot veins, renewed seams) never land in a keep's front or the lane between
 // the keeps, whatever the world seed; and an untouched one left there by an older save moves on.
 for (let seed = 1; seed <= 24; seed++) {

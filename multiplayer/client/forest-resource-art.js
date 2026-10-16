@@ -1,9 +1,10 @@
 // Forest/resource art pass (Opus 5.5, 2026-10-03). Procedural, editable authored geometry: every shape below is a deliberate
 // sculpt (displaced, cut, stratified, faceted) built once and shared by every instance. No textures, no lights, no transparency.
-//  createResourceArt() -> {pickup(kind), deposit(kind,{variant}), update(seconds), stats(), dispose()}
+//  createResourceArt() -> {pickup(kind), deposit(kind,{variant}), formation(kind,{variant,size}), update(seconds), stats(), dispose()}
 //  enhanceTreeTemplate(scene,{lod,variant}) -> merges leaf sprays / twigs / root flares into the template's own Leaves /
 //  Branches / Roots geometry (cached per source geometry). Trunk geometry, named groups and pivots are never touched.
 import * as T from 'three';
+import {toCreasedNormals} from 'three/addons/utils/BufferGeometryUtils.js';
 
 // ---------- deterministic helpers ----------
 const rng = seed => () => { seed = seed + 0x6d2b79f5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
@@ -56,8 +57,11 @@ function patchCrystal(m, time, rim) {
 }
 
 // ---------- geometry builders ----------
+// Rock surfaces: shade smooth across the icosphere's facets but keep a crisp edge where a fracture plane or ledge cuts
+// it (2026-10-17; the all-flat facets read as low-poly from a few metres).
+const CREASE = Math.PI * .22;
 // Faceted rock lump: displaced icosphere + planar fractures + undercut strata ledges + flattened bed. Non-indexed => flat
-// facets (hand-cut look). Returns geometry plus per-vertex `cavity` (0 exposed .. 1 recessed) for colouring.
+// facets until the caller creases the normals (toCreasedNormals, CREASE). Returns geometry plus per-vertex `cavity` (0 exposed .. 1 recessed) for colouring.
 function rockLump({detail = 2, sx = 1, sy = 1, sz = 1, seed = 1, cuts = 4, strata = .2, rough = .35, bed = -.55}) {
  const g = new T.IcosahedronGeometry(1, detail), p = g.attributes.position, r = rng(seed), planes = [];
  for (let i = 0; i < cuts; i++) { const n = new T.Vector3(r() * 2 - 1, r() * 1.6 - .5, r() * 2 - 1).normalize(); planes.push([n, .62 + r() * .25]); }
@@ -112,6 +116,7 @@ function mergeFlat(list) { // non-indexed concat of position/normal/uv/color (mi
 function paint(g, fn) { const p = g.attributes.position, n = g.attributes.normal, col = new Float32Array(p.count * 3), out = [0, 0, 0];
  for (let i = 0; i < p.count; i++) { _v.fromBufferAttribute(p, i); _n.fromBufferAttribute(n, i); fn(_v, _n, i, out, g.userData.cavity?.[i] ?? 0); col.set(out, i * 3); }
  g.setAttribute('color', new T.BufferAttribute(col, 3)); return g; }
+const toLinear = c => c.map(v => Math.pow(v, 2.2));
 const mixc = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 // Strata palette: banded by height with wobble; recesses darker, exposed ridges sun-bleached.
 const strataPaint = (bands, {freq = 9, rust = null} = {}) => (p, n, i, out, cav) => {
@@ -145,6 +150,8 @@ const DEPOSIT = {
  star: {style: 'geode', shape: [.7, .58, .62, 0], bands: [[.14, .12, .13], [.22, .19, .19], [.1, .09, .1], [.18, .15, .14]], rust: [.5, .3, .12], ore: 0xf2b95c, oreMetal: 1, oreRough: .24, crystal: [1, .58, .16], emissive: 0xff8a12, bounce: 0x7a3a06}
 };
 for (const [k, v] of Object.entries({iron: 'nodule', mithril: 'seam', crystal: 'geode'})) DEPOSIT[k].style = v;
+// Iron: many small rust-brown nodules along the band. A few big dark ones read as a pair of eyes (2026-10-17).
+Object.assign(DEPOSIT.iron, {oreCount: 22, oreSize: .62, ore: 0x6a4434});
 const DEPOSIT_ALIAS = {iron: 'iron', iron_vein: 'iron', mithril: 'mithril', mithril_seam: 'mithril', crystal: 'crystal', crystal_fault: 'crystal', gems: 'crystal', copper: 'copper', gold: 'gold', star: 'star'};
 export const BAR_STACK_MAX = 24;
 export const PICKUP_KINDS = Object.freeze(['ironOre', 'mithrilOre', 'starOre', 'iron', 'mithril', 'starMetal', 'crystal', 'copperOre', 'goldOre', 'copper', 'gold']);
@@ -163,8 +170,8 @@ export function createResourceArt() {
   const main = rockLump({detail: 1, sx: 1.05, sy: .82, sz: .78, seed, cuts: 5, strata: .28, rough: .32, bed: -.5});
   const b = rockLump({detail: 1, sx: .6, sy: .5, sz: .55, seed: seed + 3, cuts: 4, rough: .4}); b.rotateZ(.5); b.translate(.78, -.28, .32);
   const c = rockLump({detail: 1, sx: .45, sy: .42, sz: .5, seed: seed + 7, cuts: 3, rough: .4}); c.rotateX(-.4); c.translate(-.55, -.36, -.52);
-  for (const x of [main, b, c]) paint(x, strataPaint(o.bands, {freq: 4.5}));
-  const body = mergeFlat([main, b, c]);
+  for (const x of [main, b, c]) paint(x, strataPaint(o.bands.map(toLinear), {freq: 4.5}));
+  const body = toCreasedNormals(mergeFlat([main, b, c]), CREASE);
   const veins = [], pts = surfacePoints(main, 9, seed + 11, (P, N) => N.y > -.2);
   pts.forEach(([P, N], i) => { const f = rockLump({detail: 0, sx: .16, sy: .05, sz: .12, seed: seed + 20 + i, cuts: 2, rough: .2, bed: -2});
    f.lookAt(N); f.translate(P.x - N.x * .02, P.y - N.y * .02, P.z - N.z * .02); paint(f, (p, n, j, out) => { out[0] = out[1] = out[2] = .75 + .25 * Math.max(0, n.y); }); veins.push(f); });
@@ -201,7 +208,7 @@ export function createResourceArt() {
   return {parts: [[own(g), metalMat(kind, m.color, kind === 'iron' ? .85 : 1, m.rough, m.tone, kind === 'starMetal' ? 0x3a1c00 : 0)]]};
  }
  function crystalPickup() { const seed = 4242, base = rockLump({detail: 1, sx: 1, sy: .35, sz: .85, seed, cuts: 3, rough: .3, bed: -.4});
-  paint(base, strataPaint(DEPOSIT.crystal.bands, {freq: 6}));
+  paint(base, strataPaint(DEPOSIT.crystal.bands.map(toLinear), {freq: 6}));
   const dirs = [[0, 1, 0, .95, .2, 0], [.45, .8, .1, .7, .16, 1], [-.5, .75, .2, .62, .15, 0], [.1, .7, -.6, .55, .14, 1], [-.2, .6, .7, .45, .12, 0], [.7, .5, -.3, .38, .1, 0]];
   const cr = mergeFlat(dirs.map(([x, y, z, l, r, br], i) => prism({base: new T.Vector3(x * .25, .1, z * .25), dir: new T.Vector3(x, y, z), len: l, rad: r, seed: seed + i, broken: !!br, tint: DEPOSIT.crystal.crystal})));
   sitOnFloorGroup([base, cr], .27);
@@ -230,13 +237,35 @@ export function createResourceArt() {
    else { const k = d.oreSize || 1; g = rockLump({detail: 1, sx: (.06 + r() * .05) * k, sy: .05 * k, sz: (.06 + r() * .04) * k, seed: seed + 90 + i, cuts: 3, rough: .3, bed: -2}); g.lookAt(N); g.translate(P.x - N.x * .015, P.y - N.y * .015, P.z - N.z * .015); }
    ore.push(g); });
   const rust = {color: d.rust, at: p => st === 'nodule' ? 1 - Math.abs(p.y - .25 - p.x * .35) * 5 + (fbm(p.x * 6, p.y * 6, p.z * 6) - .5) : st === 'seam' ? 1 - Math.abs(p.x * .8 - p.y * .3 + p.z * .5 - .05) * 7 : 0};
-  for (const g of lumps) paint(g, strataPaint(d.bands, {freq: 6.5, rust}));
-  const rock = mergeFlat(lumps), crys = mergeFlat(crystals), oreG = mergeFlat(ore);
+  // The palettes are picked by eye as display colours; vertex colours are linear, so convert or the host rock washes out
+  // to chalk white in daylight (it did until 2026-10-17).
+  rust.color = toLinear(d.rust); for (const g of lumps) paint(g, strataPaint(d.bands.map(toLinear), {freq: 6.5, rust}));
+  const rock = toCreasedNormals(mergeFlat(lumps), CREASE), crys = mergeFlat(crystals), oreG = mergeFlat(ore);
   paint(oreG, (p, n, i, out) => { const k = .7 + .3 * Math.max(0, n.y); out[0] = out[1] = out[2] = k; });
   // baked crystal bounce into uv.y (fake nearby glow; no lights)
   const rp = rock.attributes.position, uv = rock.attributes.uv; for (let i = 0; i < rp.count; i++) { _v.fromBufferAttribute(rp, i); let gl = 0; for (const R of roots) gl += Math.exp(-_v.distanceToSquared(R) / .045); uv.setY(i, Math.min(1, gl * .6)); uv.setX(i, 0); }
   sitOnFloorGroup([rock, crys, oreG], 1.2); for (const g of [rock, crys, oreG]) g.translate(0, -.05, 0); // bed sinks 5 cm into terrain
   return [[own(rock), stoneMat('deposit:' + kind, d.bounce), 'Rock'], [own(oreG), metalMat('ore:' + kind, d.ore, d.oreMetal, d.oreRough, .18), 'Ore'], [own(crys), crystalMat('deposit:' + kind, d.emissive, [.9, .95, 1]), 'Crystal']];
+ }
+ // Landform dressing (TERRAIN_FORMATIONS): weathered granite outcrops, smooth-shaded so they read as eroded stone rather
+ // than cut ore, banded in dark greys with moss and lichen on the tops. bank = a long low shelf, ridge = a tall spine.
+ function formationKit(kind, variant) { const seed = 5000 + variant * 7919 + (kind === 'ridge' ? 313 : 0), r = rng(seed), lumps = [];
+  const spec = kind === 'ridge'
+   ? [[.5, 1, .38, 0, 0, 0, .12, 5], [.38, .68, .32, .46, -.24, .12, -.22, 3], [.3, .44, .3, -.44, -.44, -.06, .3, 3], [.22, .2, .24, .2, -.7, .34, 0, 2]]
+   : [[.95, .62, .52, 0, 0, 0, .05, 5], [.62, .5, .46, .92, -.1, .16, -.08, 3], [.55, .44, .42, -.92, -.14, -.1, .1, 3], [.3, .24, .28, .42, -.36, .5, 0, 2], [.26, .2, .24, -.5, -.4, -.48, 0, 2]];
+  spec.forEach(([sx, sy, sz, x, y, z, rz, detail], i) => { const g = rockLump({detail, sx, sy, sz, seed: seed + i * 17, cuts: 6, strata: .12, rough: .36, bed: -.6});
+   g.rotateZ(rz); g.rotateY((r() - .5) * .8); g.translate(x, y, z); lumps.push(g); });
+  const g = toCreasedNormals(mergeFlat(lumps), CREASE);
+  g.computeBoundingBox(); const b = g.boundingBox, lo = b.min.y, span = b.max.y - b.min.y;
+  const bands = [[.21, .2, .18], [.3, .285, .25], [.12, .115, .105], [.24, .225, .2], [.17, .16, .145]], moss = [.075, .12, .035], lichen = [.3, .27, .17];
+  paint(g, (p, n, i, out) => { strataPaint(bands, {freq: 5.5})(p, n, i, out, 0);
+   const h = (p.y - lo) / span, wet = fbm(p.x * 2.3 + 11, p.y * 2.3, p.z * 2.3);
+   let c = [out[0], out[1], out[2]];
+   c = mixc(c, moss, clamp01((n.y - .35) * 3) * clamp01(wet * 2.4 - .5) * (kind === 'ridge' ? .7 : .95));
+   c = mixc(c, lichen, clamp01(fbm(p.x * 7, p.y * 7 + 3, p.z * 7) * 3 - 2.1) * .5 * clamp01(n.y + .4));
+   const ao = .55 + .45 * sm(clamp01(h * 3.5)); out[0] = c[0] * ao; out[1] = c[1] * ao; out[2] = c[2] * ao; });
+  sitOnFloor(g, 1); g.translate(0, -.04, 0); // unit height; the caller scales to the drawn size, the bed sinks into the turf
+  return [[own(g), mat('stone:formation', () => patchDetail(new T.MeshStandardMaterial({vertexColors: true, roughness: .92, metalness: 0}), {scale: 4.5, bump: .02, tone: .45, key: 'formation'})), 'Rock']];
  }
  function build(parts, name) { const root = new T.Group(); root.name = name; const host = new T.Group(); host.name = name + 'Art'; root.add(host);
   for (const [g, m, n] of parts) { const mesh = new T.Mesh(g, m); mesh.name = n || m.name; mesh.castShadow = mesh.receiveShadow = true; host.add(mesh); } return root; }
@@ -249,6 +278,8 @@ export function createResourceArt() {
    const g = build(kit.parts, 'BarStack:' + kind); g.userData.authoredPickup = true; g.userData.resourceArt = kind; g.userData.barStack = n; return g; },
   deposit(kind, {variant = 0} = {}) { const k = DEPOSIT_ALIAS[kind]; if (!k) return null; const key = k + ':' + (variant % 3); let kit = deposits.get(key);
    if (!kit) { kit = depositKit(k, variant % 3); deposits.set(key, kit); } const g = build(kit, 'Deposit:' + k); g.userData.authoredDeposit = true; g.userData.resourceArt = k; return g; },
+  formation(kind, {variant = 0, size = 1} = {}) { if (!['bank', 'ridge'].includes(kind)) return null; const key = 'formation:' + kind + ':' + (variant % 3); let kit = deposits.get(key);
+   if (!kit) { kit = formationKit(kind, variant % 3); deposits.set(key, kit); } const g = build(kit, 'Formation:' + kind); g.scale.setScalar(size); g.userData.resourceArt = kind; return g; },
   update(seconds) { if (Number.isFinite(seconds)) time.value = seconds; },
   stats() { let tris = 0; for (const g of geos) tris += g.attributes.position.count / 3; return {geometries: geos.size, materials: mats.size, triangles: tris}; },
   dispose() { for (const g of geos) g.dispose(); for (const m of mats.values()) m.dispose(); geos.clear(); mats.clear(); pickups.clear(); deposits.clear(); }

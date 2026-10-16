@@ -7,7 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {performance} from 'node:perf_hooks';
 
 const suite = [
-  'lossless-textures','readiness-cache','environment-delivery','progressive-assets','mobile-render-budget','asset-delivery','compile-world','rigid-weapon-batch',
+  'lossless-textures','asset-geometry','readiness-cache','environment-delivery','progressive-assets','mobile-render-budget','asset-delivery','compile-world','rigid-weapon-batch',
   'room-directory','room-capacity','../peer/capacity-test','room-service-gate','cloud-directory-lifecycle','public-room-directory','peer-encoding','frame-inbox','session-publication','terrain-geometry','network-capacity','battle-mode','battle-presentation','hero-pose-performance',
   'proximity-voice','voice-recovery','voice-topology','voice-zones','ice-servers','battle-model','checkpoint-delta','host-handover','adventure-capacity','battle-renderer-contact',
   'enemy-embed-lifecycle','session-held-ore','session-save-recovery','peer-channel-recovery','timberline-sight-cache','phoenix-flare-view','input-reset',
@@ -34,7 +34,7 @@ const suite = [
   'tree-growth','tree-harvest-warmup','mining-warmup','tree-integration','tree-land-timing','tree-materials','tree-batch-upload','vr-adventure-panel',
   'vr-input-policy','weapon-controller','weapon-motion','held-sway','strike-feel','weapon-swap','weapon-readiness','wood-audio',
   'world-content','world-saves','enemy-motion','enemy-interp','golem-presentation','earth-spells','smooth-terrain','grove-growth','spell-schools','remains-physics','bone-physics',
-  'phoenix-flight','phoenix-ignite','phoenix-light','phoenix-carry','emberwing-motion','phoenix-flare','pick-wall-motion','stumplings','day-night-weather','rainfall','patch-notes','quick-play','apple-snack','apple-feast','home-bases','siege-damage','keep-ring','home-workshop','home-base-kit','home-ballista','forgeling-kit','hero-progress','home-town','home-town-view','dragon-streak','heavy-launcher','turn-phone','stormreel','radiant-staff','sound-pass','larimar-cove','map-layout','map-clearance','rock-collision',
+  'phoenix-flight','phoenix-ignite','phoenix-light','phoenix-carry','emberwing-motion','phoenix-flare','pick-wall-motion','stumplings','day-night-weather','rainfall','patch-notes','quick-play','apple-snack','apple-feast','home-bases','siege-damage','keep-ring','home-workshop','home-base-kit','home-ballista','forgeling-kit','hero-progress','home-town','home-town-view','dragon-streak','heavy-launcher','turn-phone','stormreel','radiant-staff','sound-pass','larimar-cove','map-layout','map-clearance','road-paving','rock-collision',
 ];
 
 // Assertions that disagree with current gameplay (or need assets/tools absent in CI).

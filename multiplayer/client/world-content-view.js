@@ -11,6 +11,8 @@ import {createCrystalWall} from './crystal-wall.js';
 import {attachFracture,prepareFractureWarmup,prepareFractureWarmupAsync} from './mining-fracture.js';
 import {createGeodeLight,setGeodeLightTime,geodeLightGlobalStats,GEODE_LIGHT_BUDGET,GEODE_LIGHT_DISTANCE} from './geode-light.js';
 import {createTreeView} from './tree-view.js';
+import {TERRAIN_FORMATIONS} from '../shared/world-content.js';
+import {pavingClearance} from './road-paving.js';
 
 // Installed GLBs plus the Opus-authored reusable mineral and tree-detail kit.
 // Trees (notches, hinge fall, stumps, physical logs, LOD) are delegated to tree-view.js; this module keeps props.
@@ -86,14 +88,14 @@ export function createWorldContent({scene,templates,instantiate,height,camera=nu
  }
  function terrainMoved(dirty){if(!last||!dirty?.length)return;reground(p=>dirty.some(e=>Math.hypot(p.x-e.x,p.z-e.z)<=e.radius+TERRAIN_GRID.step),last.edits);}
  function scatter(s){
-  for(const [name,x,z,size,angle]of [['bank',-18,-18,1.4,.8],['bank',-21,-16,1.1,1.2],['ridge',20,-22,3.1,-.5],['ridge',23,-24,2.4,.5],['roots',-13,-10,.65,1.2]]){const mesh=authored(name,size);if(mesh){mesh.position.set(x,height(x,z,s.edits)-.1,z);mesh.rotation.y=angle;scene.add(mesh);formations.push({mesh,x,z});}}
+  for(const [i,{asset:name,x,z,size,angle}]of TERRAIN_FORMATIONS.entries()){const mesh=resourceArt.formation(name,{variant:i,size})||authored(name,size);if(mesh){mesh.position.set(x,height(x,z,s.edits)-.1,z);mesh.rotation.y=angle;scene.add(mesh);formations.push({mesh,x,z});}}
   const group=scatterDecorations(s,DECORATION_ASSETS.filter(name=>readyDecorations.has(name)));scene.add(group);
  }
  function clearDecorations(){generation++;for(const entry of decorationGroups.values()){entry.reveal?.finish();entry.group.removeFromParent();}decorationGroups.clear();}
  function scatterDecorations(s,names){
   const group=new T.Group();
   for(const name of names){const n=DECORATION_ASSETS.indexOf(name);if(decorationGroups.has(name))continue;const template=templates.get(name);if(!template)continue;decorationGroups.set(name,{group,reveal:null});template.scene.updateMatrixWorld(true);const points=[];
-   for(let i=0;i<65;i++){const h=((Math.imul(i+1,73856093)^Math.imul(n+1,19349663)^s.seed)>>>0);const a=h*.000001,r=5+Math.sqrt((h%1000)/1000)*45,x=Math.sin(a)*r,z=Math.cos(a)*r;if(Math.abs(x)<1.5&&z>0&&z<16)continue;points.push({x,z,angle:a,scale:.7+(h%70)/100});}
+   for(let i=0;i<65;i++){const h=((Math.imul(i+1,73856093)^Math.imul(n+1,19349663)^s.seed)>>>0);const a=h*.000001,r=5+Math.sqrt((h%1000)/1000)*45,x=Math.sin(a)*r,z=Math.cos(a)*r;if(Math.abs(x)<1.5&&z>0&&z<16||pavingClearance(x,z)<.45)continue;points.push({x,z,angle:a,scale:.7+(h%70)/100});}
    template.scene.traverse(c=>{if(!c.isMesh)return;const mesh=new T.InstancedMesh(c.geometry,c.material,points.length);mesh.name=`GroundDetail:${name}`;group.add(mesh);batches.push({mesh,points,local:c.matrixWorld.clone()});});
   }
   return group;

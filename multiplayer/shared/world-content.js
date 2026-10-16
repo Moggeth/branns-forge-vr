@@ -13,6 +13,13 @@ export const baseTrees = [
   [-12, -9, 7], [14, -12, 6.5], [-17, 17, 7.2], [21, 16, 5.6], [-24, 4, 6.4], [25, 2, 6.8]
 ].map(([x, z, h], i) => [...moved(`tree${i + 1}`, [x, z]), h])
   .concat(MAP_EXTRAS.filter(e => e.kind === 'tree').map(e => [e.x, e.z, e.height ?? 6.2]));
+// Landform dressing (earth banks, a rock ridge, a root burrow): presentation only, never solid, but kept off the main
+// road and the keep fronts like everything else (tests/map-clearance.mjs). `size` is the drawn height in metres and
+// `r` the footprint radius that height gives the model. Movable in the map editor as formation<n>.
+export const TERRAIN_FORMATIONS = Object.freeze([
+  ['bank', -9.5, -19.8, 1.4, 2.3, 1.9], ['bank', -21, -10.5, 1.1, -.85, 1.5], ['ridge', 20, -22, 3.1, -.5, 1.4], ['ridge', 23, -24, 2.4, .5, 1.1],
+  ['roots', -13.6, -6.6, .65, 1.2, .75]
+].map(([asset, x, z, size, angle, r], i) => { const [mx, mz] = moved(`formation${i + 1}`, [x, z]); return Object.freeze({id: `formation${i + 1}`, asset, x: mx, z: mz, size, angle, r}); }));
 export const initialDeposits = () => [
   [-5, 5, 'stone'], [5, 5, 'stone'], [-7, 10, 'stone'], [7, 10, 'stone'], [0, 14, 'stone'],
   [-8, 3, 'iron'], [8, 3, 'iron'], [9, -8, 'iron'], [-16, -7, 'iron'],
