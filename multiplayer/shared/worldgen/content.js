@@ -29,6 +29,7 @@ function blocked(world, x, z, pad) {
   if (x < world.walkBounds.minX || x > world.walkBounds.maxX || z < world.walkBounds.minZ || z > world.walkBounds.maxZ) return true;
   for (const s of world.settlements) if (!s.start) { const dx = x - s.x, dz = z - s.z, r = s.radius * .7 + pad; if (dx * dx + dz * dz < r * r) return true; }
   for (const e of world.entrances) { const dx = x - e.x, dz = z - e.z; if (dx * dx + dz * dz < (12 + pad) * (12 + pad)) return true; }
+  for (const d of world.discoveries) { const dx = x - d.x, dz = z - d.z; if (dx * dx + dz * dz < (7.5 + pad) * (7.5 + pad)) return true; }
   if (world.roadAt(x, z) < 4.5 + pad) return true;
   return world.isWater(x, z) || world.isWater(x + 1.5, z) || world.isWater(x - 1.5, z) || world.isWater(x, z + 1.5) || world.isWater(x, z - 1.5);
 }

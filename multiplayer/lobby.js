@@ -235,6 +235,19 @@ function quickFallback() {
   return true;
 }
 $('solo').addEventListener('click',()=>start({create:true,solo:true}));
+// The Great Wilds: discoveries, ambushes and cleared sites as short banners (shared/wilds.js events).
+function wildsBanner(e, me) {
+  if (!e?.kind?.startsWith?.('wilds_')) return null;
+  const stars = t => '★'.repeat(Math.max(1, Math.min(5, Math.round(t || 0))));
+  if (e.kind === 'wilds_ambush') return `Guardians rise at ${e.name}!`;
+  if (e.kind === 'wilds_cleared') return `${e.name} is clear. Its treasure is yours.`;
+  if (e.kind !== 'wilds_discovery' || (e.by && e.by !== me && e.site !== 'region')) return null;
+  if (e.site === 'region') return `You enter ${e.name} · danger ${stars(e.tier)}`;
+  if (e.site === 'settlement') return `Discovered ${e.name}, a ${e.sub === 'harbour' ? 'harbour' : e.sub === 'village' ? 'village' : e.sub}.`;
+  if (e.site === 'entrance') return `Discovered ${e.name}, a cave mouth. The Underways lie below.`;
+  if (e.site === 'landmark') return `Discovered ${e.name}.`;
+  return `You found ${e.name}. Search it.`;
+}
 // World creation menu: the classic valley or a generated world (Great Wilds, plus the experimental modes as they land).
 const worldMenu = createWorldMenu({
   available: kind => kind === 'arena' || kind === 'wilds' ? true : 'Arriving in a coming update. This mode is still being built.',
@@ -405,7 +418,7 @@ async function start(attempt) {
   next.addEventListener('welcome', mine(onWelcome));
   next.addEventListener('status', mine(onStatus));
   next.addEventListener('snapshot', mine(onSnapshot));
-  next.addEventListener('event', mine(detail => { lastEvent = detail; game?.handleEvent(detail); const banner=rewardBanner(detail,lastSnapshot?.players?.find(p=>p.id===playerId)?.side||'party'); if(banner)toast(banner); if(detail.kind==='respawn'&&detail.id===playerId)toast('Back on your feet. Three seconds of protection to get your bearings.');if(detail.kind==='shop_buy'&&detail.id===playerId)quartermaster.bought(detail.item);if(detail.kind==='level_up'){if(detail.id===playerId)heroProgress.levelUp(detail);else{const who=lastSnapshot?.players?.find(p=>p.id===detail.id)?.name;if(who)toast(`${who} reached level ${detail.level}!`);}} if(detail.kind==='god_gift')giftToast(detail); if(detail.kind==='bloom_level')bloomToast(detail); if(detail.kind==='weather')toast(detail.by===playerId?'Rain is coming. Groves bloom twice as fast and Heroes mend while it falls.':'The God calls the rain: you slowly mend while it falls.'); if(detail.kind==='party_reward')toast('Expedition milestone: +20 health, +30 mana for the party.'); if(detail.kind==='adventure_reward')toast('Expedition complete! Fully restored, +6 wood, +4 stone, +3 gems each.'); }));
+  next.addEventListener('event', mine(detail => { lastEvent = detail; game?.handleEvent(detail); const banner=rewardBanner(detail,lastSnapshot?.players?.find(p=>p.id===playerId)?.side||'party'); if(banner)toast(banner); const wild=wildsBanner(detail,playerId); if(wild)toast(wild); if(detail.kind==='respawn'&&detail.id===playerId)toast('Back on your feet. Three seconds of protection to get your bearings.');if(detail.kind==='shop_buy'&&detail.id===playerId)quartermaster.bought(detail.item);if(detail.kind==='level_up'){if(detail.id===playerId)heroProgress.levelUp(detail);else{const who=lastSnapshot?.players?.find(p=>p.id===detail.id)?.name;if(who)toast(`${who} reached level ${detail.level}!`);}} if(detail.kind==='god_gift')giftToast(detail); if(detail.kind==='bloom_level')bloomToast(detail); if(detail.kind==='weather')toast(detail.by===playerId?'Rain is coming. Groves bloom twice as fast and Heroes mend while it falls.':'The God calls the rain: you slowly mend while it falls.'); if(detail.kind==='party_reward')toast('Expedition milestone: +20 health, +30 mana for the party.'); if(detail.kind==='adventure_reward')toast('Expedition complete! Fully restored, +6 wood, +4 stone, +3 gems each.'); }));
   next.addEventListener('error', mine(onSessionError));
   next.addEventListener('hosting', mine(() => { refreshHostControls(); }));
   next.addEventListener('host_changed', mine(detail => {
