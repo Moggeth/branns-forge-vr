@@ -15,10 +15,10 @@ import {TIMBERFALL, timberfallLane} from '../shared/timberfall.js';
 // Budget: wave = 4 draws (blade, seam, sparks, ring) while alive, pool of 3; preview = 2 draws; heartwood = 2 draws,
 // pool of 6. Preallocated geometry, no lights, no post, no per-frame allocation. Reduced motion drops sparks.
 
-const AMBER = new THREE.Color(1.0, .48, .08), HOT = new THREE.Color(1.0, .86, .52), DIM = new THREE.Color(.62, .44, .26);
+const AMBER = new THREE.Color(1.0, .38, .03), HOT = new THREE.Color(1.0, .72, .3), DIM = new THREE.Color(.62, .44, .26);
 export const HEART_COLOURS = Object.freeze({amber: [1.0, .52, .1], gold: [1.0, .82, .32], gems: [.72, .5, 1.0]});
 const POOL = 3, HEART_POOL = 6, ALONG = 48, SPARKS = 72, GLINTS = 28, RING_MARKS = TIMBERFALL.trees;
-export const TIMBERFALL_VIEW = Object.freeze({fade: 1.3, bladeHeight: 2.9, bladeHalf: 2.3, bulge: .9, heartLife: 1.7});
+export const TIMBERFALL_VIEW = Object.freeze({fade: 1.3, bladeHeight: 3.4, bladeHalf: 1.7, bulge: 1.1, heartLife: 1.7});
 
 const finish = `
   #include <tonemapping_fragment>
@@ -46,13 +46,13 @@ uniform vec3 uGlow, uHot;
 varying vec2 vBlade;
 void main() {
   float crest = sqrt(max(0., 1. - vBlade.x * vBlade.x));
-  float edge = exp(-(1. - vBlade.y) * 11.);           // the burning cutting line along the crest
-  float body = (1. - vBlade.y) * .22 + vBlade.y * .1;  // a thin curtain of light beneath it
-  float foot = exp(-vBlade.y * 9.) * .55;              // where it tears the ground
-  float sides = smoothstep(1., .7, abs(vBlade.x));
-  float streak = .75 + .25 * sin(vBlade.x * 23. + uFlicker * 31.) * sin(vBlade.y * 7. - uFlicker * 17.);
-  float a = (edge * 1.25 + body * streak + foot) * sides * uFade;
-  vec3 c = mix(uGlow, uHot, clamp(edge * .9 + foot * .4, 0., 1.));
+  float edge = exp(-(1. - vBlade.y) * 22.);            // the burning cutting line along the crest
+  float halo = exp(-(1. - vBlade.y) * 5.) * .22;       // its glow just beneath
+  float streak = pow(.5 + .5 * sin(vBlade.x * 31. + uFlicker * 23.), 6.) * (1. - vBlade.y) * .35; // rising shreds of light
+  float foot = exp(-vBlade.y * 12.) * .5;              // where it tears the ground
+  float sides = smoothstep(1., .55, abs(vBlade.x)) * (.35 + .65 * crest);
+  float a = (edge * 1.7 + halo * 1.6 + streak * 1.4 + foot * 1.5) * sides * uFade;
+  vec3 c = mix(uGlow, uHot, clamp(edge * .7 + foot * .3, 0., 1.));
   gl_FragColor = vec4(c * a, 1.);${finish}
 }`;
 
@@ -145,7 +145,7 @@ void main() {
   float x = vUv.x * 2. - 1.;
   float core = exp(-x * x * 18.), soft = exp(-x * x * 3.) * .35;
   float a = (core + soft) * pow(1. - vUv.y, 1.6) * uFade;
-  gl_FragColor = vec4(mix(uColour, vec3(1.), core * .5) * a * 1.5, 1.);${finish}
+  gl_FragColor = vec4(mix(uColour, vec3(1.), core * .4) * a * 2.2, 1.);${finish}
 }`;
 const GLINT_VERTEX = `
 attribute vec4 aGlint;
@@ -304,20 +304,20 @@ export function createTimberfallView({scene, height = () => 0, reducedMotion = f
       if (t < 0 || t > life) { h.live = h.beam.visible = h.glints.visible = false; continue; }
       const k = t / life;
       h.beam.material.uniforms.uFade.value = Math.min(1, t / .08) * (1 - k) ** 1.5;
-      h.beam.material.uniforms.uHeight.value = (3.5 + 3.5 * Math.min(1, t / .3)) * h.scale;
+      h.beam.material.uniforms.uHeight.value = (5 + 5 * Math.min(1, t / .3)) * h.scale;
       h.glints.material.uniforms.uAge.value = t;
     }
   }
 
   // ---------------------------------------------------------------- heartwood bursts
-  const beamGeometry = new THREE.PlaneGeometry(1.1, 1, 1, 1).translate(0, .5, 0), hearts = [];
+  const beamGeometry = new THREE.PlaneGeometry(1.7, 1, 1, 1).translate(0, .5, 0), hearts = [];
   for (let i = 0; i < HEART_POOL; i++) {
     const beam = new THREE.Mesh(beamGeometry, additive({uFade: {value: 0}, uHeight: {value: 5}, uColour: {value: new THREE.Color()}}, BEAM_VERTEX, BEAM_FRAGMENT));
     const spec = new Float32Array(GLINTS * 4);
     for (let g = 0; g < GLINTS; g++) { const a = seeded(g + i * 41, 5) * Math.PI * 2, s = .4 + seeded(g + i * 41, 6) * 1.3; spec.set([Math.cos(a) * s, 2.4 + seeded(g + i * 41, 7) * 3, Math.sin(a) * s, seeded(g + i * 41, 8)], g * 4); }
     const glintGeometry = new THREE.BufferGeometry();
     glintGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(GLINTS * 3), 3)); glintGeometry.setAttribute('aGlint', new THREE.BufferAttribute(spec, 4));
-    const glints = new THREE.Points(glintGeometry, additive({uAge: {value: 0}, uScale: {value: 60}, uBase: {value: new THREE.Vector3()}, uColour: {value: new THREE.Color()}}, GLINT_VERTEX, GLINT_FRAGMENT));
+    const glints = new THREE.Points(glintGeometry, additive({uAge: {value: 0}, uScale: {value: 90}, uBase: {value: new THREE.Vector3()}, uColour: {value: new THREE.Color()}}, GLINT_VERTEX, GLINT_FRAGMENT));
     for (const m of [beam, glints]) { m.visible = false; m.frustumCulled = false; m.renderOrder = 6; m.userData.ignoreContact = true; m.raycast = () => {}; scene.add(m); }
     beam.name = 'heartwood-beam'; glints.name = 'heartwood-glints';
     hearts.push({beam, glints, at: -Infinity, live: false, scale: 1});

@@ -1228,7 +1228,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     // Emberdew: smashing glass and splashing dew, a whump when lit, a cork pop when Cinder Cluster's jug bursts.
     if(emberdewFx.handle(event)){const ear=listenerPose().position,mine=event.by===playerId;playEmberdewSound(audioContext,event,mine?1:Math.max(0,1-Math.hypot(event.position[0]-ear[0],event.position[2]-ear[2])/30));
       if(mine&&event.kind==='cinder_pop'){if(renderer.xr.isPresenting)feedback.pattern?.([{at:0,amplitude:.45,duration:25}]);else if(touchEnabled)try{navigator.vibrate?.([14]);}catch{}}}
-    if(event.kind==='axe_cleave'){cleaveView.play(event,performance.now());const mine=event.id===playerId,ear=listenerPose().position,near=mine?1:Math.max(0,1-Math.hypot(event.position[0]-ear[0],event.position[2]-ear[2])/40);
+    if(event.kind==='axe_cleave'){if(!event.timberfall)cleaveView.play(event,performance.now());const mine=event.id===playerId,ear=listenerPose().position,near=mine?1:Math.max(0,1-Math.hypot(event.position[0]-ear[0],event.position[2]-ear[2])/40);
       playCleaveSound(audioContext,near*.7);
       if(event.timberfall){timberfallView.play(event,performance.now());playTimberfallSound(audioContext,near,(event.timberfall.length||19)/(event.timberfall.speed||27));
         // The caster feels the blade run away from them: a rumble that fades down the lane.
