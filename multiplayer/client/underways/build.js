@@ -136,7 +136,7 @@ export function buildUnderwayShell(d, {quality = 'high'} = {}) {
         const y0 = floorHeight(d, sx, sz) - .35, y1 = floorHeight(d, sx, sz) + ceilingAt(d, tileCx, tileCz) + roofLift(x, z);
         const col = [];
         for (let r = 0; r <= wallRows; r++) {
-          const k = r / wallRows, y = lerp(y0, y1, k), taper = Math.sin(Math.PI * clamp((y - y0) / (y1 - y0) * 1.05)), push = L.bulge * taper * (.35 + .65 * fbm(x * .55, y * .55, z * .55)) + L.bulge * .2 * taper * fbm(x * 1.7, y * 1.7, z * 1.7);
+          const k = r / wallRows, y = lerp(y0, y1, k), taper = Math.sin(Math.PI * clamp((y - y0) / (y1 - y0) * 1.05)), push = L.bulge * taper * Math.max(.06, .1 + 1.5 * (fbm(x * .45, y * .38, z * .45) - .3) + .45 * (fbm(x * 1.6, y * 1.6, z * 1.6) - .4)); // lumpy rock, never in front of where walkers stop
           col.push({x: x + out[0] * push, y, z: z + out[1] * push, u: (di ? z : x) * (di + dj > 0 ? 1 : -1), v: y});
         }
         grid.push(col);

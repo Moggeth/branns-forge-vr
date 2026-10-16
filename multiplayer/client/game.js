@@ -686,7 +686,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     disposePlaceholder(entry.visual);
     entry.visual = model;
     entry.root.add(model);
-    if (entry.data.boss) underways.dressGuardian(model); // the Underways' crowned guardian
+    if (entry.data.boss) underways.dressGuardian(model, 2.8 * BOSS_SCALE); // the Underways' crowned guardian
     if (forgeling) dressForgelingModel(model, entry.data.id);
     else if (entry.data.side === 'party' && entry.data.battleRun !== undefined && ['skeleton', 'golem'].includes(entry.data.kind)) dressForgeling(model, entry.data.kind);
   }

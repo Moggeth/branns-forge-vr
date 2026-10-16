@@ -295,17 +295,12 @@ export function createUnderwayView({scene, quality = 'high', sound = () => {}, k
     },
     stats: () => ({...stat, portals: portals?.stats()}),
     /** Crown a guardian golem's model (its head bone, or the top of the model when it has none). */
-    dressGuardian(model) {
+    dressGuardian(model, height = 3.6) {
       if (!model || model.userData.uwCrown) return;
-      let head = null; model.traverse(o => { if (!head && o.isBone && /head/i.test(o.name)) head = o; });
-      const box = new THREE.Box3().setFromObject(model), size = box.getSize(new THREE.Vector3());
+      // On the model root (bone axes and skinned bounds differ between rigs): just above the head, from the known height.
       const crown = single(underwayKit().crown, propMat, [.9, .75, .6]); crown.name = 'UnderwayCrown';
-      const width = size.x * .2; // about the head's span on the golem
-      model.updateWorldMatrix(true, true);
-      // On the model root (bone axes differ between rigs): just above the head, at the top of the body's bounds.
-      const ms = model.getWorldScale(new THREE.Vector3()).x, base = model.getWorldPosition(new THREE.Vector3());
-      const hx = head ? head.getWorldPosition(new THREE.Vector3()).sub(base) : new THREE.Vector3();
-      crown.scale.setScalar(width / ms); crown.position.set(0, (box.max.y - base.y) / ms - width * .25 / ms, 0); crown.position.x = 0; crown.position.z = head ? hx.z / ms * .5 : 0; model.add(crown);
+      model.updateWorldMatrix(true, false); const ms = model.getWorldScale(new THREE.Vector3()).x || 1, width = height * .2;
+      crown.scale.setScalar(width / ms); crown.position.set(0, height * .86 / ms, 0); model.add(crown);
       model.userData.uwCrown = crown;
     },
     current: () => current,
