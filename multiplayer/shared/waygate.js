@@ -28,8 +28,8 @@ const shifted = (id, name, x, z, [fx, fz]) => { const [dx, dz] = siteShift(id); 
 export const DESTINATIONS = Object.freeze([
   destination('forge', 'the Forge', -7.4, 5.1, [0, 0]), // on the sanctuary path, clear of the yard's ore nodes
   // Landmark destinations follow their site when the map editor shifts it (shared/map-layout.js).
-  shifted('outcrop', 'the Crystal Outcrop', 20.5, 12.5, [27, 14]),
-  shifted('watcharch', 'the Ruined Watch-Arch', -4.5, -22, [-5, -28]),
+  shifted('outcrop', 'the Crystal Outcrop', 16.7, -4.2, [24, -6]),
+  shifted('watcharch', 'the Ruined Watch-Arch', -10.5, 4.5, [-11, -1.5]),
 ]);
 const flat = (a, x, z) => Math.hypot(a[0] - x, a[2] - z);
 

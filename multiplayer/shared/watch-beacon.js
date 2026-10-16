@@ -12,7 +12,7 @@ const site = STARTING_SITES.find(s => s.id === 'watcharch');
 const tower = site.footprints.find(f => f.kind === 'tower');
 export const BEACON = Object.freeze({id: 'watchBeacon', x: tower.x, z: tower.z, top: tower.h});
 // Hearth: in front of the arch on the forge side, clear of the piers, the fallen blocks and the waygate's return circle.
-export const BEACON_HEARTH = Object.freeze({x: -6.6, z: -23.4});
+export const BEACON_HEARTH = Object.freeze({x: site.x - 1.6, z: site.z + 4.6});
 const flat = (a, x, z) => Math.hypot(a[0] - x, a[2] - z);
 
 export const beaconLit = state => !!state.beacon && state.tick < state.beacon.litUntil;
