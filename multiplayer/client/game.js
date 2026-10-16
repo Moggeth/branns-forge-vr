@@ -1958,7 +1958,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     skyCycle.setTrees(siegebirdTrees());skyCycle.update({tick:estimatedTick,seed:snapshot.seed??41,override:snapshot.weather||null,time:now/1000,dt,camera:viewCamera,groundY:heightAt(heroCamera.x,heroCamera.z,snapshot.edits),rts:role==='god'&&!renderer.xr.isPresenting});inventionVisual.setNight(skyCycle.night());
     orchard.update(dt, camera); skyline.update(camera);
     if(wildsView.active()){ // a whole landscape to see: push the haze out, keeping the sky cycle's colour and weather scale
-      scene.fog.near*=wildsView.fog.near;scene.fog.far*=wildsView.fog.far;
+      {const above=Math.max(0,heroCamera.y-heightAt(heroCamera.x,heroCamera.z)),lift=1+above/260;scene.fog.near*=wildsView.fog.near*lift;scene.fog.far*=wildsView.fog.far*Math.min(2.2,lift);}
       const wildsFocus=role==='god'&&!renderer.xr.isPresenting?pan:heroCamera;wildsView.update({focus:wildsFocus,camera:viewCamera,snapshot:{...snapshot,tick:terrainShownTick()},dt});wildsPlaces.update(wildsFocus,dt);
     }
     coveHeroes.length=0;if(role==='hero'&&initialized)coveHeroes.push({id:playerId,x:localPosition.x,y:localPosition.y,z:localPosition.z});
