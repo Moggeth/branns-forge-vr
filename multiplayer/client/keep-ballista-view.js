@@ -6,7 +6,7 @@
 // invention-view.js), standing on a Dawnhold dais.
 import * as THREE from 'three';
 import {HOME_MANNED, KEEP_BALLISTA, homeBallistaYaw, keepMuzzle, keepShotAt, keepSpeed, keepStyle, sunDraw} from '../shared/home-ballista.js';
-import {machineCycleAge} from '../shared/inventions.js';
+import {MANNED} from '../shared/inventions.js';
 import {buildKeepRig, poseKeepRig, prepareKeepKit, rigMuzzle} from './keep-ballista-art.js';
 import {createTimberlineBallista} from '../assets-source/timberline-twinbolt-20261003/runtime/timberline-ballista.js';
 import {addLadderPlates} from './timberline-ladder-plates.js';
@@ -16,6 +16,18 @@ const STUCK_CAP = 20, STUCK_LIFE = 22, LINK = .13, LINKS = 300;
 const COLOR = {sunlance: new THREE.Color(0x7cc4ff), dawn: new THREE.Color(0xffc65a), gnashjaw: new THREE.Color(0x8cff4a), dust: new THREE.Color(0xb59a74)};
 const wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
 const v3 = a => new THREE.Vector3(a[0], a[1], a[2]);
+
+// Where a gate Timberline is in its Fire (0-.75 s) + Reload (.75-3.9 s) clips. Its reload varies (4 s crewed, 6 s on its
+// own, half with the hat, faster while cranked), so the fire always plays in full and the wind is stretched over
+// however long this reload really takes: the share already wound, against what is left.
+const FIRE_CLIP = .75, RELOAD_CLIP = 3.15;
+export function gateCycleAge(part, tick) {
+  const fired = tick - (part.fireTick ?? -1e4), left = (part.readyTick ?? 0) - tick;
+  if (left <= 0) return FIRE_CLIP + RELOAD_CLIP + .1;
+  if (fired < MANNED.fireTicks) return fired / 60;
+  const wound = fired - MANNED.fireTicks;
+  return FIRE_CLIP + RELOAD_CLIP * Math.min(1, wound / Math.max(1, wound + left));
+}
 
 // The dais under a gate Timberline: Dawnhold sandstone, a brass rim and a blue enamel inlay that wakes while it is loaded.
 const DAIS = Object.freeze({radius: 1.32, top: .04, depth: .45, stone: 0xb9ad97, brass: 0xc49a52, glow: 0x5fb4ff});
@@ -235,8 +247,7 @@ export function createKeepBallistaView({root, height = () => 0, timberline = () 
     const mine = localAim.get(data.id), want = mine || {yaw: data.aimYaw || 0, pitch: data.aimPitch || 0}, ease = mine ? 1 : 1 - Math.exp(-dt * 7);
     k.yaw += wrap(want.yaw - k.yaw) * ease; k.pitch += (want.pitch - k.pitch) * ease;
     k.machine.aimImmediate(k.yaw, k.pitch);
-    const age = machineCycleAge({fireTick: data.fireTick ?? -1e4, readyTick: data.readyTick ?? 0}, tick);
-    k.machine.seekCycle(alive ? age : 99, camera, viewport, {ammo: alive});
+    k.machine.seekCycle(alive ? gateCycleAge(data, tick) : 99, camera, viewport, {ammo: alive});
     // The inlay glows while a pair sits on the rails and dims through the wind.
     const ready = tick >= (data.readyTick ?? 0);
     k.dais.inlay.emissiveIntensity += ((alive ? (ready ? 1.1 : .35) : 0) - k.dais.inlay.emissiveIntensity) * (1 - Math.exp(-dt * 6));
