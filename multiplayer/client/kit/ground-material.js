@@ -15,7 +15,7 @@ import {loadDeliveredTexture} from '../texture-delivery.js';
 export const KIT_LAYERS = Object.freeze(['lush', 'meadow', 'forest', 'soil', 'sand', 'rock', 'snow']);
 const SIZE = 512, NSIZE = 256;
 // Linear mean colour of each painted layer (kept in step with the texture script) and a gain that sets the final look.
-const MEAN = [[.083, .218, .029], [.277, .305, .075], [.188, .137, .031], [.252, .122, .045], [.618, .485, .245], [.21, .197, .171], [.751, .811, .881]];
+const MEAN = [[.083, .218, .029], [.277, .305, .075], [.122, .142, .032], [.252, .122, .045], [.618, .485, .245], [.21, .197, .171], [.751, .811, .881]];
 const GAIN = [[2.1, 1.85, 2.0], [1, 1.12, .95], [1.1, 1.1, 1.1], [1, 1, 1], [.92, .92, .92], [1.12, 1.12, 1.12], [.88, .9, .93]];
 const ROUGH = [.92, .93, .9, .95, .97, .85, .6];
 // Metres per texture repeat.
@@ -55,14 +55,14 @@ function kitTextures(assetBase) {
  * morph: [start, end] metres (Chebyshev) over which this level slides onto its coarser neighbour; null for none.
  * ring: {value: Vector3(cx, cz, half)} — this level's built extent, so its rim always meets the coarser level exactly.
  */
-export function createGroundMaterial({assetBase = '/assets/', focus, morph = null, ring, snow, quality = 'high'}) {
+export function createGroundMaterial({assetBase = '/assets/', focus, morph = null, ring, snow, time, quality = 'high'}) {
   const tex = kitTextures(assetBase);
   const uniforms = {
     kitAlbedo: {value: tex.albedo}, kitNormal: {value: tex.normal}, kitReady: tex.ready,
     kitMean: {value: MEAN.map((m, k) => new THREE.Vector3(m[0] * GAIN[k][0], m[1] * GAIN[k][1], m[2] * GAIN[k][2]))},
     kitGain: {value: GAIN.map(g => new THREE.Vector3(...g))},
     kitFocus: focus, kitRing: ring, kitMorph: {value: new THREE.Vector2(...(morph || [1e9, 2e9]))},
-    kitSnow: snow,
+    kitSnow: snow, kitTime: time || {value: 0},
   };
   const material = new THREE.MeshStandardMaterial({vertexColors: true, roughness: .92, metalness: 0});
   const low = quality === 'low';
@@ -70,7 +70,7 @@ export function createGroundMaterial({assetBase = '/assets/', focus, morph = nul
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>
-        attribute vec4 kitA; attribute vec4 kitB; attribute vec3 morph;
+        attribute vec4 kitA; attribute vec4 kitB; attribute vec3 morph; attribute float water; varying float vKitWater;
         uniform vec2 kitFocus; uniform vec3 kitRing; uniform vec2 kitMorph;
         varying vec4 vKitA; varying vec4 vKitB; varying vec3 vKitPos; varying vec3 vKitN;`)
       .replace('#include <beginnormal_vertex>', `
@@ -83,12 +83,13 @@ export function createGroundMaterial({assetBase = '/assets/', focus, morph = nul
         #endif`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
         transformed.y = mix(position.y, morph.x, kitK);
-        vKitA = kitA; vKitB = kitB; vKitN = objectNormal; vKitPos = (modelMatrix * vec4(transformed, 1.0)).xyz;`);
+        vKitA = kitA; vKitB = kitB; vKitWater = water; vKitN = objectNormal; vKitPos = (modelMatrix * vec4(transformed, 1.0)).xyz;`);
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>
         precision highp sampler2DArray;
         uniform sampler2DArray kitAlbedo, kitNormal; uniform float kitReady; uniform vec3 kitMean[7]; uniform vec3 kitGain[7];
-        uniform vec2 kitSnow;
+        uniform vec2 kitSnow; uniform float kitTime;
+        varying float vKitWater;
         varying vec4 vKitA; varying vec4 vKitB; varying vec3 vKitPos; varying vec3 vKitN;
         const float KIT_SCALE[7] = float[7](${SCALE.map(s => (1 / s).toFixed(5)).join(', ')});
         const float KIT_ROUGH[7] = float[7](${ROUGH.map(r => r.toFixed(3)).join(', ')});
@@ -158,6 +159,24 @@ export function createGroundMaterial({assetBase = '/assets/', focus, morph = nul
         kitAlb *= .9 + kitMacro * .2;
         kitAlb *= vColor.rgb;
         kitAlb *= 1.0 - vKitB.y * .38; kitR = mix(kitR, .45, vKitB.y * .7);
+        // Water: the bed loses red first, then fades to the deep colour; sunlight ripples (caustics) play on the shallows
+        // and foam laps at the waterline. Drawn on the ground under the clear water, so it needs no depth buffer.
+        float kitDepth = vKitWater - vKitPos.y;
+        if (kitDepth > -.7) {
+          float d = max(kitDepth, 0.0), t = kitTime;
+          kitAlb = mix(kitAlb * exp(-d * vec3(.42, .15, .1)), vec3(.018, .1, .13), 1.0 - exp(-d * .22));
+          if (d > 0.0 && kitNear > 0.0) {
+            vec2 q = vKitPos.xz * .9;
+            float c = abs(kitNoise(q + vec2(t * .35, t * .2)) - kitNoise(q * 1.3 - vec2(t * .25, -t * .3)));
+            kitAlb *= 1.0 + smoothstep(.12, 0.0, c) * .9 * exp(-d * .5) * kitNear;
+          }
+          float n = kitNoise(vKitPos.xz * 1.6 + t * .25) * .6 + kitNoise(vKitPos.xz * 4.3 - t * .45) * .4;
+          float band = smoothstep(-.6, -.08, kitDepth) * (1.0 - smoothstep(.05, .7, kitDepth));
+          float lap = .5 + .5 * sin(kitDepth * 8.0 - t * 1.7 + n * 3.0);
+          float foam = band * smoothstep(.5, .8, n * .55 + lap * .55);
+          kitAlb = mix(kitAlb, vec3(.92, .95, .96), foam * .85); kitR = mix(kitR, .7, foam);
+          kitR = mix(kitR, .3, smoothstep(-.7, 0.0, kitDepth) * .6);
+        }
         diffuseColor.rgb *= kitAlb;`)
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = kitR;')
       .replace('#include <normal_fragment_maps>', 'normal = normalize((viewMatrix * vec4(kitN, 0.0)).xyz);');

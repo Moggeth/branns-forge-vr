@@ -145,8 +145,8 @@ layers.append((col, 0.4 * base + 0.6 * cov, 2.6, 0.93))
 f1, f2, idx = voronoi(1400, 4)
 leaf = smooth(0.0, 0.008, f2 - f1)
 hue = (idx * 0.6180339) % 1.0
-col = palette(hue, [(0, 0x7a5432), (0.35, 0x9b6b39), (0.65, 0x6e5a2e), (1, 0xa9843f)])
-moss = smooth(0.45, 0.8, norm01(spectral(3.0, 2, 16))) * 0.75
+col = palette(hue, [(0, 0x6b5434), (0.35, 0x80683d), (0.65, 0x5f5631), (1, 0x8f7845)])
+moss = smooth(0.32, 0.68, norm01(spectral(3.0, 2, 16))) * 0.85
 col = lerp(col * (0.84 + 0.16 * leaf[..., None]) * (0.85 + 0.3 * norm01(spectral(2.5, 2, 64))[..., None]), palette(norm01(spectral(2, 16, 200)), [(0, 0x3f6527), (1, 0x5f8a33)]), moss * 0.85)
 h = leaf * 0.5 + norm01(spectral(2.2, 4, 128)) * 0.5
 layers.append((col, h, 3.5, 0.9))

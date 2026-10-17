@@ -17,6 +17,9 @@ import {chunkContent, activeChunks, CHUNK, CRAG_KINDS} from '../shared/worldgen/
 import {BIOME, BIOME_NAMES} from '../shared/worldgen/generate.js';
 import {hash01} from '../shared/worldgen/random.js';
 import {createGroundMaterial} from './kit/ground-material.js';
+import {ATMOSPHERE} from './atmosphere-materials.js';
+import {impostorSources, bakeImpostors, createImpostorField} from './kit/tree-impostors.js';
+import {VARIANTS, treeScale} from '../shared/trees.js';
 
 // morph: Chebyshev metres from the focus over which a level slides onto the next coarser one. It must finish before the
 // nearest the level's edge can be (half extent minus the recentring slack of .75 snap), so rims always meet exactly.
@@ -28,12 +31,12 @@ const LEVELS = Object.freeze([
 ]);
 const TILE = 32, TILE_MAX = 900;
 const QUALITY = {
-  high: {budget: 4, mid: 230, far: 1500, cap: 16000, fogNear: 2.2, fogFar: 10},
-  low: {budget: 2.5, mid: 150, far: 950, cap: 7000, fogNear: 2, fogFar: 6.5},
+  high: {budget: 4, mid: 230, far: 1500, cap: 16000, fogNear: 6, fogFar: 22, aerial: 1 / 1500},
+  low: {budget: 2.5, mid: 150, far: 950, cap: 7000, fogNear: 4, fogFar: 13, aerial: 1 / 1100},
 };
 // Ground kit layers per generator biome id: lush, meadow, forest floor, soil, sand, then rock and snow leanings.
 const BIOME_KIT = [
-  [0, 0, 0, .3, .7, 0, 0], [0, 0, 0, .5, .5, 0, 0], [0, 0, 0, 0, 1, 0, 0], [.62, .38, 0, 0, 0, 0, 0], [.35, .1, .55, 0, 0, 0, 0],
+  [0, 0, 0, .3, .7, 0, 0], [0, 0, 0, .5, .5, 0, 0], [0, 0, 0, 0, 1, 0, 0], [.74, .26, 0, 0, 0, 0, 0], [.35, .1, .55, 0, 0, 0, 0],
   [.15, .25, .6, 0, 0, 0, 0], [.65, 0, .1, .25, 0, 0, 0], [.1, .9, 0, 0, 0, 0, 0], [0, .3, 0, .2, 0, .5, 0], [0, .2, 0, 0, 0, 0, .8], [0, .6, 0, .25, 0, .15, 0]];
 // A gentle tint per biome over the painted layers (linear multipliers): cool pines, olive marsh, sun-baked steppe.
 const BIOME_TINT = [[1, 1, 1], [1, 1, 1], [1, 1, 1], [1, 1, 1], [.94, .98, .92], [.84, .94, .93], [.9, .95, .76], [1.05, 1, .86], [1, .98, .96], [1, 1, 1], [.95, .96, .94]];
@@ -42,10 +45,10 @@ export const SNOW_LINE = Object.freeze([135, 185]);
 const smooth = (a, b, v) => { const t = Math.min(1, Math.max(0, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
 const lerp3 = (out, c, t) => { out[0] += (c[0] - out[0]) * t; out[1] += (c[1] - out[1]) * t; out[2] += (c[2] - out[2]) * t; };
 
-export function createWildsView({scene, renderer = null, quality = 'high', assetBase = '/assets/', report = () => {}}) {
+export function createWildsView({scene, renderer = null, templates = null, quality = 'high', assetBase = '/assets/', report = () => {}}) {
   const Q = QUALITY[quality] || QUALITY.high;
   const group = new THREE.Group(); group.name = 'wilds'; group.visible = false; scene.add(group);
-  const kitFocus = {value: new THREE.Vector2()}, kitSnow = {value: new THREE.Vector2(...SNOW_LINE)};
+  const kitFocus = {value: new THREE.Vector2()}, kitSnow = {value: new THREE.Vector2(...SNOW_LINE)}, kitTime = {value: 0};
   const waterMaterial = createWaterMaterial();
   let world = null, descriptor = null, state = null, bake = null, tiles = new Map(), editRects = [], editKey = '';
   // ---------- heights ----------
@@ -77,7 +80,7 @@ export function createWildsView({scene, renderer = null, quality = 'high', asset
   // ---------- terrain levels ----------
   const levels = LEVELS.map((spec, l) => {
     const ring = {value: new THREE.Vector3(0, 0, 1e9)};
-    const material = createGroundMaterial({assetBase, focus: kitFocus, morph: spec.morph, ring, snow: kitSnow, quality});
+    const material = createGroundMaterial({assetBase, focus: kitFocus, morph: spec.morph, ring, snow: kitSnow, time: kitTime, quality});
     const mesh = new THREE.Mesh(new THREE.BufferGeometry(), material);
     mesh.name = 'wilds-terrain-' + l; mesh.frustumCulled = false; mesh.visible = false; mesh.receiveShadow = l < 2;
     mesh.userData.ignoreContact = true; group.add(mesh);
@@ -171,20 +174,31 @@ export function createWildsView({scene, renderer = null, quality = 'high', asset
     const morph = new Float32Array(v * 3), cache = new Map();
     for (let k = 0; k < v; k++) { morphAt(l, pos[k * 3], pos[k * 3 + 2], morph, k * 3, cache); if ((k & 511) === 511) yield; }
     geometry.setAttribute('morph', new THREE.BufferAttribute(morph, 3));
-    const colors = new Float32Array(v * 3), ka = new Float32Array(v * 4), kb = new Float32Array(v * 4);
+    const colors = new Float32Array(v * 3), ka = new Float32Array(v * 4), kb = new Float32Array(v * 4), wl = new Float32Array(v);
     for (let k = 0; k < v; k++) {
-      surfaceKit(pos[k * 3], pos[k * 3 + 1], pos[k * 3 + 2], l, colors, ka, kb, k);
+      surfaceKit(pos[k * 3], pos[k * 3 + 1], pos[k * 3 + 2], l, colors, ka, kb, wl, k);
       if ((k & 255) === 255) yield;
     }
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geometry.setAttribute('kitA', new THREE.BufferAttribute(ka, 4));
     geometry.setAttribute('kitB', new THREE.BufferAttribute(kb, 4));
+    geometry.setAttribute('water', new THREE.BufferAttribute(wl, 1));
     geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(cx, 0, cz), half * 1.5 + 400);
     out.geometry = geometry;
   }
-  const kitW = new Float32Array(7);
+  const kitW = new Float32Array(7), cavCache = new Map();
+  /** Concavity on the 12 m lattice (48 m for the farthest level; cached), bilinear between lattice points. Positive in hollows. */
+  function cavityAt(x, z, cl) {
+    const C = LEVELS[cl].cell, X = x / C, Z = z / C, i = Math.floor(X), j = Math.floor(Z), fx = X - i, fz = Z - j;
+    const at = (a, b) => {
+      const key = cl * 1e10 + a * 131072 + b; let c = cavCache.get(key);
+      if (c === undefined) { c = ((vertex(cl, a + 1, b) + vertex(cl, a - 1, b) + vertex(cl, a, b + 1) + vertex(cl, a, b - 1)) * .25 - vertex(cl, a, b)) / C; cavCache.set(key, c); if (cavCache.size > 60000) cavCache.clear(); }
+      return c;
+    };
+    return (at(i, j) * (1 - fx) + at(i + 1, j) * fx) * (1 - fz) + (at(i, j + 1) * (1 - fx) + at(i + 1, j + 1) * fx) * fz;
+  }
   /** Ground kit weights and tint at a vertex: biome mix, forest floor, moisture, shores, beaches, roads, high pasture. */
-  function surfaceKit(x, y, z, l, colors, ka, kb, k) {
+  function surfaceKit(x, y, z, l, colors, ka, kb, wl, k) {
     const w = kitW; w.fill(0); let tr = 0, tg = 0, tb = 0;
     // Biome, blended over four nearby samples so boundaries read as soft transitions.
     for (const [dx, dz] of [[-5, -3], [4, -5], [-4, 5], [5, 4]]) {
@@ -193,20 +207,24 @@ export function createWildsView({scene, renderer = null, quality = 'high', asset
       tr += t[0] * .25; tg += t[1] * .25; tb += t[2] * .25;
     }
     const forest = world.forestAt(x, z), moist = world.moistureAt(x, z);
-    const shade = Math.min(1, forest) * .4; w[2] += (w[0] + w[1]) * shade; w[0] *= 1 - shade; w[1] *= 1 - shade;
+    const shade = smooth(.35, .85, forest) * .7; w[2] += (w[0] + w[1]) * shade; w[0] *= 1 - shade; w[1] *= 1 - shade;
     const lush = Math.max(-1, Math.min(1, (moist - .5) * 1.2)) * .6;
     if (lush > 0) { const d = w[1] * lush; w[1] -= d; w[0] += d; } else { const d = w[0] * -lush; w[0] -= d; w[1] += d; }
     if (y > 70) { const t = smooth(70, 130, y) * .6, d = w[0] * t; w[0] -= d; w[1] += d; } // high pasture before the snowline
     let wet = 0;
-    const water = world.waterAt(x, z), depth = water - y;
-    if (depth > -1.6 && water > -1e9) { const t = smooth(-1.6, .1, depth); for (let i = 0; i < 4; i++) w[i] *= 1 - t * .85; w[4] += t * .85; wet = smooth(-1.2, .2, depth) * (depth > 0 ? .5 : 1); }
+    const water = world.waterAt(x, z), depth = water - y; wl[k] = water > -1e9 ? water : -1e4;
+    if (depth > -1 && water > -1e9) { const t = smooth(-1, .1, depth); for (let i = 0; i < 4; i++) w[i] *= 1 - t * .85; w[4] += t * .85; wet = smooth(-1.2, .2, depth) * (depth > 0 ? .5 : 1); }
     if (depth > 0) { const t = smooth(.2, 7, depth); tr += (DEEP_TINT[0] - tr) * t; tg += (DEEP_TINT[1] - tg) * t; tb += (DEEP_TINT[2] - tb) * t; }
     if (y < 2.2 && y > -1 && water === 0) { const t = smooth(2.2, .6, y); for (let i = 0; i < 4; i++) w[i] *= 1 - t; w[4] += t; }
     if (l < 2) { const r = world.roadAt(x, z); if (r < 2.6) { const t = smooth(2.6, 1.2, r) * .9; for (let i = 0; i < 5; i++) if (i !== 3) w[i] *= 1 - t; w[3] += t; } }
     const sum = w[0] + w[1] + w[2] + w[3] + w[4] || 1;
     ka[k * 4] = w[0] / sum; ka[k * 4 + 1] = w[1] / sum; ka[k * 4 + 2] = w[2] / sum; ka[k * 4 + 3] = w[3] / sum;
     kb[k * 4] = w[4] / sum; kb[k * 4 + 1] = wet; kb[k * 4 + 2] = w[6]; kb[k * 4 + 3] = w[5];
-    colors[k * 3] = tr; colors[k * 3 + 1] = tg; colors[k * 3 + 2] = tb;
+    // Cavity: hollows and gullies a little darker, crests a little brighter (sky light they see), at one world scale so
+    // every level agrees.
+    const cav = cavityAt(x, z, Math.max(2, l));
+    const ao = Math.min(1.06, Math.max(.76, 1 - cav * .9));
+    colors[k * 3] = tr * ao; colors[k * 3 + 1] = tg * ao; colors[k * 3 + 2] = tb * ao;
   }
   function wantedConfig(fx, fz) {
     const cfg = []; let prev = null;
@@ -299,11 +317,25 @@ export function createWildsView({scene, renderer = null, quality = 'high', asset
     m.count = 0; m.frustumCulled = false; m.name = 'wilds-trees-' + v; m.userData.ignoreContact = true; group.add(m); return m;
   });
   let treeJob = null, treeKey = '', treeAt = [NaN, NaN], treeCount = 0;
+  // Impostors (once the species models have loaded and been baked) replace the faceted stand-ins above.
+  let impostors = null, impostorFailed = false;
+  const impFade = {value: new THREE.Vector2(Q.mid * 1.4, Q.far)};
+  function tryImpostors() {
+    if (impostors || impostorFailed || !templates || !renderer || renderer.xr?.isPresenting) return;
+    const sources = impostorSources(templates, VARIANTS); if (!sources) return;
+    try {
+      const bake = bakeImpostors(renderer, sources, quality === 'low' ? 128 : 256);
+      impostors = createImpostorField({bake, capacity: Math.ceil(Q.cap * 2), fade: impFade, time: kitTime}); group.add(impostors.mesh);
+      for (const m of treeMeshes) { m.count = 0; m.visible = false; }
+      treeKey = ''; treeJob = null; // rebuild the forest as impostors
+    } catch (e) { impostorFailed = true; report('wilds-impostors', String(e?.message || e)); }
+  }
   const VARIANT_BY_BIOME = {[BIOME.MEADOW]: [0, 0, 2], [BIOME.FOREST]: [0, 1, 2], [BIOME.PINE]: [1, 1, 2], [BIOME.MARSH]: [1, 1, 0], [BIOME.STEPPE]: [2, 0, 2], [BIOME.TUNDRA]: [2, 1, 2], [BIOME.BEACH]: [2, 2, 2]};
   const TREE_TINT = {[BIOME.PINE]: [.78, .9, .86], [BIOME.TUNDRA]: [.92, .9, .78], [BIOME.MARSH]: [.9, .95, .72], [BIOME.STEPPE]: [1.08, 1.02, .78]};
   function* buildTrees(fx, fz, skip, felled) {
     const lists = [[], [], []], mid2 = Q.mid * Q.mid, far2 = Q.far * Q.far, seed = world.gen.seedHash;
-    const push = (v, x, z, h, tint) => { const L = lists[v]; if (L.length / 6 < treeMeshes[v].instanceMatrix.count) L.push(x, z, h, tint[0], tint[1], tint[2]); };
+    const imp = impostors, room = v => imp ? imp.capacity / 2 : treeMeshes[v].instanceMatrix.count;
+    const push = (v, x, z, h, tint) => { const L = lists[v]; if (L.length / 6 < room(v)) L.push(x, z, h, tint[0], tint[1], tint[2]); };
     // Exact generated trees between the live window and the mid radius.
     const r = Math.ceil(Q.mid / CHUNK);
     const ccx = Math.floor(fx / CHUNK), ccz = Math.floor(fz / CHUNK);
@@ -313,6 +345,7 @@ export function createWildsView({scene, renderer = null, quality = 'high', asset
         const mx = (cx + .5) * CHUNK - fx, mz = (cz + .5) * CHUNK - fz; if (mx * mx + mz * mz > mid2) continue;
         for (const t of chunkContent(world, cx, cz).trees) {
           if (felled.has(t.id)) continue;
+          if (imp) { push(t.variant, t.x, t.z, t.height, [1, 1, 1]); continue; } // exactly as the live tree will draw it
           const b = world.biomeAt(t.x, t.z), shade = .85 + hash01(seed, 71, t.x * 7 | 0, t.z * 7 | 0) * .3, tint = TREE_TINT[b] || [1, 1, 1];
           push(t.variant, t.x, t.z, t.height, [tint[0] * shade, tint[1] * shade, tint[2] * shade]);
         }
@@ -329,7 +362,7 @@ export function createWildsView({scene, renderer = null, quality = 'high', asset
         const b = biome[c], variants = VARIANT_BY_BIOME[b]; if (!variants) continue;
         const cxs = (i + .5) * cell - half - ox, czs = (j + .5) * cell - half - oz, dx = cxs - fx, dz = czs - fz, d2 = dx * dx + dz * dz;
         if (d2 < mid2 * .92 || d2 > far2) continue;
-        const thin = d2 > far2 * .3 ? .45 : .8, n = cover > .55 ? 2 : 1;
+        const thin = impostors ? .8 : d2 > far2 * .3 ? .45 : .8, n = cover > .55 ? 2 : 1;
         for (let k = 0; k < n; k++) {
           if (hash01(seed, 81, i, j, k) > cover * thin) continue;
           const x = cxs + (hash01(seed, 82, i, j, k) - .5) * cell * .9, z = czs + (hash01(seed, 83, i, j, k) - .5) * cell * .9;
@@ -345,6 +378,15 @@ export function createWildsView({scene, renderer = null, quality = 'high', asset
     const ys = lists.map(L => new Float32Array(L.length / 6));
     for (const [v, L] of lists.entries()) for (let k = 0; k < L.length / 6; k++) { ys[v][k] = world.heightAt(L[k * 6], L[k * 6 + 1]); if ((k & 511) === 511) yield; }
     treeCount = 0;
+    if (imp) {
+      const n = lists.reduce((a, L) => a + L.length / 6, 0), data = new Float32Array(n * 9); let o = 0;
+      for (const [v, L] of lists.entries()) for (let k = 0; k < L.length / 6; k++, o += 9) {
+        const x = L[k * 6], z = L[k * 6 + 1];
+        data[o] = x; data[o + 1] = ys[v][k] - .1; data[o + 2] = z; data[o + 3] = treeScale({variant: v, height: L[k * 6 + 2]});
+        data[o + 4] = v; data[o + 5] = hash01(seed, 92, x * 10 | 0, z * 10 | 0); data[o + 6] = L[k * 6 + 3]; data[o + 7] = L[k * 6 + 4]; data[o + 8] = L[k * 6 + 5];
+      }
+      imp.set(data, n); treeCount = imp.count(); return;
+    }
     for (const [v, L] of lists.entries()) {
       const mesh = treeMeshes[v], n = L.length / 6;
       for (let k = 0; k < n; k++) {
@@ -404,11 +446,11 @@ export function createWildsView({scene, renderer = null, quality = 'high', asset
   let time = 0;
   function setWorld(next, nextDescriptor) {
     if (next === world) return;
-    world = next; descriptor = nextDescriptor || null; tiles = new Map(); job = null; treeJob = null; treeKey = '';
+    world = next; descriptor = nextDescriptor || null; tiles = new Map(); cavCache.clear(); job = null; treeJob = null; treeKey = '';
     for (const L of levels) { L.built = false; L.cx = L.cz = L.wantX = L.wantZ = NaN; L.innerKey = ''; L.mesh.visible = false; }
     for (const m of treeMeshes) m.count = 0;
     for (const row of cragMeshes) for (const m of row) m.count = 0; cragJob = null; cragAt = [NaN, NaN];
-    group.visible = !!world;
+    group.visible = !!world; ATMOSPHERE.bfAerial.value.set(world ? Q.aerial : 0, 220, world ? 1 : 0);
     if (world) { baseState.world = descriptor; buildWater(); }
   }
   /** Run queued builds for up to `budget` ms (a bigger budget on the loading screen). */
@@ -423,13 +465,14 @@ export function createWildsView({scene, renderer = null, quality = 'high', asset
   }
   function update({focus, camera, snapshot, dt = 0, budget = Q.budget}) {
     if (!world || !snapshot) return;
-    time += dt; waterMaterial.userData.time.value = time; kitFocus.value.set(focus.x, focus.z);
+    time += dt; waterMaterial.userData.time.value = time; kitFocus.value.set(focus.x, focus.z); kitTime.value = time;
     if (bake !== snapshot.terrainBake) { bake = snapshot.terrainBake; baseState.terrainBake = bake; tiles = new Map(); for (const L of levels) L.innerKey = 'stale'; }
     state = snapshot; const ek = (snapshot.edits || []).length + '|' + (snapshot.inventions?.structures || []).length; if (ek !== editKey) { editKey = ek; refreshEdits(); }
     if (!job) {
       const cfg = wantedConfig(focus.x, focus.z);
       if (levels.some((L, l) => !L.built || L.cx !== cfg[l].cx || L.cz !== cfg[l].cz || L.innerKey !== cfg[l].innerKey)) job = buildAll(cfg);
     }
+    tryImpostors();
     if (!treeJob) {
       const skip = new Set(activeChunks(snapshot).map(([a, b]) => a + ',' + b)), felled = snapshot.wilds?.felled || [];
       const key = [...skip].join(';') + '|' + felled.length + '|' + (snapshot.harvestedTrees || []).length;
@@ -447,8 +490,10 @@ export function createWildsView({scene, renderer = null, quality = 'high', asset
   function dispose() {
     scene.remove(group);
     for (const L of levels) { L.mesh.geometry.dispose(); L.mesh.material.dispose(); }
+    ATMOSPHERE.bfAerial.value.x = 0;
     for (const m of [sea, lakes, rivers]) m?.geometry.dispose();
     for (const m of treeMeshes) { m.geometry.dispose(); m.dispose?.(); }
+    impostors?.dispose();
     for (const row of cragMeshes) for (const m of row) { m.geometry.dispose(); m.dispose?.(); }
     waterMaterial.dispose(); treeMaterial.dispose(); cragMaterial.dispose();
   }
@@ -459,28 +504,50 @@ export function createWildsView({scene, renderer = null, quality = 'high', asset
 
 // ---------- materials ----------
 function createWaterMaterial() {
-  const material = new THREE.MeshStandardMaterial({color: 0x2e8fa3, roughness: .08, metalness: 0, transparent: true, opacity: .85, depthWrite: false, envMapIntensity: 1.3});
+  // Clear water: what you see of depth is the ground's own absorption and caustics underneath (kit ground material);
+  // the surface adds sky reflection, sun glints, rings of ripples and, on rivers, foam streaks running downstream.
+  const material = new THREE.MeshStandardMaterial({color: 0x1d6e82, roughness: .06, metalness: 0, transparent: true, opacity: .85, depthWrite: false, envMapIntensity: 1.15});
   const time = {value: 0}; material.userData.time = time;
   material.onBeforeCompile = shader => {
     shader.uniforms.wTime = time;
     shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nattribute vec3 water; varying vec3 vWater; varying vec3 vWWorld;')
       .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvWater = water; vWWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nuniform float wTime; varying vec3 vWater; varying vec3 vWWorld;')
+    shader.fragmentShader = shader.fragmentShader.replace('#include <common>', `#include <common>
+        uniform float wTime; varying vec3 vWater; varying vec3 vWWorld;
+        float wHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float wNoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+          return mix(mix(wHash(i), wHash(i + vec2(1, 0)), f.x), mix(wHash(i + vec2(0, 1)), wHash(i + vec2(1, 1)), f.x), f.y); }
+        // Gradient of a few travelling wave trains at different angles and lengths: no visible grid, no single direction.
+        vec2 wWaves(vec2 p, float t) {
+          vec2 g = vec2(0.0);
+          const int N = 6;
+          for (int i = 0; i < N; i++) {
+            float fi = float(i), a = fi * 2.399 + .4, k = .28 * pow(1.55, fi), amp = 1.0 / (1.0 + fi * .9);
+            vec2 d = vec2(cos(a), sin(a));
+            g += d * cos(dot(d, p) * k + t * sqrt(9.8 * k) * .55 + fi * 1.7) * amp * k;
+          }
+          return g;
+        }`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        float wRiver = vWater.z;
+        vec2 wP = mix(vWWorld.xz, vec2(vWater.x, vWater.y - wTime * 1.6), wRiver);
+        float wDist = length(vWWorld - cameraPosition);
+        // Foam streaks on rivers, stretched along the flow.
+        float wStreak = wRiver * .6 * smoothstep(.72, .9, wNoise(vec2(wP.x * 1.4, wP.y * .22)) * .7 + wNoise(vec2(wP.x * 3.1, wP.y * .5)) * .3) * (1.0 - smoothstep(30.0, 160.0, wDist));
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.9, .94, .95), wStreak * .8);`)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
         {
-          float river = vWater.z;
-          vec2 p = mix(vWWorld.xz, vec2(vWater.x, vWater.y - wTime * 1.6), river);
-          float t = wTime;
-          vec2 g = vec2(sin(p.x * .35 + t * 1.1) + .8 * sin(p.x * .21 + p.y * .27 - t * .9) + .3 * sin(p.y * .93 + t * 1.7),
-                        sin(p.y * .31 - t * 1.0) + .8 * sin(p.y * .19 - p.x * .25 + t * .8) + .3 * sin(p.x * .87 - t * 1.5));
-          g += vec2(sin(p.x * 1.9 + p.y * .7 + t * 2.6), sin(p.y * 2.1 - p.x * .6 - t * 2.3)) * .35;
-          float fade = 1.0 - smoothstep(40.0, 400.0, length(vWWorld - cameraPosition));
-          normal = normalize(normal + (viewMatrix * vec4(g.x * .07 * fade, 0.0, g.y * .07 * fade, 0.0)).xyz);
-          float fr = pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 3.0);
-          diffuseColor.a = mix(.62, .97, fr);
+          float fade = 1.0 - smoothstep(30.0, 260.0, wDist);
+          vec2 g = wWaves(wP, wTime) * (.05 + wRiver * .03);
+          vec2 q = wP * 1.7 + vec2(wTime * .4, -wTime * .3);
+          g += (vec2(wNoise(q + vec2(.13, 0)), wNoise(q + vec2(0, .13))) - wNoise(q)) * 1.6 * fade;
+          g *= mix(.35, 1.0, fade);
+          normal = normalize(normal + (viewMatrix * vec4(-g.x, 0.0, -g.y, 0.0)).xyz);
+          float fr = pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 4.0);
+          diffuseColor.a = clamp(mix(.4, .97, fr) + wStreak * .5, 0.0, 1.0);
         }`);
   };
-  material.customProgramCacheKey = () => 'wilds-water-v1';
+  material.customProgramCacheKey = () => 'wilds-water-v2';
   return material;
 }
 // Faceted low-poly trees, unit height, coloured per vertex (bark, shaded crown). v0 broad, v1 weeping, v2 young.
