@@ -37,9 +37,11 @@ TAU = math.tau
 rng = np.random.default_rng(7)
 
 # ------------------------------------------------------------------ dimensions (shared with the runtime)
-EDGE_C = (0.0688, 0.758)      # edge arc centre (x, z): a hatchet's broad sweep, horn and beard tips 16 cm above/below
-EDGE_R = 0.1812               # edge arc radius (apex)
-EDGE_SPAN = math.atan2(0.162, 0.15 - EDGE_C[0])    # half the arc's angle
+EDGE_C = (0.020, 0.730)       # edge arc centre (x, z): a bearded axe, the edge runs long and the beard drops low
+EDGE_R = 0.230                # edge arc radius (apex)
+A_HI = math.asin((0.920 - EDGE_C[1]) / EDGE_R)     # arc angle up to the horn tip (z .92)
+A_LO = math.asin((EDGE_C[1] - 0.515) / EDGE_R)     # arc angle down to the beard tip (z .515): longer than the horn
+EDGE_SPAN = max(A_LO, A_HI)
 EYE_X = 0.022                 # inner boundary of the blade (inside the eye)
 EYE_Z = (0.692, 0.828)        # blade root on the eye, bottom and top
 HEART = (0.080, 0.774)        # the amber acorn, low in the panel's swoop by the eye
@@ -51,15 +53,15 @@ EYE = (0.672, 0.842)          # eye (socket) z range
 POLL_Z = 0.757
 
 def edge_point(t):
-    a = -EDGE_SPAN + 2 * EDGE_SPAN * t
+    a = -A_LO + (A_LO + A_HI) * t
     return np.array([EDGE_C[0] + EDGE_R * math.cos(a), EDGE_C[1] + EDGE_R * math.sin(a)])
 def bezier(p0, p1, p2, p3, u):
     p0, p1, p2, p3 = map(np.array, (p0, p1, p2, p3)); w = 1 - u
     return w**3 * p0 + 3 * w * w * u * p1 + 3 * w * u * u * p2 + u**3 * p3
 A_B, A_T = np.array([EYE_X, EYE_Z[0]]), np.array([EYE_X, EYE_Z[1]])
 B_TIP, H_TIP = edge_point(0), edge_point(1)
-def top(s): return bezier(A_T, (0.060, 0.838), (0.110, 0.862), H_TIP, s)      # the spine rises to a sharp horn
-def bottom(s): return bezier(A_B, (0.070, 0.712), (0.128, 0.705), B_TIP, s)   # a deep hooked beard
+def top(s): return bezier(A_T, (0.065, 0.840), (0.115, 0.866), H_TIP, s)      # the spine rises to a sharp horn
+def bottom(s): return bezier(A_B, (0.088, 0.684), (0.122, 0.628), B_TIP, s)   # a deep hooked beard
 def left(t): return A_B + (A_T - A_B) * t
 def blade(s, t):
     """Coons patch over the four boundary curves: s = 0 eye .. 1 edge, t = 0 beard .. 1 horn."""
@@ -110,17 +112,17 @@ def normal_map(name, hgt, strength):
     return image(name, n * .5 + .5, colour=False)
 
 # Cheek UV: planar over the head, u = x / 0.26, v = (z - 0.58) / 0.36.
-CU, CV, CZ = 0.26, 0.36, 0.58
+CU, CV, CZ = 0.26, 0.44, 0.50
 def cheek_uv(x, z): return x / CU, (z - CZ) / CV
 def bez_vec(p0, p1, p2, p3, u):
     w = 1 - u
     return [w**3 * p0[k] + 3 * w * w * u * p1[k] + 3 * w * u * u * p2[k] + u**3 * p3[k] for k in (0, 1)]
 def blade_vec(S, T):
     """Vectorised blade(s, t) -> (x, z)."""
-    a = -EDGE_SPAN + 2 * EDGE_SPAN * T
+    a = -A_LO + (A_LO + A_HI) * T
     ex, ez = EDGE_C[0] + EDGE_R * np.cos(a), EDGE_C[1] + EDGE_R * np.sin(a)
-    tx, tz = bez_vec(A_T, (0.060, 0.838), (0.110, 0.862), H_TIP, S)
-    bx, bz = bez_vec(A_B, (0.070, 0.712), (0.128, 0.705), B_TIP, S)
+    tx, tz = bez_vec(A_T, (0.065, 0.840), (0.115, 0.866), H_TIP, S)
+    bx, bz = bez_vec(A_B, (0.088, 0.684), (0.122, 0.628), B_TIP, S)
     lx, lz = A_B[0] + (A_T[0] - A_B[0]) * T, A_B[1] + (A_T[1] - A_B[1]) * T
     cx = (1 - S) * (1 - T) * A_B[0] + S * (1 - T) * B_TIP[0] + (1 - S) * T * A_T[0] + S * T * H_TIP[0]
     cz = (1 - S) * (1 - T) * A_B[1] + S * (1 - T) * B_TIP[1] + (1 - S) * T * A_T[1] + S * T * H_TIP[1]
@@ -162,7 +164,8 @@ def ring_textures(n=1024):
     sm, tm = st_raster(n)
     panel = panel_mask(sm, tm); inner = erode(panel, 14); rim = panel & ~inner
     leaves = leaf_mask(x, z) & erode(panel, 20)
-    sa, sr, sh = forged_parts(u * 2.6, v * 3.6)                     # hammered steel, the cells a little larger here
+    sa, sr, sh = forged_parts(u * 1.8, v * 3.0)   # deliberate hammer facets, planished smooth                     # hammered steel, the cells a little larger here
+    sa = sa * .35 + srgb((.47, .475, .49)) * .65; sr = sr * .35 + .30 * .65   # planished: the hammer marks read faintly
     # forge scale lingers darker along the spine; the striking face is bright
     spine = np.clip((np.nan_to_num(tm, nan=0) - .55) / .4, 0, 1)
     sa = sa * (1 - .22 * spine[..., None])
@@ -173,7 +176,7 @@ def ring_textures(n=1024):
     metal = np.where(inner & ~leaves, 0.0, 1.0)
     mr = np.stack([np.zeros_like(rough), np.clip(rough, .12, .9), metal], -1)
     hgt = sh * (~panel) + rim * .9 - inner * .5 + leaves * .6
-    return image('KF_Ring_Albedo', alb), image('KF_Ring_MR', mr, colour=False), normal_map('KF_Ring_Normal', hgt * .22 + (rim * .9 - inner * .5 + leaves * .6) * .55, 3.0)
+    return image('KF_Ring_Albedo', alb), image('KF_Ring_MR', mr, colour=False), normal_map('KF_Ring_Normal', hgt * .07 + (rim * .9 - inner * .5 + leaves * .6) * .55, 3.0)
 def edge_textures(n=512):
     v, u = np.mgrid[0:n, 0:n] / (n - 1)
     x, z = u * CU, v * CV + CZ
@@ -708,10 +711,37 @@ def acorn_pommel():
     lathe('Pommel_Tip', 'KF_Gold', [(zc - .068, .0), (zc - .060, .0065), (zc - .053, .0085), (zc - .050, .0060)], 12, smooth=40)
 acorn_pommel()
 
+# ------------------------------------------------------------------ the haft's curve
+# Like a Leviathan-style handle: straight through the eye, then a gentle ergonomic bow that brings the butt forward,
+# under the beard. Everything below the eye follows it (haft, wrap, bands, keeper, pommel).
+def haft_bend(z):
+    w = min(1.0, max(0.0, (EYE[0] - .02 - z) / (EYE[0] - .02 - HAFT[0])))
+    return .048 * w ** 1.6
+def bend_lower():
+    for o in [o for o in SC.objects if o.type == 'MESH']:
+        if o.name == 'Strap_Stud':
+            o.location.x += haft_bend(o.location.z); continue
+        me = o.data; co = np.zeros(len(me.vertices) * 3); me.vertices.foreach_get('co', co); co = co.reshape(-1, 3)
+        co[:, 0] += [haft_bend(z) for z in co[:, 2]]
+        me.vertices.foreach_set('co', co.ravel()); me.update()
+bend_lower()
+def panel_rivets():
+    """The enamel is a separate plate: four brass rivets pin it to the cheek, through both faces."""
+    bm = bmesh.new()
+    for s_, t_ in ((.07, .885), (.36, .885), (.62, .87), (.13, .50)):
+        for side in (-1, 1):
+            c = on_cheek(s_, t_, 0, side)
+            ring = [bm.verts.new((c.x + math.cos(a) * .0028, c.y, c.z + math.sin(a) * .0028)) for a in np.linspace(0, TAU, 9)[:-1]]
+            top = bm.verts.new((c.x, c.y + side * .0016, c.z))
+            for k in range(8):
+                f = (ring[k], ring[(k + 1) % 8], top); bm.faces.new(f if side > 0 else tuple(reversed(f)))
+    mesh_obj('Panel_Rivets', bm, 'KF_Gold', smooth_angle=70)
+panel_rivets()
+
 # ------------------------------------------------------------------ sockets
-empty('Grip_Center', (0.0075, 0, 0.120))
-for name, t in (('CuttingEdge_Bottom', .08), ('CuttingEdge_Mid', .5), ('CuttingEdge_Top', .92)):
-    x, z = edge_point(t); empty(name, (float(x), 0, float(z)))
+empty('Grip_Center', (0.0075 + haft_bend(0.120), 0, 0.120))
+for name, a in (('CuttingEdge_Bottom', -.9 * A_HI), ('CuttingEdge_Mid', 0.0), ('CuttingEdge_Top', .9 * A_HI)):   # symmetric about the arc's middle
+    empty(name, (EDGE_C[0] + EDGE_R * math.cos(a), 0, EDGE_C[1] + EDGE_R * math.sin(a)))
 empty('Head_Center', (0.130, 0, 0.758))
 empty('Poll_Face', (-0.058, 0, POLL_Z))
 empty('Heartstone', (HEART[0], 0, HEART[1]))
@@ -801,7 +831,7 @@ if RENDER:
         go = bpy.data.objects.new('heart', glow); go.location = (HEART[0], side * .03, HEART[1]); SC.collection.objects.link(go)
     cam = bpy.data.cameras.new('c'); co = bpy.data.objects.new('c', cam); SC.collection.objects.link(co); SC.camera = co
     views = {'full': ((.10, -1.55, .42), (.08, 0, .42), 42), 'three-quarter': ((1.0, -1.45, .95), (.07, 0, .45), 45),
-             'head': ((.10, -.62, .76), (.09, 0, .75), 50), 'edge-on': ((1.0, -.05, .76), (.12, 0, .75), 60),
+             'head': ((.10, -.74, .72), (.09, 0, .71), 50), 'edge-on': ((1.0, -.05, .76), (.12, 0, .75), 60),
              'heart': ((.08, -.26, .76), (.08, 0, .75), 55), 'back': ((-.9, 1.6, .75), (.06, 0, .45), 45),
              'first-person': ((-.30, -.36, .34), (.10, .05, .74), 30),
              'socket': ((-.12, -.40, .82), (-.02, 0, .76), 55), 'pommel': ((.08, -.30, .02), (0, 0, -.03), 55)}

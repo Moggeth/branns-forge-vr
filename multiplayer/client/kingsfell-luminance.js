@@ -51,11 +51,11 @@ export function kingsfellFrame(scene) {
   const cy = (top.y + bottom.y) / 2, h = (top.y - bottom.y) / 2;
   const cx = (top.x * top.x + h * h - mid.x * mid.x) / (2 * (top.x - mid.x));
   const pos = edge.geometry.attributes.position, m = new THREE.Matrix4().multiplyMatrices(inv, edge.matrixWorld), v = new THREE.Vector3();
-  let apex = 0, bevel = Infinity, span = 0;
+  let apex = 0, bevel = Infinity, spanLo = 0, spanHi = 0;   // the arc may run further below the middle than above (a beard)
   for (let i = 0; i < pos.count; i++) {
     v.fromBufferAttribute(pos, i).applyMatrix4(m);
     const r = Math.hypot(v.x - cx, v.y - cy); apex = Math.max(apex, r); bevel = Math.min(bevel, r);
-    span = Math.max(span, Math.abs(Math.atan2(v.y - cy, v.x - cx)));
+    const a = Math.atan2(v.y - cy, v.x - cx); if (a < 0) spanLo = Math.max(spanLo, -a); else spanHi = Math.max(spanHi, a);
   }
   // the heartstone gem: how deep the cheek surface sits under it (|z| of its rim) and its radius
   const gem = new THREE.Vector2(.008, .03), amber = meshesByMaterial(scene, 'KF_Amber');
@@ -69,7 +69,7 @@ export function kingsfellFrame(scene) {
     }
   }
   if (Number.isFinite(rim) && radius > 0) gem.set(rim, radius);
-  return {space, center: new THREE.Vector2(cx, cy), apex, bevel, span, heart: new THREE.Vector2(heart.x, heart.y), gem};
+  return {space, center: new THREE.Vector2(cx, cy), apex, bevel, span: Math.max(spanLo, spanHi), spanLo, spanHi, heart: new THREE.Vector2(heart.x, heart.y), gem};
 }
 
 // ---------------------------------------------------------------- shaders
@@ -266,7 +266,7 @@ function ribbonGeometry(frame, toHost) {
   const n = RIBBON_SEGMENTS + 1, position = new Float32Array(n * 2 * 3), tangent = new Float32Array(n * 2 * 3), rib = new Float32Array(n * 2 * 2);
   const p = new THREE.Vector3(), d = new THREE.Vector3(), normalMatrix = new THREE.Matrix3().setFromMatrix4(toHost), index = [];
   for (let i = 0; i < n; i++) {
-    const a = -frame.span + 2 * frame.span * i / RIBBON_SEGMENTS;
+    const a = -frame.spanLo + (frame.spanLo + frame.spanHi) * i / RIBBON_SEGMENTS;
     p.set(frame.center.x + Math.cos(a) * frame.apex, frame.center.y + Math.sin(a) * frame.apex, 0).applyMatrix4(toHost);
     d.set(-Math.sin(a), Math.cos(a), 0).applyMatrix3(normalMatrix);
     for (const [k, side] of [[0, -1], [1, 1]]) {
