@@ -1455,14 +1455,14 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   function mannedMachine(){if(!manned)return null;if(isHomeBallistaId(manned.id)){const b=homeBallista(manned.id);return b?.hp>0?b:null;}return snapshot.inventions?.structures.find(b=>b.id===manned.id&&b.hp>0);}
   function mountMachine(b){weapons.cancel();clearInput();cancelCast();cancelInventionPlacement();if(manned)dismountMachine();
     manned={id:b.id,yaw:b.aimYaw||0,pitch:b.aimPitch||0,yawRate:0,sentAt:0,sent:'',sinceTick:snapshot.tick??0};yaw=(b.yaw||0)+manned.yaw;pitch=manned.pitch;
-    onAction('inventionMount',{structureId:b.id});if(b.type==='homeBallista'){report(keepStyle(b.side)==='sunlance'?(touchEnabled?'Manning the Sunlance. Drag to swing it, hold Attack to draw and let go to loose (let go on the golden flash for a Dawnbreak), Sight shows the arc, hold Wind to crank, Collect steps off.':'Manning the Sunlance. Mouse swings it, hold click to draw and let go to loose (let go on the golden flash for a Dawnbreak), hold right-click to see the arc, hold R to wind faster, E or Esc steps off.'):(touchEnabled?'Manning the Gnashjaw. Drag to swing it, Attack spits the harpoon, hold Wind to reel a catch in (Attack again yanks), Sight shows the arc, Collect steps off.':'Manning the Gnashjaw. Mouse swings it, click spits the harpoon, hold R to reel a catch in (click again to yank), hold right-click to see the arc, E or Esc steps off.'));return;}report(touchEnabled?'Manning the Timberline. Drag to swing it, Attack fires, hold Wind to crank, Sight aims along the range ladder, Collect steps off.':'Manning the Timberline. Mouse swings it, click fires, hold right-click (or Q) to sight along the range ladder, hold R to wind faster, E or Esc steps off.');}
+    onAction('inventionMount',{structureId:b.id});if(b.type==='homeBallista'&&b.style==='timberline'){report(touchEnabled?'Manning Dawnhold\'s gate Timberline. Drag to swing it, Attack fires, hold Wind to crank, Sight aims along the range ladder, Collect steps off. The keep pays for its bolts.':'Manning Dawnhold\'s gate Timberline. Mouse swings it, click fires, hold right-click (or Q) to sight along the range ladder, hold R to wind faster, E or Esc steps off. The keep pays for its bolts.');return;}if(b.type==='homeBallista'){report(keepStyle(b.side)==='sunlance'?(touchEnabled?'Manning the Sunlance. Drag to swing it, hold Attack to draw and let go to loose (let go on the golden flash for a Dawnbreak), Sight shows the arc, hold Wind to crank, Collect steps off.':'Manning the Sunlance. Mouse swings it, hold click to draw and let go to loose (let go on the golden flash for a Dawnbreak), hold right-click to see the arc, hold R to wind faster, E or Esc steps off.'):(touchEnabled?'Manning the Gnashjaw. Drag to swing it, Attack spits the harpoon, hold Wind to reel a catch in (Attack again yanks), Sight shows the arc, Collect steps off.':'Manning the Gnashjaw. Mouse swings it, click spits the harpoon, hold R to reel a catch in (click again to yank), hold right-click to see the arc, E or Esc steps off.'));return;}report(touchEnabled?'Manning the Timberline. Drag to swing it, Attack fires, hold Wind to crank, Sight aims along the range ladder, Collect steps off.':'Manning the Timberline. Mouse swings it, click fires, hold right-click (or Q) to sight along the range ladder, hold R to wind faster, E or Esc steps off.');}
   function dismountMachine(send=true){scoping=false;crankHeld=false;if(!manned)return;const id=manned.id;manned=null;inventionVisual.setLocalAim(id,null);keepKeep()?.setLocalDraw(id,null);keepSight(null);pitch=0;heldSway.snap();if(send)onAction('inventionMount',{structureId:id,off:true});}
   function fireManned(){const b=mannedMachine();if(!b)return;unlockAudio();onAction('inventionUse',{structureId:b.id,aim:{yaw:manned.yaw,pitch:manned.pitch}});}
   // The Sunlance draws while the button is held and looses on release; everything else fires on the press.
   const keepKeep=()=>inventionVisual.homeKeep?.();
   function mannedPress(){const b=mannedMachine();if(!b)return;if(b.type==='homeBallista'&&b.style==='sunlance'){unlockAudio();if((snapshot.tick??0)<b.readyTick){report('The Sunlance is still winding.');return;}keepKeep()?.setLocalDraw(b.id,performance.now());manned.perfectRang=false;keepAudio.drawStart({local:true});onAction('inventionDraw',{structureId:b.id});return;}fireManned();}
   // The touch attack button's word while seated: what a press does on this machine right now.
-  function mannedVerb(){if(!manned)return null;const b=mannedMachine();if(b?.type!=='homeBallista')return 'Fire';return b.style==='sunlance'?'Draw':b.hook?'Yank':'Spit';}
+  function mannedVerb(){if(!manned)return null;const b=mannedMachine();if(b?.type!=='homeBallista'||b.style==='timberline')return 'Fire';return b.style==='sunlance'?'Draw':b.hook?'Yank':'Spit';}
   function mannedRelease(){const b=mannedMachine(),keep=keepKeep();if(!b||!keep?.localDraw(b.id))return;keep.setLocalDraw(b.id,null);fireManned();}
   function keepSight(b,draw){const keep=keepKeep();if(!keep)return null;return keep.sight(b,manned?{yaw:manned.yaw,pitch:manned.pitch}:{yaw:0,pitch:0},{charge:draw?.charge||0,perfect:!!draw?.perfect,visible:!!b&&scopeAmount>.05});}
   function keepNotice(ev){
@@ -1495,18 +1495,19 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     if(scopeAmount>0&&inventionVisual.scopeEye(b.id,scopeEye)){const k=THREE.MathUtils.smoothstep(scopeAmount,0,1);camera.position.lerp(scopeEye.sub(rig.position),k);}
     inventionVisual.setScoped(b.id,scopeAmount);
   }
-  function timberlineReadiness(b){const tick=snapshot.tick??0;if(tick>=b.readyTick)return {reload:1,ready:true,state:'Ready'};const left=b.readyTick-tick;return {reload:THREE.MathUtils.clamp(1-left/(b.type==='homeBallista'?HOME_MANNED.reloadTicks:MANNED.reloadTicks),0,1),ready:false,state:`Winding · ${(left/60).toFixed(1)} s`};}
+  function timberlineReadiness(b){const tick=snapshot.tick??0;if(tick>=b.readyTick)return {reload:1,ready:true,state:'Ready'};const left=b.readyTick-tick;return {reload:THREE.MathUtils.clamp(1-left/(b.type==='homeBallista'&&b.style!=='timberline'?HOME_MANNED.reloadTicks:MANNED.reloadTicks),0,1),ready:false,state:`Winding · ${(left/60).toFixed(1)} s`};}
   function updateTimberlineAids(now){
     const b=manned&&!renderer.xr.isPresenting&&role==='hero'&&active?mannedMachine():null;
     document.body.classList.toggle('timberline-manned',!!b);
     if(!b){timberlineSight.hide();timberlineAmmoHud.set(null);if(scopeAmount||scoping){scopeAmount=0;scoping=false;}inventionVisual.setScoped(null);return;}
-    if(b.type==='homeBallista'){ // free bolts; the sighting arc stands in for the range ladder
+    if(b.type==='homeBallista'&&b.style!=='timberline'){ // free bolts; the sighting arc stands in for the range ladder
       timberlineSight.hide();const keep=keepKeep(),draw=b.style==='sunlance'?keep?.localDraw(b.id):null,sight=keepSight(b,draw);
       if(draw?.perfect&&!manned.perfectRang){manned.perfectRang=true;keepAudio.perfectBeat();}
       if(b.hook&&(keys.has('KeyR')||crankHeld))keepAudio.ratchet({local:true,rate:1,reel:true});else if((snapshot.tick??0)<b.readyTick&&(keys.has('KeyR')||crankHeld))keepAudio.ratchet({local:true,rate:1});
       const state=b.hook?(touchEnabled?'Hooked · hold Wind to reel':'Hooked · hold R to reel, click to yank'):draw?(draw.perfect?'Dawnbreak! Let go!':`Drawing · ${Math.round(draw.charge*100)}%`):timberlineReadiness(b).state;
       timberlineAmmoHud.set({label:b.style==='sunlance'?'Sunlance':'Gnashjaw',bolts:1,state:sight?.visible&&sight.distance?`${state} · ${Math.round(sight.distance)} m`:state,scoped:scopeAmount>.5});return;}
-    const self=snapshot.players.find(p=>p.id===playerId),ammo=timberlineAmmo(snapshot,self),ready=timberlineReadiness(b);
+    // A gate Timberline is the keep's: its bolts are free, so the counter just names it.
+    const self=snapshot.players.find(p=>p.id===playerId),ammo=b.type==='homeBallista'?{label:'Gate Timberline',bolts:1,total:1}:timberlineAmmo(snapshot,self),ready=timberlineReadiness(b);
     camera.getWorldPosition(sightEye);
     // The forecast arcs only show while sighting along the ladder, and fade in with it.
     if(scopeAmount>0)timberlineSight.update({b,aim:manned,height:(x,z)=>terrainHeight(x,z,snapshot.edits,snapshot.tick??Infinity),eye:sightEye,camera,time:now/1000,editsKey:startingEdits,amount:scopeAmount});else timberlineSight.hide();
@@ -1771,7 +1772,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     } else if (!dragonEye(dt)) {
       rig.position.copy(localPosition);
       const b = manned && mannedMachine();
-      if (!renderer.xr.isPresenting) { camera.position.set(0, b?.type === 'homeBallista' ? (b.style === 'gnashjaw' ? 2.75 : 1.9) : 1.65, 0); if (b) { /* the gate ballistas stand on a plinth: the operator sights over the stock */ camera.rotation.set(manned.pitch, (b.yaw || 0) + manned.yaw, 0, 'YXZ'); updateTimberlineScope(dt, b); } else camera.rotation.set(pitch, yaw, 0, 'YXZ'); const lean=!b&&appleSnack.view();if(lean){camera.rotation.x+=lean.pitch;camera.position.y+=lean.y;} }
+      if (!renderer.xr.isPresenting) { camera.position.set(0, b?.type === 'homeBallista' && b.style !== 'timberline' ? (b.style === 'gnashjaw' ? 2.75 : 1.9) : 1.65, 0); if (b) { /* the gate ballistas stand on a plinth: the operator sights over the stock */ camera.rotation.set(manned.pitch, (b.yaw || 0) + manned.yaw, 0, 'YXZ'); updateTimberlineScope(dt, b); } else camera.rotation.set(pitch, yaw, 0, 'YXZ'); const lean=!b&&appleSnack.view();if(lean){camera.rotation.x+=lean.pitch;camera.position.y+=lean.y;} }
     }
     stormJoltStep(dt);
     viewPunch.update(dt);

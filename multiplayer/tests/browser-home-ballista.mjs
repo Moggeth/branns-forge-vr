@@ -1,5 +1,5 @@
-// Home base hands-on pieces in the real game: walk from Dawnhold's heart to a gate ballista, press E to man it,
-// swing it onto a skeleton, draw and loose a lance, step off, then ring the barracks bell and drink at the fountain.
+// Home base hands-on pieces in the real game: walk from Dawnhold's heart to a gate Timberline, press E to man it,
+// swing it onto a skeleton, sight along the ladder and fire the pair, step off, look the machine over, then ring the barracks bell and drink at the fountain.
 // Real input on a virtual clock like browser-apple-timberline.mjs (a software renderer is slow).
 import assert from 'node:assert/strict';
 import {createSimulation} from '../shared/simulation.js';
@@ -10,7 +10,7 @@ import {makeSave} from '../client/world-saves.js';
 import {launch, BASE, record, save, shot} from './browser-acceptance-lib.mjs';
 
 // The fixture: a quiet Dawnhold with a legless wild skeleton crawling in from 12 m out in front of its left gate ballista.
-// (A walking one reaches the ballista's feet during the walk over, under the barrel where no lance can reach it.)
+// (A walking one reaches the ballista's feet during the walk over, under the barrel where no bolt can reach it.)
 const sim = createSimulation({room: 'SOLO'}), s = sim.adventureWorld(); s.tick = 1; s.landmarks = false; s.enemies = [];
 s.battle.nextWaveTick = 3600;
 const part = s.battle.bases[0].parts.find(p => p.id === 'battle-base-party-ballista-0'), y = homeBallistaYaw('party');
@@ -86,14 +86,14 @@ try {
  await look([f2.position[0], f2.position[1] + 1, f2.position[2]], 12); await frames(30);
  f2 = (await harness()).s.enemies.find(e => e.id === 'qa-skeleton'); await look([f2.position[0], f2.position[1] + 1, f2.position[2]], 6); await frames(20);
  const hp0 = (await harness()).s.enemies.find(e => e.id === 'qa-skeleton')?.hp ?? 0;
- // The Sunlance draws while held (the wings bend back, the sun ring lights) and looses on release.
- // A real held touch on the on-screen attack button (synthetic pointer events can't be captured).
+ // Sight along the brass ladder (hold right mouse; Sight on touch), then fire the pair with a press.
+ // A real touch on the on-screen attack button (synthetic pointer events can't be captured).
  const cdp = PHONE ? await page.context().newCDPSession(page) : null;
  const strike = async down => { const r = await page.evaluate(() => { const b = document.querySelector('[data-touch-action="strike"]').getBoundingClientRect(); return {x: b.x + b.width / 2, y: b.y + b.height / 2}; });
   await cdp.send('Input.dispatchTouchEvent', {type: down ? 'touchStart' : 'touchEnd', touchPoints: down ? [{x: r.x, y: r.y, id: 7}] : []}); };
  const resight = async () => { const f = (await harness()).s.enemies.find(e => e.id === 'qa-skeleton'); await look([f.position[0], f.position[1] + 1, f.position[2]], 10); await frames(10); };
- if (PHONE) { await strike(true); await resight(); await shot(page, tag('home-ballista-draw')); await strike(false); }
- else { await capture(); await page.mouse.down(); await resight(); await shot(page, 'home-ballista-draw'); await page.mouse.up(); }
+ if (PHONE) { await resight(); await shot(page, tag('home-ballista-sight')); await strike(true); await frames(2); await strike(false); }
+ else { await capture(); await page.mouse.down({button: 'right'}); await resight(); await frames(20); await shot(page, 'home-ballista-sight'); await page.mouse.up({button: 'right'}); await frames(8); await page.mouse.down(); await frames(2); await page.mouse.up(); }
  await frames(4); await shot(page, tag('home-ballista-fire')); await frames(40);
  h = await harness(); b = h.s.battle.bases[0].parts.find(p => p.id === part.id);
  const hp1 = h.s.enemies.find(e => e.id === 'qa-skeleton')?.hp ?? 0;
@@ -104,6 +104,9 @@ try {
  await page.keyboard.down('KeyR'); await frames(40); await page.keyboard.up('KeyR');
  await page.keyboard.press('KeyE'); await frames(30);
  h = await harness(); assert.equal(h.c.manned, null, 'stepped off'); assert.ok(!h.s.battle.bases[0].parts.find(p => p.id === part.id).operator, 'seat released');
+ // Look the gate Timberline over from in front and to one side.
+ const side = [part.position[0] - Math.sin(y) * 3.2 + Math.cos(y) * 2.6, part.position[1], part.position[2] - Math.cos(y) * 3.2 - Math.sin(y) * 2.6];
+ if (await walkTo(side, .8)) { await look([part.position[0], part.position[1] + 1, part.position[2]], 20); await frames(20); await shot(page, tag('home-ballista-machine')); }
 
  // Ring the bell beside the barracks door.
  const bell = bellPostAt('party');

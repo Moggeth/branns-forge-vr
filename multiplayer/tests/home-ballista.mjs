@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import {createSimulation,loadSimulation} from '../shared/simulation.js';
-import {HOME_MANNED,KEEP_BALLISTA,homeBallistaSeat,homeBallistaYaw,keepMuzzle,keepShotAt,sunDraw} from '../shared/home-ballista.js';
+import {KEEP_BALLISTA,homeBallistaSeat,homeBallistaYaw,keepMuzzle,keepStyle,keepTimberlineFrame} from '../shared/home-ballista.js';
+import {MANNED,mannedShot} from '../shared/inventions.js';
+import {timberlineLaunch,TIMBERLINE_LONG} from '../shared/timberline-flight.js';
 import {homeFrame} from '../shared/home-bases.js';
 import {createEnemy} from '../shared/combat.js';
 let count=0;
@@ -39,45 +41,37 @@ test('a hero of the side mans its ballista and sits behind it; the other side an
 const ahead=(part,d,side=part.side)=>{const y=homeBallistaYaw(side);return [part.position[0]-Math.sin(y)*d,part.position[1],part.position[2]-Math.cos(y)*d];};
 const bot=(w,id,at,side)=>Object.assign(createEnemy(id,at),side?{side,battleRun:w.battle.run,battleWaypoint:1,emergeTick:0}:{});
 
-test('a Sunlance draws, looses a real ballistic lance that flies and hits, then reloads and winds faster when cranked',()=>{
-  const {sim,w,part}=rig();assert.equal(act(sim,'host','inventionMount',{structureId:part.id}).ok,true);
-  part.readyTick=0;w.enemies.push(createEnemy('skel9',ahead(part,14)));w.enemies.at(-1).yaw=homeBallistaYaw('party');
-  const before=w.enemies.at(-1).hp;
-  assert.equal(act(sim,'host','inventionDraw',{structureId:part.id}).ok,true);assert.equal(part.drawTick,w.tick);
-  steps(sim,40);const draw=sunDraw(part.drawTick,w.tick);assert.ok(draw.charge>.5&&draw.charge<1&&!draw.perfect);
-  const r=act(sim,'host','inventionUse',{structureId:part.id,aim:{yaw:0,pitch:-.04}});assert.equal(r.ok,true,r.code);
-  const fire=r.events.find(e=>e.kind==='keep_ballista_fire');assert.ok(fire&&fire.manned&&fire.style==='sunlance');
-  assert.ok(Math.hypot(...fire.v)>KEEP_BALLISTA.sunlance.speed[0]+10,'a longer draw flies faster');
-  assert.equal(w.battle.keepShots.length,1,'the lance is in the air, not a hitscan');assert.equal(w.enemies.find(e=>e.id==='skel9').hp,before);
-  const ev=steps(sim,30);const hit=ev.find(e=>e.kind==='keep_ballista_hit');
-  assert.ok(hit&&hit.target==='skel9','the lance reaches the skeleton');assert.ok((w.enemies.find(e=>e.id==='skel9')?.hp??0)<before);
-  assert.ok(ev.some(e=>e.kind==='keep_ballista_stop'&&e.host==='enemy'),'and sticks in it');assert.equal(w.battle.keepShots,undefined);
+const shotsOf=(w,part)=>w.inventions.shots.filter(q=>q.structureId===part.id);
+test('a gate Timberline looses the built Timberline\'s long pair for free: it cuts a line of skeletons, then winds faster when cranked',()=>{
+  const {sim,w,hero,part}=rig();assert.equal(keepStyle('party'),'timberline');assert.equal(act(sim,'host','inventionMount',{structureId:part.id}).ok,true);
+  assert.ok(Math.hypot(hero.position[0]-homeBallistaSeat(part)[0],hero.position[2]-homeBallistaSeat(part)[2])<1e-6);
+  assert.ok(Math.abs(Math.hypot(homeBallistaSeat(part)[0]-part.position[0],homeBallistaSeat(part)[2]-part.position[2])-MANNED.seat)<1e-6,'the seat is the Timberline\'s');
+  part.readyTick=0;w.enemies.push(createEnemy('a',ahead(part,10)),createEnemy('b',ahead(part,14)));
+  const wealth=JSON.stringify([hero.resources,w.inventions.stockpiles,w.inventions.bolts]);
+  assert.equal(act(sim,'host','inventionDraw',{structureId:part.id}).code,'invalid_action','no draw on a Timberline');
+  const r=act(sim,'host','inventionUse',{structureId:part.id,aim:{yaw:0,pitch:0}});assert.equal(r.ok,true,r.code);
+  const fire=r.events.find(e=>e.kind==='timberline_fire');assert.ok(fire&&fire.manned&&fire.keep&&fire.structureId===part.id);
+  assert.equal(JSON.stringify([hero.resources,w.inventions.stockpiles,w.inventions.bolts]),wealth,'the keep pays: no Wood, Iron or crafted bolts spent');
+  const [q]=shotsOf(w,part);assert.ok(q&&q.v===3&&q.type==='timberline'&&q.keep,'a real long-flight pair, not a hitscan');
+  assert.equal(part.readyTick,w.tick+MANNED.reloadTicks);
+  steps(sim,MANNED.fireTicks+5);assert.ok(!w.enemies.some(e=>['a','b'].includes(e.id)&&e.hp>0),'the wire cuts through both');
   assert.equal(act(sim,'host','inventionUse',{structureId:part.id,aim:{yaw:0,pitch:0}}).code,'machine_loading');
   const ready=part.readyTick;for(let i=0;i<20;i++){act(sim,'host','inventionCrank',{structureId:part.id});sim.step();}
   assert.ok(part.readyTick<ready-15,'cranking winds it faster');
+  steps(sim,TIMBERLINE_LONG.maxTicks);assert.equal(shotsOf(w,part).length,0,'the pair comes to rest');
 });
 
-test('the lance follows the shared curve every frame: launch at the muzzle, gravity drop, elevation carries it further',()=>{
+test('the pair leaves the gate Timberline\'s eyes on the shared flight, elevated and aimed like a built one',()=>{
   const {sim,w,part}=rig();act(sim,'host','inventionMount',{structureId:part.id});part.readyTick=0;
-  const r=act(sim,'host','inventionUse',{structureId:part.id,aim:{yaw:0,pitch:.3}}),f=r.events[0];
-  const m=keepMuzzle(part,0,.3).at;assert.ok(Math.hypot(f.o[0]-m[0],f.o[1]-m[1],f.o[2]-m[2])<1e-3);
-  const at=keepShotAt(f,1);assert.ok(Math.abs(at[1]-(f.o[1]+f.v[1]-KEEP_BALLISTA.gravity/2))<1e-9);
-  const ev=steps(sim,KEEP_BALLISTA.maxTicks+2),stop=ev.find(e=>e.kind==='keep_ballista_stop');
-  assert.ok(stop&&Math.hypot(stop.position[0]-f.o[0],stop.position[2]-f.o[2])>HOME_MANNED.range,'an elevated quick shot lobs well past the old 30 m reach');void w;
+  act(sim,'host','inventionUse',{structureId:part.id,aim:{yaw:.4,pitch:.2}});const [q]=shotsOf(w,part),want=mannedShot(keepTimberlineFrame(part),{yaw:.4,pitch:.2});
+  assert.deepEqual(q.origin,want.origin);assert.deepEqual(q.target,want.target);assert.equal(q.pitch,want.pitch);
+  const m=keepMuzzle(part,.4,.2),l=timberlineLaunch(q);assert.ok(Math.hypot(...m.at.map((v,k)=>v-l.origin[k]))<1e-9,'the sight and the shot agree');
 });
 
-test('a Dawnbreak release (the golden beat after a full draw) pierces a line of skeletons and bursts; a late release does not',()=>{
+test('a save taken while a gate Timberline pair is in the air still loads, without the pair',()=>{
   const {sim,w,part}=rig();act(sim,'host','inventionMount',{structureId:part.id});part.readyTick=0;
-  w.enemies.push(createEnemy('a',ahead(part,10)),createEnemy('b',ahead(part,13)));
-  act(sim,'host','inventionDraw',{structureId:part.id});steps(sim,KEEP_BALLISTA.sunlance.drawTicks+4);assert.ok(sunDraw(part.drawTick,w.tick).perfect);
-  const r=act(sim,'host','inventionUse',{structureId:part.id,aim:{yaw:0,pitch:-.05}});assert.ok(r.events[0].perfect);
-  const ev=steps(sim,30),hits=ev.filter(e=>e.kind==='keep_ballista_hit').map(e=>e.target);
-  assert.deepEqual(hits,['a','b'],'flies through both');
-  const {sim:sim2,w:w2,part:p2}=rig();act(sim2,'host','inventionMount',{structureId:p2.id});p2.readyTick=0;
-  w2.enemies.push(createEnemy('a',ahead(p2,10)),createEnemy('b',ahead(p2,13)));
-  act(sim2,'host','inventionDraw',{structureId:p2.id});steps(sim2,KEEP_BALLISTA.sunlance.drawTicks+KEEP_BALLISTA.sunlance.perfectTicks+5);
-  const late=act(sim2,'host','inventionUse',{structureId:p2.id,aim:{yaw:0,pitch:-.05}});assert.equal(late.events[0].perfect,false);assert.equal(late.events[0].charge,1);
-  const ev2=steps(sim2,30);assert.deepEqual(ev2.filter(e=>e.kind==='keep_ballista_hit').map(e=>e.target),['a'],'a plain full draw stops in the first');
+  act(sim,'host','inventionUse',{structureId:part.id,aim:{yaw:0,pitch:.1}});sim.step();assert.equal(shotsOf(w,part).length,1);
+  const loaded=loadSimulation(sim.checkpoint());assert.equal(loaded.snapshot().inventions.shots.length,0);assert.ok(loaded.snapshot().battle.bases.length===2);
 });
 
 test('the Gnashjaw harpoons a foe, holds it on the chain, reels it in on the crank and chomps it',()=>{
@@ -102,17 +96,18 @@ test('the Gnashjaw harpoons a foe, holds it on the chain, reels it in on the cra
 test('a manned ballista never fires on its own; leaving the seat frees it and it tracks, leads and fires by itself',()=>{
   const {sim,w,hero,part}=rig();assert.equal(act(sim,'host','inventionMount',{structureId:part.id}).ok,true);
   part.readyTick=0;w.enemies.push(bot(w,'battle1_1_rivals_1',ahead(part,9),'rivals'));
-  let ev=steps(sim,3);assert.ok(!ev.some(e=>e.kind==='keep_ballista_fire'&&e.part===part.id),'held fire');
+  let ev=steps(sim,3);assert.ok(!ev.some(e=>e.kind==='timberline_fire'&&e.part===part.id),'held fire');
   hero.position=[hero.position[0]+5,hero.position[1],hero.position[2]];ev=steps(sim,120);
-  assert.equal(part.operator,null);const shot=ev.find(e=>e.kind==='keep_ballista_fire'&&e.part===part.id);assert.ok(shot,'back on auto');assert.equal(shot.manned,false);
+  assert.equal(part.operator,null);const shot=ev.find(e=>e.kind==='timberline_fire'&&e.part===part.id);assert.ok(shot,'back on auto');assert.equal(shot.manned,false);
+  assert.equal(part.readyTick,part.fireTick+KEEP_BALLISTA.timberline.unmannedReload,'it winds more slowly on its own');
   assert.ok(!ev.some(e=>e.kind==='home_turret_fire'&&e.id===part.id),'no more instant hitscan bolts');
 });
 
 test('rival heroes in the line of fire take hero damage; a broken ballista throws its operator off',()=>{
   const {sim,w,foe,part}=rig();assert.equal(act(sim,'host','inventionMount',{structureId:part.id}).ok,true);
   part.readyTick=0;foe.position=ahead(part,10);foe.protectedUntil=0;
-  const r=act(sim,'host','inventionUse',{structureId:part.id,aim:{yaw:0,pitch:-.04}});assert.equal(r.ok,true);
-  const ev=steps(sim,20);assert.ok(ev.some(e=>e.kind==='keep_ballista_hit'&&e.target==='foe'&&e.hero));assert.equal(foe.hp,100-KEEP_BALLISTA.sunlance.hero[0]);
+  const r=act(sim,'host','inventionUse',{structureId:part.id,aim:{yaw:0,pitch:0}});assert.equal(r.ok,true);
+  steps(sim,20);assert.equal(foe.hp,100-KEEP_BALLISTA.timberline.hero,'the wire cuts them once and flies on');
   part.hp=0;sim.step();assert.equal(part.operator,null);
   assert.equal(act(sim,'host','inventionMount',{structureId:part.id}).code,'machine_broken');
   void w;
@@ -124,12 +119,6 @@ test('an unmanned Gnashjaw hooks a rival hero, but a hero who runs past the chai
   g.hook={target:hero.id,hero:true,tick:w.tick,shot:'t',off:[0,1,0]};
   const far=ahead(g,KEEP_BALLISTA.gnashjaw.chain+1,'rivals');hero.position=[far[0],far[1],far[2]];
   const ev=steps(sim,1);assert.ok(ev.some(e=>e.kind==='keep_ballista_release'&&e.reason==='snap'),'tore free');assert.equal(g.hook,undefined);
-});
-
-test('a save taken mid-flight and mid-hook still loads',()=>{
-  const {sim,w,part}=rig();act(sim,'host','inventionMount',{structureId:part.id});part.readyTick=0;
-  act(sim,'host','inventionUse',{structureId:part.id,aim:{yaw:0,pitch:.1}});sim.step();assert.ok(w.battle.keepShots?.length);
-  const loaded=loadSimulation(sim.checkpoint());assert.ok(loaded.snapshot().battle.bases.length===2);
 });
 
 // The other hands-on pieces: fountain drink, barracks bell, hammer repairs.
