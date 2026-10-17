@@ -31,12 +31,12 @@ export function createInventionView({scene,lightning=null}){
  const ghost=createBlueprintGhost({scene,timberlineReady:()=>!!assets.timberline_ballista,timberline:()=>createTimberlineBallista(assets.timberline_ballista,{castShadow:false,filament:false,autoReload:false}),authored:{stormspire:()=>assets.stormspire?{object:assets.stormspire.scene.clone(true)}:null}});
  function label(text,valid){if(!labelContext||lastLabel===`${valid}:${text}`)return;lastLabel=`${valid}:${text}`;labelContext.clearRect(0,0,768,104);labelContext.fillStyle='rgba(24,23,20,.9)';labelContext.fillRect(0,0,768,104);labelContext.fillStyle=valid?'#ffe1a0':'#ffb7ad';labelContext.font='bold 25px sans-serif';labelContext.textAlign='center';const lines=[];let line='';for(const word of text.split(' ')){const next=line?`${line} ${word}`:word;if(labelContext.measureText(next).width>730&&line){lines.push(line);line=word;}else line=next;}lines.push(line);lines.slice(0,2).forEach((line,i)=>labelContext.fillText(line,384,lines.length>1?38+i*34:61));previewLabel.material.map.needsUpdate=true;}
  let refinery=null;
- const homeBases=createHomeBaseView({scene}),homeTown=createHomeTownView({scene}),backTown=createBackTownView({scene}),townLife=createTownLife({scene});
+ const homeBases=createHomeBaseView({scene,timberline:()=>assets.timberline_ballista||null}),homeTown=createHomeTownView({scene}),backTown=createBackTownView({scene}),townLife=createTownLife({scene});
  const mapExtras=createMapExtrasView({scene,height:(x,z)=>snapshot?terrainHeight(snapshot,x,z,false):baseHeight(x,z)}); // buildings placed with the map editor
  const shotGeo=new THREE.IcosahedronGeometry(.28,1),shotMat=new THREE.MeshStandardMaterial({color:0x77736a,roughness:.9});
  const wardGeo=new THREE.RingGeometry(5.92,6,64),wardMat=new THREE.MeshBasicMaterial({color:0x64dbea,transparent:true,opacity:.35,side:THREE.DoubleSide,depthWrite:false});
 
- function installTimberline(name,gltf){assets[name]=gltf;if(name==='timberline_ballista')for(const e of entries.values())if(e.data.type==='timberline')upgrade(e);
+ function installTimberline(name,gltf){assets[name]=gltf;if(name==='timberline_ballista'){for(const e of entries.values())if(e.data.type==='timberline')upgrade(e);homeBases.timberlineReady();}
   if(assets.timberline_bolts&&assets.timberline_ballista&&!stuck){stuck=createTimberlineStuck({scene,gltf:assets.timberline_bolts,sharedMaterials:collectMaterials(assets.timberline_ballista.scene),ground:(x,z)=>terrainHeight(snapshot,x,z,false)});if(snapshot)stuck.sync(snapshot);}}
  // Heavy Launcher: the Blender spring catapult replaces the code-built stand-in once its model arrives.
  function installLauncher(gltf){assets.heavy_launcher=gltf;for(const e of entries.values())if(e.data.type==='launcher')upgradeLauncher(e);}
@@ -63,7 +63,7 @@ export function createInventionView({scene,lightning=null}){
   if(/launcher/.test(ev.kind)&&ev.position&&ev.target&&!assets.heavy_launcher){const g=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(...ev.position),new THREE.Vector3(...ev.target)]);const m=new THREE.LineBasicMaterial({color:0xa9ffdc,transparent:true});const line=new THREE.Line(g,m);scene.add(line);effects.push({line,life:.3});while(effects.length>16){const old=effects.shift();old.line.removeFromParent();old.line.geometry.dispose();old.line.material.dispose();}}
  }
  function update(dt,tick,camera=null,viewportHeight=1080){
-  homeBases.update(dt,camera,tick);homeTown.update(dt);backTown.update(dt);townLife.update(dt,viewportHeight);
+  homeBases.update(dt,camera,tick,viewportHeight);homeTown.update(dt);backTown.update(dt);townLife.update(dt,viewportHeight);
   for(const e of entries.values())if(e.spire)spires.animate(e,tick/60,dt);
   timberFx.update(dt);stuck?.update(snapshot,tick);tracers.begin();
   const ids=new Set();for(const q of snapshot?.inventions?.shots||[]){ids.add(q.id);let v=shots.get(q.id);
@@ -90,7 +90,7 @@ for(const e of entries.values()){const b=e.data;e.root.rotation.y+=Math.atan2(Ma
   setLocalAim(id,aim){homeBases.setLocalAim(id,aim);if(aim)localAim.set(id,aim);else localAim.delete(id);},stuckPose:id=>stuck?.pose(id)||null,setViewer(id){viewerId=id||null;},
   // Who is sighting along the ladder. The ladder stays visible to them (it is the sight).
   setScoped(id,amount=0){scoped=id&&amount>0?{id,amount}:null;},
-  scopeEye(id,out=new THREE.Vector3()){const e=entries.get(id);if(!e?.machine)return null;e.root.updateWorldMatrix(true,true);return e.machine.nodes.Socket_ScopeEye?.getWorldPosition(out)||null;},
+  scopeEye(id,out=new THREE.Vector3()){const e=entries.get(id);if(!e?.machine)return homeBases.keep.scopeEye(id,out);e.root.updateWorldMatrix(true,true);return e.machine.nodes.Socket_ScopeEye?.getWorldPosition(out)||null;},
   targets:()=>[...entries.values()].filter(e=>e.data.hp>0).map(e=>e.root).concat(homeBases.targets()),preview(point,type,validation=null,{yaw=0,dt=1/60,time=0,label:showLabel=true}={}){
    previewState=point?validation:null;const valid=validation?.ok!==false,color=valid?BLUEPRINT_COLORS.valid.ring:BLUEPRINT_COLORS.invalid.ring,at=validation?.position|| (point?[point.x,point.y,point.z]:null);
    // Operating a machine aims a target ring only; building shows the see-through model where it will stand.

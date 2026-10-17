@@ -34,12 +34,12 @@ void main(){
 function mat(color, extra = {}) { return new THREE.MeshStandardMaterial({color, roughness: .82, metalness: 0, flatShading: true, ...extra}); }
 function glowMat(color, intensity = 1.4) { return new THREE.MeshStandardMaterial({color, emissive: color, emissiveIntensity: intensity, roughness: .3, flatShading: true}); }
 
-export function createHomeBaseView({scene}) {
+export function createHomeBaseView({scene, timberline = () => null}) {
   const root = new THREE.Group(); root.name = 'home-bases'; scene.add(root);
   const bases = new Map(), effects = [], effectPool = [], localAim = new Map();
   let snapshot = null, enabled = false, kit = null;
-  // The gate ballistas: once their kit loads, each base's ballista parts are taken over by Sunlance / Gnashjaw rigs.
-  const keep = createKeepBallistaView({root, height: (x, z) => terrainHeight(snapshot, x, z, false)});
+  // The gate ballistas: once their models load, Dawnhold's are taken over by Timberlines and Grumblekeep's by Gnashjaw rigs.
+  const keep = createKeepBallistaView({root, height: (x, z) => terrainHeight(snapshot, x, z, false), timberline});
   // Siege hits: chips, sparks, cracks and a health bar over whatever was struck (client/siege-damage-view.js).
   const damage = createSiegeDamageView({root, height: (x, z) => terrainHeight(snapshot, x, z, false), lookup: id => {
     for (const b of bases.values()) {
@@ -260,9 +260,9 @@ export function createHomeBaseView({scene}) {
     }
   }
 
-  function update(dt, camera, tick = snapshot?.tick) {
+  function update(dt, camera, tick = snapshot?.tick, viewportHeight = 1080) {
     if (!enabled || !snapshot) return;
-    keep.update(dt, tick, camera);
+    keep.update(dt, tick, camera, viewportHeight);
     if (camera) damage.update(dt, camera);
     const now = performance.now(), t = now / 1000, k = 1 - Math.exp(-dt * 6);
     for (const b of bases.values()) {
@@ -323,6 +323,8 @@ export function createHomeBaseView({scene}) {
 
   const setLocalAim = (id, aim) => { keep.setLocalAim(id, aim); if (aim) localAim.set(id, aim); else localAim.delete(id); };
   function installKeepKit(gltf) { if (!keep.install(gltf)) return false; for (const b of bases.values()) adoptKeep(b); return true; }
-  return {sync, event, update, targets, installKit, installKeepKit, keep, setLocalAim, object: root, damageStats: () => damage.stats(), stats: () => ({kit: !!kit, bases: bases.size, staticDraws: [...bases.values()].reduce((n, b) => n + (b.draws || 0), 0)}),
+  /** The Timberline model arrived: hand Dawnhold's gate ballistas over to it. */
+  const timberlineReady = () => { for (const b of bases.values()) adoptKeep(b); };
+  return {sync, event, update, targets, installKit, installKeepKit, timberlineReady, keep, setLocalAim, object: root, damageStats: () => damage.stats(), stats: () => ({kit: !!kit, bases: bases.size, staticDraws: [...bases.values()].reduce((n, b) => n + (b.draws || 0), 0)}),
     dispose() { keep.dispose(); damage.dispose(); for (const light of heartLights.values()) {light.removeFromParent(); light.dispose();} root.removeFromParent(); for (const g of Object.values(geo)) g.dispose(); }};
 }

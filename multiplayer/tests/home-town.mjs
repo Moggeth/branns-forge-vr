@@ -9,7 +9,7 @@ import {MILL,millAt} from '../shared/home-mill.js';
 import {TAVERN,insideTavern,taverns,tavernBar} from '../shared/taverns.js';
 import {heroMaxHp} from '../shared/hero-progress.js';
 import {createEnemy} from '../shared/combat.js';
-import {HOME_MANNED} from '../shared/home-ballista.js';
+import {MANNED} from '../shared/inventions.js';
 let count=0;
 function test(name,fn){fn();count++;console.log('PASS',name);}
 let seq=0;const act=(sim,id,action,extra={})=>sim.command(id,{type:'action',action,seq:++seq,...extra});
@@ -138,13 +138,12 @@ test('the Ballista Captain\'s Hat halves a crewed keep ballista\'s reload and ad
     const {sim,w,hero}=rig();const part=w.battle.bases[0].parts.find(p=>p.id==='battle-base-party-ballista-0');
     hero.items=hat?['hat']:[];hero.position=[part.position[0]+1,part.position[1],part.position[2]];
     assert.equal(act(sim,'host','inventionMount',{structureId:part.id}).ok,true);part.readyTick=0;
-    act(sim,'host','inventionDraw',{structureId:part.id});steps(sim,10);
     const r=act(sim,'host','inventionUse',{structureId:part.id,aim:{yaw:0,pitch:0}});assert.equal(r.ok,true,r.code);
-    return {reload:part.readyTick-w.tick,power:w.battle.keepShots.at(-1).power||1};
+    return {reload:part.readyTick-w.tick,power:w.inventions.shots.at(-1).power||1}; // Dawnhold's gate Timberline
   };
   const plain=fire(false),capped=fire(true);
-  assert.equal(plain.reload,HOME_MANNED.reloadTicks);assert.equal(plain.power,1);
-  assert.equal(capped.reload,HOME_MANNED.reloadTicks/2);assert.equal(capped.power,1.5);
+  assert.equal(plain.reload,MANNED.reloadTicks);assert.equal(plain.power,1);
+  assert.equal(capped.reload,MANNED.reloadTicks/2);assert.equal(capped.power,1.5);
 });
 
 console.log(JSON.stringify({suite:'home-town',ok:true,checks:count}));
