@@ -36,7 +36,7 @@ const QUALITY = {
 };
 // Ground kit layers per generator biome id: lush, meadow, forest floor, soil, sand, then rock and snow leanings.
 const BIOME_KIT = [
-  [0, 0, 0, .3, .7, 0, 0], [0, 0, 0, .5, .5, 0, 0], [0, 0, 0, 0, 1, 0, 0], [.74, .26, 0, 0, 0, 0, 0], [.35, .1, .55, 0, 0, 0, 0],
+  [.3, .15, 0, .15, .4, 0, 0], [.5, .25, 0, .1, .15, 0, 0], [0, 0, 0, 0, 1, 0, 0], [.74, .26, 0, 0, 0, 0, 0], [.35, .1, .55, 0, 0, 0, 0],
   [.15, .25, .6, 0, 0, 0, 0], [.65, 0, .1, .25, 0, 0, 0], [.1, .9, 0, 0, 0, 0, 0], [0, .3, 0, .2, 0, .5, 0], [0, .2, 0, 0, 0, 0, .8], [0, .6, 0, .25, 0, .15, 0]];
 // A gentle tint per biome over the painted layers (linear multipliers): cool pines, olive marsh, sun-baked steppe.
 const BIOME_TINT = [[1, 1, 1], [1, 1, 1], [1, 1, 1], [1, 1, 1], [.94, .98, .92], [.84, .94, .93], [.9, .95, .76], [1.05, 1, .86], [1, .98, .96], [1, 1, 1], [.95, .96, .94]];
