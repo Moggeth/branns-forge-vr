@@ -16,31 +16,36 @@ import {rawTerrainHeight, terrainRenderVertex, FOUNDATION_HALF} from '../shared/
 import {chunkContent, activeChunks, CHUNK, CRAG_KINDS} from '../shared/worldgen/content.js';
 import {BIOME, BIOME_NAMES} from '../shared/worldgen/generate.js';
 import {hash01} from '../shared/worldgen/random.js';
-import {loadDeliveredTexture} from './texture-delivery.js';
+import {createGroundMaterial} from './kit/ground-material.js';
 
+// morph: Chebyshev metres from the focus over which a level slides onto the next coarser one. It must finish before the
+// nearest the level's edge can be (half extent minus the recentring slack of .75 snap), so rims always meet exactly.
 const LEVELS = Object.freeze([
-  {cell: .75, segs: 160, snap: 24},
-  {cell: 3, segs: 160, snap: 96},
-  {cell: 12, segs: 160, snap: 384},
-  {cell: 48, segs: 128, snap: 1536},
+  {cell: .75, segs: 160, snap: 24, morph: [28, 40]},
+  {cell: 3, segs: 160, snap: 96, morph: [115, 160]},
+  {cell: 12, segs: 160, snap: 384, morph: [460, 650]},
+  {cell: 48, segs: 128, snap: 1536, morph: null},
 ]);
 const TILE = 32, TILE_MAX = 900;
 const QUALITY = {
   high: {budget: 4, mid: 230, far: 1500, cap: 16000, fogNear: 2.2, fogFar: 10},
   low: {budget: 2.5, mid: 150, far: 950, cap: 7000, fogNear: 2, fogFar: 6.5},
 };
-// Cheerful crafted palette (sRGB), one per generator biome id.
-const BIOME_HEX = [0xd9c99a, 0x8f8a62, 0xe6d6a2, 0x86b552, 0x5e8f3c, 0x58804a, 0x748f4c, 0xbfae63, 0x8f877b, 0xf3f6f8, 0x9ea47e];
-const BIOME_RGB = BIOME_HEX.map(h => new THREE.Color(h).toArray());
-const ROCK = new THREE.Color(0x7d7468).toArray(), ALPINE = new THREE.Color(0x8d9a6a).toArray(), DIRT = new THREE.Color(0xa98b5e).toArray(), WET = new THREE.Color(0x5f5a3c).toArray();
-const SAND = new THREE.Color(0xd8c690).toArray(), DEEP = new THREE.Color(0x2c6f78).toArray(), SNOW = new THREE.Color(0xf4f7fa).toArray();
+// Ground kit layers per generator biome id: lush, meadow, forest floor, soil, sand, then rock and snow leanings.
+const BIOME_KIT = [
+  [0, 0, 0, .3, .7, 0, 0], [0, 0, 0, .5, .5, 0, 0], [0, 0, 0, 0, 1, 0, 0], [.62, .38, 0, 0, 0, 0, 0], [.35, .1, .55, 0, 0, 0, 0],
+  [.15, .25, .6, 0, 0, 0, 0], [.65, 0, .1, .25, 0, 0, 0], [.1, .9, 0, 0, 0, 0, 0], [0, .3, 0, .2, 0, .5, 0], [0, .2, 0, 0, 0, 0, .8], [0, .6, 0, .25, 0, .15, 0]];
+// A gentle tint per biome over the painted layers (linear multipliers): cool pines, olive marsh, sun-baked steppe.
+const BIOME_TINT = [[1, 1, 1], [1, 1, 1], [1, 1, 1], [1, 1, 1], [.94, .98, .92], [.84, .94, .93], [.9, .95, .76], [1.05, 1, .86], [1, .98, .96], [1, 1, 1], [.95, .96, .94]];
+const DEEP_TINT = [.42, .66, .7];
+export const SNOW_LINE = Object.freeze([135, 185]);
 const smooth = (a, b, v) => { const t = Math.min(1, Math.max(0, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
 const lerp3 = (out, c, t) => { out[0] += (c[0] - out[0]) * t; out[1] += (c[1] - out[1]) * t; out[2] += (c[2] - out[2]) * t; };
 
 export function createWildsView({scene, renderer = null, quality = 'high', assetBase = '/assets/', report = () => {}}) {
   const Q = QUALITY[quality] || QUALITY.high;
   const group = new THREE.Group(); group.name = 'wilds'; group.visible = false; scene.add(group);
-  const terrainMaterial = createTerrainMaterial(assetBase);
+  const kitFocus = {value: new THREE.Vector2()}, kitSnow = {value: new THREE.Vector2(...SNOW_LINE)};
   const waterMaterial = createWaterMaterial();
   let world = null, descriptor = null, state = null, bake = null, tiles = new Map(), editRects = [], editKey = '';
   // ---------- heights ----------
@@ -71,13 +76,39 @@ export function createWildsView({scene, renderer = null, quality = 'high', asset
   }
   // ---------- terrain levels ----------
   const levels = LEVELS.map((spec, l) => {
-    const mesh = new THREE.Mesh(new THREE.BufferGeometry(), terrainMaterial);
+    const ring = {value: new THREE.Vector3(0, 0, 1e9)};
+    const material = createGroundMaterial({assetBase, focus: kitFocus, morph: spec.morph, ring, snow: kitSnow, quality});
+    const mesh = new THREE.Mesh(new THREE.BufferGeometry(), material);
     mesh.name = 'wilds-terrain-' + l; mesh.frustumCulled = false; mesh.visible = false; mesh.receiveShadow = l < 2;
     mesh.userData.ignoreContact = true; group.add(mesh);
-    return {spec, l, mesh, cx: NaN, cz: NaN, innerKey: '', built: false};
+    return {spec, l, mesh, ring, cx: NaN, cz: NaN, innerKey: '', built: false};
   });
   let job = null, pending = null, buildsDone = 0, lastBuildMs = 0;
   const centreFor = (spec, cur, f) => (Number.isFinite(cur) && Math.abs(f - cur) <= spec.snap * .75) ? cur : Math.round(f / spec.snap) * spec.snap;
+  /** Lattice normal (central differences) at vertex (ix, iz) of level l, as [nx, ny, nz]. */
+  function latticeNormal(l, ix, iz) {
+    const c2 = 2 * LEVELS[l].cell, nx = (vertex(l, ix - 1, iz) - vertex(l, ix + 1, iz)) / c2, nz = (vertex(l, ix, iz - 1) - vertex(l, ix, iz + 1)) / c2, len = Math.sqrt(nx * nx + 1 + nz * nz);
+    return [nx / len, 1 / len, nz / len];
+  }
+  /**
+   * Where a point of level l sits on level l+1's surface: height and normal (as slopes nx/ny, nz/ny), interpolated on
+   * the same triangles level l+1 draws ((a, c, b) and (c, d, b)). cache memoises the coarse corners for one build.
+   */
+  function morphAt(l, x, z, out, o, cache) {
+    if (l >= LEVELS.length - 1) { out[o] = 0; out[o + 1] = 0; out[o + 2] = 0; return; }
+    const C = LEVELS[l + 1].cell, X = x / C, Z = z / C, i0 = Math.floor(X + 1e-7), j0 = Math.floor(Z + 1e-7);
+    const fx = Math.min(1, Math.max(0, X - i0)), fz = Math.min(1, Math.max(0, Z - j0));
+    const corner = (i, j) => {
+      const key = i * 131072 + j; let c = cache.get(key);
+      if (!c) { c = [vertex(l + 1, i, j), ...latticeNormal(l + 1, i, j)]; cache.set(key, c); }
+      return c;
+    };
+    const a = corner(i0, j0), b = corner(i0 + 1, j0), c = corner(i0, j0 + 1), d = corner(i0 + 1, j0 + 1);
+    let wa, wb, wc, wd;
+    if (fx + fz <= 1) { wa = 1 - fx - fz; wb = fx; wc = fz; wd = 0; } else { wa = 0; wb = 1 - fz; wc = 1 - fx; wd = fx + fz - 1; }
+    const h = a[0] * wa + b[0] * wb + c[0] * wc + d[0] * wd, ny = a[2] * wa + b[2] * wb + c[2] * wc + d[2] * wd;
+    out[o] = h; out[o + 1] = (a[1] * wa + b[1] * wb + c[1] * wc + d[1] * wd) / ny; out[o + 2] = (a[3] * wa + b[3] * wb + c[3] * wc + d[3] * wd) / ny;
+  }
   function* buildLevel(L, cx, cz, inner, out) {
     const {cell, segs} = L.spec, l = L.l, side = segs + 1, half = segs * cell / 2;
     const ox = Math.round((cx - half) / cell), oz = Math.round((cz - half) / cell); // lattice index of the corner
@@ -95,11 +126,15 @@ export function createWildsView({scene, renderer = null, quality = 'high', asset
       const ax = pos[a * 3], az = pos[a * 3 + 2], ny = (pos[b * 3 + 2] - az) * (pos[c * 3] - ax) - (pos[b * 3] - ax) * (pos[c * 3 + 2] - az);
       if (ny >= 0) index.push(a, b, c); else index.push(a, c, b);
     };
-    const fine = (x, z) => { const fc = LEVELS[l - 1].cell, ix = Math.round(x / fc), iz = Math.round(z / fc); pos[v * 3] = x; pos[v * 3 + 1] = vertex(l - 1, ix, iz); pos[v * 3 + 2] = z; lat[v * 3] = l - 1; lat[v * 3 + 1] = ix; lat[v * 3 + 2] = iz; return v++; };
+    // Rim points sit exactly on the straight coarse edge: the finer level has fully morphed onto that edge by its rim.
+    const rim = [];
+    const fine = (A, B, t) => {
+      pos[v * 3] = pos[A * 3] + (pos[B * 3] - pos[A * 3]) * t; pos[v * 3 + 1] = pos[A * 3 + 1] + (pos[B * 3 + 1] - pos[A * 3 + 1]) * t; pos[v * 3 + 2] = pos[A * 3 + 2] + (pos[B * 3 + 2] - pos[A * 3 + 2]) * t;
+      lat[v * 3] = -1; rim.push(v, A, B, t); return v++;
+    };
     // Edge A->B on the hole, C/D the outer vertices beside A/B: fan through the three finer points between A and B.
     const fan = (A, B, C, D) => {
-      const ax = pos[A * 3], az = pos[A * 3 + 2], bx = pos[B * 3], bz = pos[B * 3 + 2];
-      const f = [1, 2, 3].map(k => fine(ax + (bx - ax) * k / 4, az + (bz - az) * k / 4));
+      const f = [1, 2, 3].map(k => fine(A, B, k / 4));
       tri(C, A, f[0]); tri(C, f[0], f[1]); tri(C, f[1], D); tri(D, f[1], f[2]); tri(D, f[2], B);
     };
     for (let j = 0; j < segs; j++) {
@@ -119,44 +154,59 @@ export function createWildsView({scene, renderer = null, quality = 'high', asset
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(pos.subarray(0, v * 3), 3));
     geometry.setIndex(v > 65535 ? new THREE.Uint32BufferAttribute(index, 1) : new THREE.Uint16BufferAttribute(index, 1));
-    // Normals from central differences on each vertex's own lattice: rims share their finer neighbour's shading exactly.
+    // Normals from central differences on each vertex's lattice; rim points blend their edge's ends, exactly what the
+    // finer level's rim morphs to.
     const nrm = new Float32Array(v * 3);
     for (let k = 0; k < v; k++) {
-      const lv = lat[k * 3], ix = lat[k * 3 + 1], iz = lat[k * 3 + 2], c2 = 2 * LEVELS[lv].cell;
-      const nx = (vertex(lv, ix - 1, iz) - vertex(lv, ix + 1, iz)) / c2, nz = (vertex(lv, ix, iz - 1) - vertex(lv, ix, iz + 1)) / c2, len = Math.sqrt(nx * nx + 1 + nz * nz);
-      nrm[k * 3] = nx / len; nrm[k * 3 + 1] = 1 / len; nrm[k * 3 + 2] = nz / len;
+      if (lat[k * 3] < 0) continue;
+      const n = latticeNormal(lat[k * 3], lat[k * 3 + 1], lat[k * 3 + 2]); nrm[k * 3] = n[0]; nrm[k * 3 + 1] = n[1]; nrm[k * 3 + 2] = n[2];
       if ((k & 1023) === 1023) yield;
     }
+    for (let r = 0; r < rim.length; r += 4) {
+      const k = rim[r], A = rim[r + 1], B = rim[r + 2], t = rim[r + 3];
+      let nx = nrm[A * 3] + (nrm[B * 3] - nrm[A * 3]) * t, ny = nrm[A * 3 + 1] + (nrm[B * 3 + 1] - nrm[A * 3 + 1]) * t, nz = nrm[A * 3 + 2] + (nrm[B * 3 + 2] - nrm[A * 3 + 2]) * t;
+      const len = Math.hypot(nx, ny, nz) || 1; nrm[k * 3] = nx / len; nrm[k * 3 + 1] = ny / len; nrm[k * 3 + 2] = nz / len;
+    }
     geometry.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
-    const colors = new Float32Array(v * 3), surf = new Float32Array(v * 2), c = [0, 0, 0];
+    const morph = new Float32Array(v * 3), cache = new Map();
+    for (let k = 0; k < v; k++) { morphAt(l, pos[k * 3], pos[k * 3 + 2], morph, k * 3, cache); if ((k & 511) === 511) yield; }
+    geometry.setAttribute('morph', new THREE.BufferAttribute(morph, 3));
+    const colors = new Float32Array(v * 3), ka = new Float32Array(v * 4), kb = new Float32Array(v * 4);
     for (let k = 0; k < v; k++) {
-      surfaceColor(pos[k * 3], pos[k * 3 + 1], pos[k * 3 + 2], nrm[k * 3 + 1], l, c, surf, k);
-      colors[k * 3] = c[0]; colors[k * 3 + 1] = c[1]; colors[k * 3 + 2] = c[2];
-      if ((k & 511) === 511) yield;
+      surfaceKit(pos[k * 3], pos[k * 3 + 1], pos[k * 3 + 2], l, colors, ka, kb, k);
+      if ((k & 255) === 255) yield;
     }
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    geometry.setAttribute('surf', new THREE.BufferAttribute(surf, 2));
+    geometry.setAttribute('kitA', new THREE.BufferAttribute(ka, 4));
+    geometry.setAttribute('kitB', new THREE.BufferAttribute(kb, 4));
     geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(cx, 0, cz), half * 1.5 + 400);
     out.geometry = geometry;
   }
-  const tmpBiome = [0, 0, 0];
-  function surfaceColor(x, y, z, ny, l, c, surf, k) {
-    // Biome colour, blended over four nearby samples so boundaries read as soft transitions.
-    c[0] = c[1] = c[2] = 0;
-    for (const [dx, dz] of [[-5, -3], [4, -5], [-4, 5], [5, 4]]) { const b = BIOME_RGB[world.biomeAt(x + dx, z + dz)] || BIOME_RGB[3]; c[0] += b[0] * .25; c[1] += b[1] * .25; c[2] += b[2] * .25; }
-    const forest = world.forestAt(x, z), wetness = world.moistureAt(x, z);
-    c[0] *= 1 - forest * .22; c[1] *= 1 - forest * .1; c[2] *= 1 - forest * .2;  // shaded forest floor
-    c[1] *= .94 + wetness * .1;
-    let rock = smooth(.82, .62, ny), soil = 0;
+  const kitW = new Float32Array(7);
+  /** Ground kit weights and tint at a vertex: biome mix, forest floor, moisture, shores, beaches, roads, high pasture. */
+  function surfaceKit(x, y, z, l, colors, ka, kb, k) {
+    const w = kitW; w.fill(0); let tr = 0, tg = 0, tb = 0;
+    // Biome, blended over four nearby samples so boundaries read as soft transitions.
+    for (const [dx, dz] of [[-5, -3], [4, -5], [-4, 5], [5, 4]]) {
+      const b = world.biomeAt(x + dx, z + dz), m = BIOME_KIT[b] || BIOME_KIT[3], t = BIOME_TINT[b] || BIOME_TINT[3];
+      for (let i = 0; i < 7; i++) w[i] += m[i] * .25;
+      tr += t[0] * .25; tg += t[1] * .25; tb += t[2] * .25;
+    }
+    const forest = world.forestAt(x, z), moist = world.moistureAt(x, z);
+    const shade = Math.min(1, forest) * .4; w[2] += (w[0] + w[1]) * shade; w[0] *= 1 - shade; w[1] *= 1 - shade;
+    const lush = Math.max(-1, Math.min(1, (moist - .5) * 1.2)) * .6;
+    if (lush > 0) { const d = w[1] * lush; w[1] -= d; w[0] += d; } else { const d = w[0] * -lush; w[0] -= d; w[1] += d; }
+    if (y > 70) { const t = smooth(70, 130, y) * .6, d = w[0] * t; w[0] -= d; w[1] += d; } // high pasture before the snowline
+    let wet = 0;
     const water = world.waterAt(x, z), depth = water - y;
-    if (depth > -1.2 && water > -1e9) { const wet = smooth(-1.2, .05, depth); lerp3(c, depth > 0 ? SAND : WET, wet * .8); soil = Math.max(soil, wet); rock *= 1 - wet; }
-    if (depth > 0) { lerp3(c, DEEP, smooth(.2, 7, depth)); }
-    if (y < 2.2 && y > -1 && water === 0) { lerp3(c, SAND, smooth(2.2, .6, y)); soil = Math.max(soil, smooth(2.2, .6, y)); }
-    if (l < 2 && world.roadAt(x, z) < 2.6) { const t = smooth(2.6, 1.2, world.roadAt(x, z)); lerp3(c, DIRT, t * .85); soil = Math.max(soil, t); }
-    if (y > 70) lerp3(c, ALPINE, smooth(70, 130, y) * .5 * (1 - rock)); // high pasture before the snowline
-    lerp3(c, ROCK, rock);
-    if (y > 135) { const s = smooth(135, 185, y + world.forestAt(x, z) * -40) * smooth(.6, .85, ny); lerp3(c, SNOW, s); rock *= 1 - s; }
-    surf[k * 2] = rock; surf[k * 2 + 1] = soil;
+    if (depth > -1.6 && water > -1e9) { const t = smooth(-1.6, .1, depth); for (let i = 0; i < 4; i++) w[i] *= 1 - t * .85; w[4] += t * .85; wet = smooth(-1.2, .2, depth) * (depth > 0 ? .5 : 1); }
+    if (depth > 0) { const t = smooth(.2, 7, depth); tr += (DEEP_TINT[0] - tr) * t; tg += (DEEP_TINT[1] - tg) * t; tb += (DEEP_TINT[2] - tb) * t; }
+    if (y < 2.2 && y > -1 && water === 0) { const t = smooth(2.2, .6, y); for (let i = 0; i < 4; i++) w[i] *= 1 - t; w[4] += t; }
+    if (l < 2) { const r = world.roadAt(x, z); if (r < 2.6) { const t = smooth(2.6, 1.2, r) * .9; for (let i = 0; i < 5; i++) if (i !== 3) w[i] *= 1 - t; w[3] += t; } }
+    const sum = w[0] + w[1] + w[2] + w[3] + w[4] || 1;
+    ka[k * 4] = w[0] / sum; ka[k * 4 + 1] = w[1] / sum; ka[k * 4 + 2] = w[2] / sum; ka[k * 4 + 3] = w[3] / sum;
+    kb[k * 4] = w[4] / sum; kb[k * 4 + 1] = wet; kb[k * 4 + 2] = w[6]; kb[k * 4 + 3] = w[5];
+    colors[k * 3] = tr; colors[k * 3 + 1] = tg; colors[k * 3 + 2] = tb;
   }
   function wantedConfig(fx, fz) {
     const cfg = []; let prev = null;
@@ -175,6 +225,7 @@ export function createWildsView({scene, renderer = null, quality = 'high', asset
       const out = outs[l]; if (!out) continue;
       L.mesh.geometry.dispose(); L.mesh.geometry = out.geometry; L.mesh.visible = true; L.built = true;
       L.cx = cfg[l].cx; L.cz = cfg[l].cz; L.innerKey = cfg[l].innerKey;
+      L.ring.value.set(L.cx, L.cz, l < levels.length - 1 ? cfg[l].half : 1e9);
     }
     buildsDone++; lastBuildMs = performance.now() - started;
   }
@@ -192,7 +243,11 @@ export function createWildsView({scene, renderer = null, quality = 'high', asset
       if (rects && !rects.some(r => x >= r[0] && x <= r[2] && z >= r[1] && z <= r[3])) continue;
       const y = Math.fround(full(x, z)); if (y !== p.array[k * 3 + 1]) { p.array[k * 3 + 1] = y; changed = true; }
     }
-    if (changed) { p.needsUpdate = true; g.computeVertexNormals(); }
+    if (changed) {
+      p.needsUpdate = true; g.computeVertexNormals();
+      const m = g.attributes.morph, cache = new Map();
+      if (m) { for (let k = 0; k < count; k++) { const x = p.array[k * 3], z = p.array[k * 3 + 2]; if (rects && !rects.some(r => x >= r[0] && x <= r[2] && z >= r[1] && z <= r[3])) continue; morphAt(0, x, z, m.array, k * 3, cache); } m.needsUpdate = true; }
+    }
   }
   // ---------- water ----------
   let sea = null, lakes = null, rivers = null;
@@ -368,7 +423,7 @@ export function createWildsView({scene, renderer = null, quality = 'high', asset
   }
   function update({focus, camera, snapshot, dt = 0, budget = Q.budget}) {
     if (!world || !snapshot) return;
-    time += dt; waterMaterial.userData.time.value = time;
+    time += dt; waterMaterial.userData.time.value = time; kitFocus.value.set(focus.x, focus.z);
     if (bake !== snapshot.terrainBake) { bake = snapshot.terrainBake; baseState.terrainBake = bake; tiles = new Map(); for (const L of levels) L.innerKey = 'stale'; }
     state = snapshot; const ek = (snapshot.edits || []).length + '|' + (snapshot.inventions?.structures || []).length; if (ek !== editKey) { editKey = ek; refreshEdits(); }
     if (!job) {
@@ -391,11 +446,11 @@ export function createWildsView({scene, renderer = null, quality = 'high', asset
   function prime({focus, snapshot}) { update({focus, camera: null, snapshot, budget: 0}); while (job || treeJob || cragJob) pump(50); }
   function dispose() {
     scene.remove(group);
-    for (const L of levels) L.mesh.geometry.dispose();
+    for (const L of levels) { L.mesh.geometry.dispose(); L.mesh.material.dispose(); }
     for (const m of [sea, lakes, rivers]) m?.geometry.dispose();
     for (const m of treeMeshes) { m.geometry.dispose(); m.dispose?.(); }
     for (const row of cragMeshes) for (const m of row) { m.geometry.dispose(); m.dispose?.(); }
-    terrainMaterial.dispose(); waterMaterial.dispose(); treeMaterial.dispose(); cragMaterial.dispose();
+    waterMaterial.dispose(); treeMaterial.dispose(); cragMaterial.dispose();
   }
   return {group, setWorld, update, prime, terrainChanged, fog: {near: Q.fogNear, far: Q.fogFar}, active: () => !!world,
     nearMesh: () => levels[0].mesh, building: () => !!job || !!treeJob,
@@ -403,49 +458,6 @@ export function createWildsView({scene, renderer = null, quality = 'high', asset
 }
 
 // ---------- materials ----------
-function createTerrainMaterial(assetBase) {
-  const flat = rgb => { const t = new THREE.DataTexture(new Uint8Array([...rgb, 255]), 1, 1); t.needsUpdate = true; return t; };
-  const uniforms = {
-    wGrass: {value: flat([128, 128, 128])}, wSoil: {value: flat([128, 128, 128])}, wRock: {value: flat([128, 128, 128])},
-    wMean: {value: new THREE.Matrix3().set(.5, .5, .5, .5, .5, .5, .5, .5, .5)},
-  };
-  const material = new THREE.MeshStandardMaterial({vertexColors: true, roughness: .96, metalness: 0});
-  material.onBeforeCompile = shader => {
-    Object.assign(shader.uniforms, uniforms);
-    shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nattribute vec2 surf; varying vec2 vSurf; varying vec3 vWPos;')
-      .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvSurf = surf; vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D wGrass, wSoil, wRock; uniform mat3 wMean; varying vec2 vSurf; varying vec3 vWPos;')
-      .replace('#include <color_fragment>', `#include <color_fragment>
-        {
-          float dist = length(vWPos - cameraPosition);
-          vec3 g = texture2D(wGrass, vWPos.xz / 3.0).rgb / max(wMean[0], vec3(.02));
-          vec3 g2 = texture2D(wGrass, vWPos.zx / 17.0 + .37).rgb / max(wMean[0], vec3(.02));
-          vec3 s = texture2D(wSoil, vWPos.xz / 2.2).rgb / max(wMean[1], vec3(.02));
-          vec3 r = texture2D(wRock, vec2(vWPos.x + vWPos.z, vWPos.y * 1.6) / 5.0).rgb / max(wMean[2], vec3(.02));
-          vec3 detail = mix(mix(g, s, vSurf.y), r, vSurf.x);
-          float near = 1.0 - smoothstep(30.0, 240.0, dist), mid = 1.0 - smoothstep(120.0, 900.0, dist);
-          detail = mix(vec3(1.0), detail, near * .85);
-          detail *= mix(1.0, mix(.86, 1.12, clamp(g2.g * .5, 0.0, 1.0)), mid * (1.0 - vSurf.x)); // large-scale meadow variation
-          diffuseColor.rgb *= clamp(detail, 0.35, 1.8);
-        }`);
-  };
-  material.customProgramCacheKey = () => 'wilds-terrain-v1';
-  if (typeof document !== 'undefined') {
-    const loader = new THREE.TextureLoader();
-    const slots = [['meadow_albedo', 'wGrass', 0], ['orchard_soil_albedo', 'wSoil', 1], ['terrain_strata_albedo', 'wRock', 2]];
-    for (const [name, slot, row] of slots) loadDeliveredTexture(loader, `${assetBase}${name}.png`, tex => {
-      tex.colorSpace = THREE.SRGBColorSpace; tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.anisotropy = 4; tex.needsUpdate = true;
-      uniforms[slot].value = tex;
-      try { // mean colour (linear) so the texture only adds detail; the biome colour stays in charge
-        const cv = document.createElement('canvas'); cv.width = cv.height = 4; const ctx = cv.getContext('2d'); ctx.drawImage(tex.image, 0, 0, 4, 4);
-        const d = ctx.getImageData(0, 0, 4, 4).data; let r = 0, g = 0, b = 0; for (let i = 0; i < 64; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; }
-        const c = new THREE.Color().setRGB(r / 16 / 255, g / 16 / 255, b / 16 / 255, THREE.SRGBColorSpace), e = uniforms.wMean.value.elements;
-        e[row * 3] = c.r; e[row * 3 + 1] = c.g; e[row * 3 + 2] = c.b;
-      } catch {}
-    }, undefined, () => {});
-  }
-  return material;
-}
 function createWaterMaterial() {
   const material = new THREE.MeshStandardMaterial({color: 0x2e8fa3, roughness: .08, metalness: 0, transparent: true, opacity: .85, depthWrite: false, envMapIntensity: 1.3});
   const time = {value: 0}; material.userData.time = time;

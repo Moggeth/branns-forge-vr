@@ -15,7 +15,9 @@ let t = performance.now(); view.prime({focus: {x: 0, z: 8}, snapshot: snap}); co
 const [l0, l1] = view.group.children.filter(c => /wilds-terrain-[01]/.test(c.name));
 const p0 = l0.geometry.attributes.position.array;
 withWorld(w, () => { for (let k = 0; k < p0.length / 3; k += 97) assert.equal(p0[k * 3 + 1], Math.fround(terrainHeight(snap, p0[k * 3], p0[k * 3 + 2], false)), 'near terrain must equal the walkable surface'); });
-// Every boundary vertex of the near level appears, at the same height, in the next level's stitched rim.
+// Every boundary vertex of the near level appears in the next level's stitched rim, at the height the near level morphs
+// to by its edge (geomorph: the near level slides onto the coarser surface before it ends, so nothing pops or cracks).
+const m0 = l0.geometry.attributes.morph.array;
 const rim = new Map(), p1 = l1.geometry.attributes.position.array;
 for (let k = 0; k < p1.length; k += 3) rim.set(`${p1[k]},${p1[k + 2]}`, p1[k + 1]);
 const xs = [], zs = []; for (let k = 0; k < p0.length; k += 3) { xs.push(p0[k]); zs.push(p0[k + 2]); }
@@ -23,9 +25,13 @@ const minX = Math.min(...xs), maxX = Math.max(...xs), minZ = Math.min(...zs), ma
 let edge = 0;
 for (let k = 0; k < p0.length; k += 3) {
   const x = p0[k], z = p0[k + 2]; if (x !== minX && x !== maxX && z !== minZ && z !== maxZ) continue;
-  edge++; assert.equal(rim.get(`${x},${z}`), p0[k + 1], `crack at ${x},${z}`);
+  edge++; assert.ok(Math.abs(rim.get(`${x},${z}`) - m0[k]) < 2e-3, `crack at ${x},${z}: ${rim.get(`${x},${z}`)} vs ${m0[k]}`);
 }
 assert.ok(edge >= 600, `checked ${edge} rim vertices`);
+// Where a near vertex sits on a coarse vertex, its morph target is that coarse vertex exactly.
+const coarse = new Map(); for (let k = 0; k < p1.length; k += 3) coarse.set(`${p1[k]},${p1[k + 2]}`, p1[k + 1]);
+let shared = 0; for (let k = 0; k < p0.length; k += 3) { const c = coarse.get(`${p0[k]},${p0[k + 2]}`); if (c === undefined) continue; shared++; assert.ok(Math.abs(c - m0[k]) < 1e-3, 'morph target off the coarse surface'); }
+assert.ok(shared > 1000, `checked ${shared} shared vertices`);
 // Walking: a recentre finishes in bounded slices.
 let pumps = 0; const slice = []; view.update({focus: {x: 40, z: 8}, camera: null, snapshot: snap, budget: 0});
 while (view.building() && pumps < 5000) { const s = performance.now(); view.update({focus: {x: 40, z: 8}, camera: null, snapshot: snap, budget: 3}); slice.push(performance.now() - s); pumps++; }
