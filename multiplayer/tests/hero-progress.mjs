@@ -84,7 +84,7 @@ assert.deepEqual(limb({axe:['limbsplitter']}),['rightArm']);
 
 // Whirlwind: full circle, more reach, quicker recharge; a foe behind the hero is caught.
 assert.equal(cleaveSpec({talents:{axe:['whirlwind']}}),WHIRLWIND);assert.equal(cleaveSpec({}),AXE_CLEAVE);
-assert.equal(specialCooldown('axe',{talents:{axe:['whirlwind']}}),240);assert.equal(specialCooldown('axe'),360);
+assert.equal(specialCooldown('axe',{talents:{axe:['whirlwind']}}),300);assert.equal(specialCooldown('axe'),420);
 s=fixture({xp:xpForLevel(2),talents:{axe:['whirlwind']},foes:[-2,AXE_CLEAVE.reach+.5]});
 const spin=act(s,{action:'special'});assert.equal(spin.ok,true);
 assert.equal(spin.events[0].arc,360);assert.equal(s.snapshot().enemies.length,0,'behind and beyond the old reach both fall');

@@ -1,7 +1,7 @@
 // Shared labels and finite recipe data; legacy `gems` remains the Crystal wire key.
 // No second wood type: physical logs pay Wood directly.
 // New keys append at the end: saves without them restore as 0 (restoreMaterials), so order stays save-compatible.
-export const MATERIAL_KEYS=Object.freeze(['wood','stone','iron','mithril','gems','starMetal','ironOre','mithrilOre','starOre','copper','gold','copperOre','goldOre']);
+export const MATERIAL_KEYS=Object.freeze(['wood','stone','iron','mithril','gems','starMetal','ironOre','mithrilOre','starOre','copper','gold','copperOre','goldOre','amber']);
 export const MATERIAL_CATALOG=Object.freeze(Object.fromEntries(Object.entries({
  wood:{label:'Wood',use:'Frames, ammunition shafts and repairs.',source:'Fell trees, gather Wood or deliver trunks to a Logging Yard.',recipes:['storehouse','loggingYard','timberline','palisade'],color:0xa76b37},
  stone:{label:'Stone',use:'Foundations, walls and heavy ammunition.',source:'Mine boulders, golem remains or newly emerged seams.',recipes:['storehouse','watchtower','launcher'],color:0x92938c},
@@ -16,7 +16,9 @@ export const MATERIAL_CATALOG=Object.freeze(Object.fromEntries(Object.entries({
  copper:{label:'Copper',use:'Wiring, bells and warm fittings for coming inventions.',source:'Refine copper ore from the green-streaked lodes along the mountain foot.',recipes:[],groundwork:true,color:0xd08a5a},
  gold:{label:'Gold',use:'Inlay, enchanting foci and fine mechanisms for coming inventions.',source:'Recover impacted golden Siegebird bolts or refine gold ore from mountain-foot quartz seams.',recipes:[],groundwork:true,color:0xf2c75a},
  copperOre:{label:'Copper ore',use:'Forge feedstock: one ore makes one Copper.',source:'Mine the glinting green lodes along the mountain foot.',recipes:['refineCopper'],color:0x4f9a7c},
- goldOre:{label:'Gold ore',use:'Forge feedstock: one ore makes one Gold.',source:'Mine the glinting quartz seams up on the mountain foot.',recipes:['refineGold'],color:0xe0b44a}
+ goldOre:{label:'Gold ore',use:'Forge feedstock: one ore makes one Gold.',source:'Mine the glinting quartz seams up on the mountain foot.',recipes:['refineGold'],color:0xe0b44a},
+ // Kingsfell's heartwood (2026-10-16): amber is old tree resin, the same stone as the axe's heartstone.
+ amber:{label:'Amber',use:'Glowing resin for enchanting foci and warm lamps in coming inventions.',source:'Split by Timberfall from the hearts of felled trees: every cast brings up at least one amberheart.',recipes:[],groundwork:true,color:0xf29a2e}
 }).map(([key,value])=>[key,Object.freeze({...value,recipes:Object.freeze(value.recipes)})])));
 // groundwork: a mined and refined metal whose first recipes are still to be designed.
 export const materialKey=key=>key==='crystal'?'gems':key;

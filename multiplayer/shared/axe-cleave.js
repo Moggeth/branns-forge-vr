@@ -1,6 +1,6 @@
 import {enemyHostileTo} from './battle-mode.js';
-// Orchard's Edge special: the cleave (2026-10-03, replaces the axe's Sunder line). One wide horizontal sweep in front
-// of the hero. Every skeleton inside the arc is cut down in one hit (armoured golems take a heavy blow and are thrown
+// Kingsfell's Timberfall, near half (2026-10-03 cleave; 2026-10-16 Timberfall): as the axe hews the ground, everything
+// round the hero is cut at once, and the blade of light runs on down the lane (shared/timberfall.js). The near sweep: Every skeleton inside the arc is cut down in one hit (armoured golems take a heavy blow and are thrown
 // back), and every standing tree inside it is felled away from the hero with the usual log yield. No terrain edits,
 // no deposits. Pure and deterministic: no clock, no RNG; the client draws the sweep from the event.
 import {terrainHeight} from './terrain.js';
@@ -8,6 +8,7 @@ import {worldTrees} from './world-content.js';
 import {chopTree, trunkRadius, treeScale, isFelled, CUT_RANGE} from './trees.js';
 import {specialCooldown} from './special-cooldowns.js';
 import {hasTalent} from './hero-progress.js';
+import {launchTimberfall, splitHeart} from './timberfall.js';
 
 // Tunable; room for mastery to grow reach, arc and the tree cap later.
 export const AXE_CLEAVE = Object.freeze({
@@ -46,11 +47,12 @@ export function planCleave(state, p) {
   return {enemies, trees};
 }
 
-export function axeCleave(state, p, ctx, hitEnemyPart) {
+export function axeCleave(state, p, ctx, hitEnemyPart, point) {
   if (state.tick - (p.specialTick ?? -1000) < specialCooldown('axe', p)) return {ok: false, code: 'cooldown', events: []};
   const {enemies, trees} = planCleave(state, p), [fx, fz] = facingOf(p), events = [], hits = [], felled = [];
   const position = [p.position[0], terrainHeight(state, p.position[0], p.position[2]), p.position[2]];
   p.specialTick = state.tick;
+  const wave = launchTimberfall(state, p, point, ctx, trees.map(({t}) => t.id));
   for (const enemy of enemies) {
     const armored = enemy.kind === 'golem';
     hitEnemyPart(state, enemy, 'torso', armored ? AXE_CLEAVE.golemDamage : Math.max(1, enemy.hp),
@@ -73,9 +75,9 @@ export function axeCleave(state, p, ctx, hitEnemyPart) {
       if (chop.code || !chop.events?.some(e => !e.glance)) break;
       events.push(...chop.events.map(e => ({...e, by: p.id}))); fell = chop.events.some(e => e.kind === 'tree_fell');
     }
-    if (fell) felled.push(t.id);
+    if (fell) { felled.push(t.id); splitHeart(state, t, wave.nearHearts.get(t.id), wave.flight, ctx, events); }
   }
   events.unshift({kind: 'axe_cleave', weapon: 'axe', id: p.id, tick: state.tick, position, direction: [fx, 0, fz],
-    reach: cleaveSpec(p).reach, arc: cleaveSpec(p).arc, hits, trees: felled});
+    reach: cleaveSpec(p).reach, arc: cleaveSpec(p).arc, hits, trees: felled, timberfall: wave.event});
   return {ok: true, events};
 }

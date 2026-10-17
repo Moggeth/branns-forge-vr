@@ -15,6 +15,7 @@ import {STRUCTURES,createInventions,inventionAction,stepInventions,restoreInvent
 import {MATERIAL_KEYS,emptyMaterials,restoreMaterials,DEPOSIT_CATALOG,depositReward} from './material-catalog.js';
 import {baseHeight,terrainHeight,moveOnTerrain,resolveTerrainBoundary,settleTerrainContents,createSunderRupture,validateTerrainRuptures,restoreTerrainEdit,hasActiveTerrain,validateWallSegment,PICK_WALL,RAISE_WALL,makeTerrainRoom,restoreTerrainBake} from './terrain.js';
 import {collapseMinedWall,stepCrystalWalls,WALL_DEPOSITS,RIDGE_KINDS} from './weapon-specials.js';
+import {stepTimberfall,drinkSap} from './timberfall.js';
 import {castEarthLine,earthLineEdits} from './earth-spells.js';
 export {terrainHeight} from './terrain.js';
 import {stepEnemies} from './enemy-behaviour.js';
@@ -311,6 +312,7 @@ function instantiate(state) {
           if (requestedTool !== 'axe' || !targetOK({x:tree.x,z:tree.z,y:terrainHeight(state,tree.x,tree.z)})) return ok();
           // Persisted notch at the struck height/side; third cut hinges the upper section (shared/trees.js).
           const chop=chopTree(state,tree,message.point,message.normal,{terrainHeight:(x,z)=>terrainHeight(state,x,z)});
+          if(!chop.code&&chop.events?.some(e=>e.kind==='wood_hit'&&!e.glance))drinkSap(state,p); // Sapdrinker: a biting blow feeds Timberfall
           return chop.code?fail(chop.code):ok(chop.events);
         }
         if (supplied && ore) {
@@ -333,12 +335,12 @@ function instantiate(state) {
           if(building){if(inReach(building)<Infinity&&Math.hypot(message.point[0]-building.position[0],message.point[2]-building.position[2])<4)damageInvention(state,building.id,requestedTool==='hammer'?55:25,p.id,events);return ok(events);}
           const salvage=mineGolemRemains(state,p,message,combatContext);if(salvage)return salvage;
           const hitEnemy=state.enemies.find(e=>e.id===message.targetId);
-          if(hitEnemy && enemyHostileTo(hitEnemy,p.side) && inReach(hitEnemy)<Infinity && validPartHit(hitEnemy,message.part||'torso',message.point)){const charge=spendCharge(state,p);if(charge)events.push({kind:'charged_strike',id:hitEnemy.id,by:p.id,position:[...message.point],hits:p.charge?.hits||0});hitEnemyPart(state,hitEnemy,message.part||'torso',(requestedTool==='hammer'?70:requestedTool==='limb'?30:34)+charge,{...message,tool:requestedTool,ownerId:p.id},combatContext,events);}
+          if(hitEnemy && enemyHostileTo(hitEnemy,p.side) && inReach(hitEnemy)<Infinity && validPartHit(hitEnemy,message.part||'torso',message.point)){if(requestedTool==='axe')drinkSap(state,p);const charge=spendCharge(state,p);if(charge)events.push({kind:'charged_strike',id:hitEnemy.id,by:p.id,position:[...message.point],hits:p.charge?.hits||0});hitEnemyPart(state,hitEnemy,message.part||'torso',(requestedTool==='hammer'?70:requestedTool==='limb'?30:34)+charge,{...message,tool:requestedTool,ownerId:p.id},combatContext,events);}
           else if(message.targetId==='shrine')return fail('permanent_forge');
           return ok(events); // No fallback to another target when a precise surface missed.
         }
         const enemy = state.enemies.filter(e=>enemyHostileTo(e,p.side)).map(e => [e, inReach(e)]).sort((a, b) => a[1] - b[1])[0];
-        if (enemy && Number.isFinite(enemy[1])) {const charge=spendCharge(state,p);if(charge)events.push({kind:'charged_strike',id:enemy[0].id,by:p.id,position:[...enemy[0].position],hits:p.charge?.hits||0});damageEnemy(state, enemy[0], 34+charge, events,p.id);}
+        if (enemy && Number.isFinite(enemy[1])) {if(requestedTool==='axe')drinkSap(state,p);const charge=spendCharge(state,p);if(charge)events.push({kind:'charged_strike',id:enemy[0].id,by:p.id,position:[...enemy[0].position],hits:p.charge?.hits||0});damageEnemy(state, enemy[0], 34+charge, events,p.id);}
         return ok(events);
       }
       if (p.role !== 'god') return fail('role_required');
@@ -459,6 +461,7 @@ function instantiate(state) {
         liftActors(state); events.push(event('cast', at, pending.id));events.push({kind:'spell',spell:'starfall',phase:'impact',position:at,id:pending.id,tick:state.tick});
       }
       stepCrystalWalls(state,combatContext,hitEnemyPart,events);
+      stepTimberfall(state,combatContext,hitEnemyPart,events);
       forgeY=terrainHeight(state,0,0,false); // Starfall may have changed the ground.
       stepBattle(state,{createEnemy,terrainHeight,nextId,damageHero,damageEnemy:(enemy,n,ev,side,ownerId)=>hitEnemyPart(state,enemy,'torso',n,ownerId?{side,ownerId}:{side},{nextId,terrainHeight},ev)},events);
       stepEnemies(state,{

@@ -21,7 +21,7 @@ export const ASSET_POSES = Object.freeze({
   // Generated Sunfall's crimson grip runs y=.03..38 and hammer face is X.
   hammer: {forward: [1, 0, 0], up: [0, 1, 0], pivot: [0, .205, 0], height: 1.34, nativeScale: 1, tipPoint: [.34, .83, 0]},
   pick: {forward: [1, 0, 0], up: [0, 1, 0], pivot: 'Grip', height: .75},
-  axe: {forward: [1, 0, 0], up: [0, 1, 0], pivot: 'Grip_Center', height: 0.7},
+  axe: {forward: [1, 0, 0], up: [0, 1, 0], pivot: 'Grip_Center', height: 0.7, nativeScale: .81}, // Kingsfell: haft authored at the Orchard's Edge size; .81 keeps the hand fit
   tree_b: {forward: [0, 0, -1], up: [0, 1, 0], pivot: 'feet', height: 4},
   tree_young: {forward: [0, 0, -1], up: [0, 1, 0], pivot: 'feet', height: 4},
   tree: {forward: [0, 0, -1], up: [0, 1, 0], pivot: 'feet', height: 4},
