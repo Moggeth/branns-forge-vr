@@ -1,3 +1,4 @@
+import {activeWorld} from './world-extent.js';
 import {friendlyEnemyHit} from './battle-mode.js';
 import {terrainHeight,settleTerrainContents,PICK_WALL,createSunderRupture,sunderFront,makeTerrainRoom,wallSpec} from './terrain.js';
 import {axeCleave} from './axe-cleave.js';
@@ -57,7 +58,7 @@ export function planCrystalWall(position,yaw,point) {
 export const wallCasts=(state,owner,kind)=>{const casts=new Map();for(const e of state.edits)if(e.wall&&(kind?e.kind===kind:true)&&(!owner||e.wall.owner===owner)){if(!casts.has(e.rupture.id))casts.set(e.rupture.id,[]);casts.get(e.rupture.id).push(e);}return casts;};
 function crystalWall(state,p,ctx,m,hitEnemyPart) {
   const plan=planCrystalWall(p.position,p.yaw,m.point);
-  if([plan.start,plan.end].some(q=>Math.abs(q[0])>46||Math.abs(q[1])>46))return fail('outside_world');
+  if(!activeWorld()&&[plan.start,plan.end].some(q=>Math.abs(q[0])>46||Math.abs(q[1])>46))return fail('outside_world');
   const n=plan.segments.length;
   makeTerrainRoom(state,n+state.pendingStarfalls.length);
   if(state.edits.length+state.pendingStarfalls.length+n>SPECIAL_LIMITS.edits||state.deposits.length+state.pendingStarfalls.length+n>SPECIAL_LIMITS.deposits)return fail('world_limit');

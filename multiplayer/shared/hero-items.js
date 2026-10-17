@@ -1,6 +1,7 @@
 // Hero items from the keep Quartermaster (shared/home-shop.js): an Overwatch Stadium style kit of up to six items
-// bought with Gold. Items are kept through deaths and saved with the hero (and their name ledger). No imports, so
-// hero-progress.js, combat and movement can all read the bonuses. Pure and deterministic.
+// bought with Gold. Items are kept through deaths and saved with the hero (and their name ledger). Only the pure
+// run-boon catalogue is imported, so hero-progress.js, combat and movement can all read the bonuses. Pure and deterministic.
+import {boonBonus} from './run-boons.js';
 export const ITEM_SLOTS = 6;
 export const ITEMS = Object.freeze(Object.fromEntries(Object.entries({
   breastplate: {name: 'Brass Breastplate', cost: 12, tier: 'common', text: '+40 max health.', hp: 40},
@@ -20,9 +21,9 @@ export const sellPrice = id => Math.floor((ITEMS[id]?.cost || 0) / 2);
 
 const owned = p => Array.isArray(p?.items) ? p.items : [];
 export const hasItem = (p, id) => owned(p).includes(id);
-/** Sum of one numeric bonus over the hero's items (0 when none). */
+/** Sum of one numeric bonus over the hero's items and Expedition run boons (0 when none). */
 export function itemBonus(p, key) {
-  let n = 0;
+  let n = boonBonus(p, key);
   for (const id of owned(p)) { const v = Object.hasOwn(ITEMS, id) ? ITEMS[id][key] : 0; if (typeof v === 'number') n += v; }
   return n;
 }

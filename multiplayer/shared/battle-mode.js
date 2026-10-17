@@ -129,7 +129,8 @@ export function spawnSquad(state,ctx,base,tag) {
 function stepHomeBattle(state,ctx,events) {
   if(homeBattle(state)){for(const base of state.battle.bases)for(const part of base.parts)if(part.kind==='ballista')stepHomeBallista(state,part,ctx,events);stepKeepShots(state,ctx,events);}
   stepHomeBases(state,ctx,events);
-  if(!state.players.length||state.tick<state.battle.nextWaveTick)return;
+  // An Expedition Roguelite run directs its own encounters, so the keeps stand but send no squads (shared/expedition-run.js).
+  if(!state.players.length||state.run||state.tick<state.battle.nextWaveTick)return;
   const b=state.battle;b.wave++;b.nextWaveTick=state.tick+HOME.waveTicks;
   let spawned=0;
   for(const base of b.bases)if(!baseFallen(state,base))spawned+=spawnSquad(state,ctx,base,String(b.wave));

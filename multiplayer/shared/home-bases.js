@@ -2,6 +2,7 @@ import {heroMaxHp} from './hero-progress.js';
 import {restoreMill} from './home-mill.js';
 import {HOME_SITES} from './keep-sites.js';
 import {movedPlaced, movedTable} from './map-layout.js';
+import {posLimit} from './world-extent.js';
 // Always-on home bases (battle v2): Dawnhold (party) in the south-west corner and
 // Grumblekeep (rivals) in the north-east. Each sits under a shield dome held up by
 // three pylons, with a heart forge, barracks, fountain, two crystal spires and two
@@ -368,7 +369,7 @@ export function restoreHomeBases(bases, tick) {
   return ['party', 'rivals'].map((side, i) => {
     const b = bases[i], ids = partIds(side);
     if (!b || b.id !== `battle-base-${side}` || b.side !== side || b.maxHp !== HOME.heartHp || !num(b.hp, 0, HOME.heartHp) || !vec(b.position)
-      || b.position[0] !== HOME_SITES[side][0] || b.position[2] !== HOME_SITES[side][1] || Math.abs(b.position[1]) > 200 || !int(b.level, 1, HOME.levelCap)
+      || b.position[0] !== HOME_SITES[side][0] || b.position[2] !== HOME_SITES[side][1] || Math.abs(b.position[1]) > posLimit() || !int(b.level, 1, HOME.levelCap)
       || !num(b.shieldDownUntil, 0, tick + HOME.shieldDownTicks) || !num(b.fallenUntil, 0, tick + HOME.rebuildTicks) || !Array.isArray(b.parts) || b.parts.length !== ids.length) bad();
     const parts = ids.map(([id, kind], n) => {
       const p = b.parts[n];

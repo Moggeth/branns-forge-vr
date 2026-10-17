@@ -1,0 +1,3 @@
+/* Wilds guide card (client/wilds-guide.js): the quest card's .xhud look, labelled Guide when folded on phones. */
+:root[data-mq] body.touch-controls-active .xhud.wilds-guide[data-expanded="false"] .xhud-toggle::after { content: 'Guide'; }
+.hud > .xhud.wilds-guide .xhud-chip { padding: 2px 7px; }

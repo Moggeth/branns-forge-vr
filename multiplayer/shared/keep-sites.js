@@ -1,9 +1,11 @@
 import {movedList, movedTable} from './map-layout.js';
+import {inUnderway} from './underways/space.js';
 // Where the two keeps stand, and the ground carved for them out of the corner mountains: a round bowl for the
 // half-ring keep, a narrow pass straight back toward the corner, and a walled back town filling the corner itself,
 // out past the old map edge. Shared by the terrain (shared/terrain.js), movement and the keep rules
 // (shared/home-bases.js). Pure data and maths. Larimar Cove (shared/larimar-cove.js) opens off each back town's yard.
 import {coveCarve} from './larimar-cove.js';
+import {activeWorld, inUnderwayBand} from './world-extent.js';
 export const HOME_SITES = Object.freeze({party: Object.freeze([-34, -34]), rivals: Object.freeze([34, 34])});
 export const KEEP_CARVE = Object.freeze({
   bowl: 20, bowlBlend: 3,          // flat to 20 m from the heart, cliffs rise over the next 3 m
@@ -14,7 +16,7 @@ export const KEEP_CARVE = Object.freeze({
 });
 // The furthest anything can be from the centre on either axis. Only the carved keep corners reach past the old
 // ±55 edge (the open meadow still stops at ±50 for walkers and ±55 for things).
-export const WORLD_EXTENT = 70;
+export const WORLD_EXTENT = 70; // arena only; generated worlds use extentLimit() (shared/world-extent.js)
 const smooth = t => { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); };
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 /** 1 where a keep has cut the mountains away, 0 where they stand, smooth between. */
@@ -70,11 +72,16 @@ export function onKeepGround(x, z) {
 }
 /** Clamp a ground point to the world: inside ±limit on the open map, or anywhere on a keep's carved floor. */
 export function clampToWorld(x, z, limit = 55) {
+  if (inUnderway(x, z)) return [x, z]; // dungeon walls hold walkers there (shared/underways/space.js)
+  const w = activeWorld();
+  if (w) { if (inUnderwayBand(x, z)) return [x, z]; const b = w.bounds; return [clamp(x, b.minX, b.maxX), clamp(z, b.minZ, b.maxZ)]; }
   if ((Math.abs(x) <= limit && Math.abs(z) <= limit) || onKeepGround(x, z)) return [x, z];
   return [clamp(x, -limit, limit), clamp(z, -limit, limit)];
 }
 /** True once a point has left the world: past ±limit and not over a keep's carved floor. */
 export function beyondWorld(x, z, limit = 55) {
+  const w = activeWorld();
+  if (w) { const [cx, cz] = clampToWorld(x, z); return cx !== x || cz !== z; }
   return (Math.abs(x) > limit || Math.abs(z) > limit) && !onKeepGround(x, z);
 }
 

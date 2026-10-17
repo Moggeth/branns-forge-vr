@@ -53,6 +53,7 @@ function homeQuestView(snapshot,playerId) {
 }
 
 export function battleQuestView(snapshot,playerId) {
+  if(snapshot?.run)return null; // an Expedition Roguelite run shows its own strip (client/run-panel.js); the keeps send no squads
   if(snapshot?.battle?.v===2&&snapshot.battle.status==='running'&&snapshot.battle.bases?.length===2)return homeQuestView(snapshot,playerId);
   const model=battlePanelModel(snapshot,playerId);
   if(model.status==='off')return null;

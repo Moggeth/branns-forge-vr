@@ -16,6 +16,7 @@ export const ATMOSPHERE = {
   bfWet: {value: 0},
   bfSnow: {value: 0},
   bfSparkle: {value: 1},                    // glitter on settled snow and wet ground
+  bfAerial: {value: new THREE.Vector3(0, 220, 0)}, // aerial perspective: density at y=0 (per metre), e-folding height, blue lift
 };
 
 const VERTEX_PARS = /* glsl */`
@@ -54,7 +55,7 @@ const FRAGMENT_PARS = /* glsl */`
 	varying vec3 vBfWorld;
 	uniform float bfTime, bfMist, bfMistBase, bfMistHeight, bfMistNoise, bfWet, bfSnow, bfSparkle;
 	uniform vec2 bfWind;
-	uniform vec3 bfSunDir, bfSunScatter;
+	uniform vec3 bfSunDir, bfSunScatter, bfAerial;
 	float bfHash( vec2 p ) { return fract( sin( dot( p, vec2( 127.1, 311.7 ) ) ) * 43758.5453 ); }
 	float bfNoise( vec2 p ) { vec2 i = floor( p ), f = fract( p ); f = f * f * ( 3.0 - 2.0 * f );
 		return mix( mix( bfHash( i ), bfHash( i + vec2( 1, 0 ) ), f.x ), mix( bfHash( i + vec2( 0, 1 ) ), bfHash( i + vec2( 1, 1 ) ), f.x ), f.y ); }
@@ -78,8 +79,18 @@ const FRAGMENT = /* glsl */`
 		}
 		float bfMistAmt = 1.0 - exp( - bfMist * bfLen * max( bfColumn, 0.0 ) * bfWisp );
 		fogFactor = 1.0 - ( 1.0 - fogFactor ) * ( 1.0 - bfMistAmt );
+		// Aerial perspective (big landscapes): air thins with height, so far valleys turn to blue haze while peaks
+		// above it stay clear and read at their true distance.
+		float bfAer = 0.0;
+		if ( bfAerial.x > 0.0 ) {
+			float aA = exp( - max( cameraPosition.y, -50.0 ) / bfAerial.y ), aB = exp( - max( vBfWorld.y, -50.0 ) / bfAerial.y );
+			float aCol = abs( bfRay.y ) > 0.5 ? ( aA - aB ) * bfAerial.y / bfRay.y : 0.5 * ( aA + aB );
+			bfAer = 1.0 - exp( - bfAerial.x * bfLen * max( aCol, 0.0 ) );
+			fogFactor = 1.0 - ( 1.0 - fogFactor ) * ( 1.0 - bfAer );
+		}
 		float bfSun = max( dot( bfDir, normalize( bfSunDir ) ), 0.0 );
 		vec3 bfFog = fogColor + bfSunScatter * ( pow( bfSun, 6.0 ) * 0.7 + pow( bfSun, 40.0 ) * 0.9 );
+		bfFog = mix( bfFog, bfFog * vec3( 0.86, 0.97, 1.16 ), bfAerial.z * bfAer * ( 1.0 - bfSun * bfSun ) );
 		#ifdef BF_ADDITIVE
 			gl_FragColor.rgb *= 1.0 - fogFactor; // glow fades into the haze instead of adding haze colour
 		#else
