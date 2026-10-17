@@ -96,6 +96,12 @@ export function createGroundMaterial({assetBase = '/assets/', focus, morph = nul
         float kitHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
         float kitNoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
           return mix(mix(kitHash(i), kitHash(i + vec2(1, 0)), f.x), mix(kitHash(i + vec2(0, 1)), kitHash(i + vec2(1, 1)), f.x), f.y); }
+        // Ridged relief for mountainsides: sharp crests and soft gullies at three scales (60 m, 22 m, 8 m).
+        float kitRidge(vec2 p, float fine) {
+          float r = 0.0, a = .6, s = 1.0 / 60.0;
+          for (int i = 0; i < 3; i++) { float n = 1.0 - abs(kitNoise(p * s + float(i) * 17.3) * 2.0 - 1.0); r += n * n * a * (i == 2 ? fine : 1.0); a *= .45; s *= 2.7; }
+          return r;
+        }
         // Two samples per layer, at two scales and angles, mixed by a slow noise: the repeat never lines up.
         vec4 kitPair(sampler2DArray t, vec2 uv, float layer, float mixT, float both) {
           vec4 a = texture(t, vec3(uv, layer));
@@ -108,6 +114,14 @@ export function createGroundMaterial({assetBase = '/assets/', focus, morph = nul
         float kitDist = length(vKitPos - cameraPosition);
         float kitNear = 1.0 - smoothstep(90.0, 160.0, kitDist);      // relief normals and the second sample fade out here
         float kitMacro = kitNoise(vKitPos.xz * .021) * .65 + kitNoise(vKitPos.xz * .093) * .35;
+        // Carve the generated slopes: steep and high ground gets ridged relief in its shading (and so in its rock and
+        // snow), which the smooth heightfield lacks between its vertices.
+        float kitCarve = smoothstep(.95, .76, kitN.y) * smoothstep(115.0, 190.0, vKitPos.y);
+        if (kitCarve > .01) {
+          float fine = 1.0 - smoothstep(120.0, 400.0, kitDist), e = 2.0;
+          float r0 = kitRidge(vKitPos.xz, fine), rx = kitRidge(vKitPos.xz + vec2(e, 0.0), fine), rz = kitRidge(vKitPos.xz + vec2(0.0, e), fine);
+          kitN = normalize(kitN - vec3(rx - r0, 0.0, rz - r0) / e * 22.0 * kitCarve);
+        }
         float w[7];
         w[0] = vKitA.x; w[1] = vKitA.y; w[2] = vKitA.z; w[3] = vKitA.w; w[4] = vKitB.x;
         // Rock where the land is steep (wobbled so the edge is not a contour line); snow above the line, on the level.
