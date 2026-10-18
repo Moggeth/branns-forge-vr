@@ -8,7 +8,7 @@ import {FLOCKWRIGHT} from '../shared/combat.js';
 export const FLOCKWRIGHT_TIMING = Object.freeze({fire: .38, reload: FLOCKWRIGHT.cycleTicks / 60 - .38, blend: .08});
 // First-person poses for the weapon anchor (the model's GripMain socket is the pivot). Hip: low right, nose a touch
 // left. Aim: the rear ring sight and the front bead on the view axis, close to the eye.
-export const FLOCKWRIGHT_POSE = Object.freeze({hip: Object.freeze([.2, -.22, -.4]), aim: Object.freeze([0, -.143, -.3]), aimRate: 12});
+export const FLOCKWRIGHT_POSE = Object.freeze({hip: Object.freeze([.22, -.17, -.46]), aim: Object.freeze([0, -.143, -.3]), aimRate: 12});
 
 export function createFlockwrightRigs() {
   let clips = null;

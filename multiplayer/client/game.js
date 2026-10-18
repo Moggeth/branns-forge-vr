@@ -1694,7 +1694,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     if(dragonRide.riding()){if(event.button===0)dragonRide.press('breath',true);if(event.button===2)dragonRide.press('fireball',true);return;}
     if(manned){if(event.button===0)mannedPress();if(event.button===2)scoping=true;return;}
     if(event.button===0)primaryDown();
-    if(event.button===2){if(tool==='staff')special();else if(['crossbow','bow','flask'].includes(tool))aiming=true;else weapons.special();if(tool==='bow')weapons.special();}
+    if(event.button===2){if(tool==='staff')special();else if(['crossbow','bow','flask','flockwright'].includes(tool))aiming=true;else weapons.special();if(tool==='bow')weapons.special();}
   });
   listen(window,'mouseup',event=>{if(role!=='hero')return;if(event.button===0)primaryUp();if(event.button===2){aiming=false;scoping=false;if(wallAim)releaseWallAim();}});
   listen(window,'pointerup',event=>{

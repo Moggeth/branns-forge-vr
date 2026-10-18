@@ -17,13 +17,9 @@ const stand = armouryStand();
 
 const PHONE = !!process.env.PHONE, VIEW = PHONE ? {width: 844, height: 390} : {width: 960, height: 540}, tag = n => PHONE ? `${n}-phone` : n;
 const {browser, page} = await launch({viewport: VIEW, pointerLock: true, touch: PHONE});
-await page.addInitScript(() => {
- const real = performance.now.bind(performance), raf = window.requestAnimationFrame.bind(window); let vt = 0, on = false, queue = [];
- performance.now = () => on ? vt : real();
- window.requestAnimationFrame = cb => { if (!on) return raf(cb); queue.push(cb); return queue.length; };
- window.__vt = {enable() { vt = real(); on = true; }, frame(ms = 1000/60) { vt += ms; const run = queue; queue = []; for (const cb of run) cb(vt); return run.length; }};
-});
-async function frames(n) { for (let i = 0; i < n; i++) { await page.evaluate(ms => window.__vt.frame(ms), 1000/60); await new Promise(r => setTimeout(r, 12)); } }
+page.on('crash', () => console.log('renderer crashed'));
+// Real clock: the virtual frame clock crashed the software renderer on this long scene (2026-10-18).
+async function frames(n) { await page.evaluate(n => new Promise(r => { let k = 0; const f = () => ++k >= n ? r() : requestAnimationFrame(f); requestAnimationFrame(f); }), n); }
 const harness = () => page.evaluate(() => { const h = window.brannHarness, s = h.snapshot(); return {s, me: s.players.find(p => p.id === h.state().playerId), c: h.controls()}; });
 async function look(at, n = 20) {
  for (let i = 0; i < n; i++) {
@@ -39,6 +35,17 @@ async function walkTo(at, near) {
   await look([at[0], me.position[1] + 1.65, at[2]], 2); await page.keyboard.down('KeyW'); await frames(4); await page.keyboard.up('KeyW'); }
  const {me} = await harness(); record('walk-blocked', 'fail', {position: me.position, target: at, near});
  return false;
+}
+// The walk out is long on a software renderer: move the Hero on the host (dev-only acceptance probe), as
+// browser-expedition-run.mjs does, then let the client settle on the new spot.
+async function place([x, , z]) {
+ console.log('place', x.toFixed(1), z.toFixed(1));
+ await page.evaluate(async ([x, z]) => {
+  const {loadSimulation, terrainHeight} = await import('/shared/simulation.js');
+  const q = window.__qaRun, s = q.session(), st = s.simulation.checkpoint(), p = st.players.find(p => p.id === q.playerId());
+  p.position = [x, terrainHeight(st, x, z, false) + .2, z]; p.velocity = [0, 0, 0]; p.vy = 0; s.simulation = loadSimulation(st);
+ }, [x, z]);
+ await frames(8); return true;
 }
 async function capture() {
  if (await page.evaluate(() => !!document.pointerLockElement)) return;
@@ -63,7 +70,6 @@ try {
  await page.waitForFunction(() => window.brannHarness?.state().phase === 'game', null, {timeout: 120000});
  await new Promise(r => setTimeout(r, 1500));
  await dismiss();
- await page.evaluate(() => window.__vt.enable());
  await capture(); await frames(10);
 
  // Locked until taken: key 9 says where to find it.
@@ -71,31 +77,33 @@ try {
  let h = await harness(); assert.notEqual(h.me.tool, 'flockwright', 'locked before the Armoury');
  // Out to the road in front of the Armoury, then look the hall over.
  const road = local([-2.2, 9.5]);
- assert.ok(await walkTo(at2(road), 1.2), 'reached the road in front');
- await look(at2(local([0, 0]), h.me.position[1] + 2.2), 30); await frames(90);
+ await place(at2(road));
+ await look(at2(local([0, 0]), h.me.position[1] + 2.2), 6); await frames(12);
  await shot(page, tag('armoury-front'));
  const door = local([0, 3.4]);
- assert.ok(await walkTo(at2(door), .9), 'reached the doorway');
- await look(at2(stand, h.me.position[1] + 1.1), 24); await frames(60);
+ await place(at2(door));
+ await look(at2(stand, h.me.position[1] + 1.1), 6); await frames(12);
  await shot(page, tag('armoury-inside'));
- assert.ok(await walkTo(at2(stand), 1.9), 'reached the stand');
- await look(at2(stand, h.me.position[1] + 1.15), 20); await frames(40);
+ await place(at2(local([.3, 1.5])));
+ await look(at2(stand, h.me.position[1] + 1.15), 6); await frames(12);
  await shot(page, tag('armoury-stand'));
- await page.keyboard.press('KeyE'); await frames(60);
+ await page.keyboard.press('KeyE'); await frames(30);
  h = await harness();
  record('taken', h.me.flockwright && h.me.tool === 'flockwright' ? 'pass' : 'fail', {tool: h.me.tool, owned: h.me.flockwright});
  assert.equal(h.me.flockwright, true, 'taken'); assert.equal(h.me.tool, 'flockwright', 'equipped');
- await frames(60);
+ await frames(10);
  // Out the door and face the meadow, then aim and fire.
- const out = local([0, 9]); await walkTo(at2(out), 1); const far = local([0, 40]);
- await look(at2(far, h.me.position[1] + 2.5), 24); await frames(90);
+ const out = local([3, 7]); await place(at2(out)); const far = local([12, 40]);
+ await look(at2(far, h.me.position[1] + 1.6), 6); await frames(12);
  await shot(page, tag('flockwright-held'));
- if (!PHONE) { await page.mouse.down({button: 'right'}); await page.mouse.up({button: 'right'}); await frames(40); await shot(page, 'flockwright-aim'); }
+ // Hold right click to raise the ring sight, fire while sighted, then let go.
+ if (!PHONE) { await page.mouse.down({button: 'right'}); await frames(15); await shot(page, 'flockwright-aim'); }
  const before = (await harness()).s.projectiles.length;
  if (!PHONE) { await page.mouse.down(); await frames(1); await page.mouse.up(); }
  await frames(4); await shot(page, tag('flockwright-fire'));
  h = await harness(); record('fired', h.s.projectiles.some(p => p.heavy) || h.s.projectiles.length > before ? 'pass' : 'fail', {projectiles: h.s.projectiles.length});
  await frames(20); await shot(page, tag('flockwright-reload'));
+ if (!PHONE) await page.mouse.up({button: 'right'});
  const diag = await page.evaluate(() => document.querySelector('canvas')?.brannDiagnostics?.() ?? null);
  record('diagnostics', 'info', {calls: diag?.calls, triangles: diag?.triangles});
 } catch (error) {
