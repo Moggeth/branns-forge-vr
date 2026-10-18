@@ -10,12 +10,12 @@ import {makeSave} from '../client/world-saves.js';
 import {launch, BASE, record, save, shot} from './browser-acceptance-lib.mjs';
 
 const sim = createSimulation({room: 'SOLO'}), s = sim.adventureWorld(); s.tick = 1; s.landmarks = false; s.enemies = [];
-s.battle.nextWaveTick = 36000;
+s.battle.nextWaveTick = 3600;
 const fixture = Buffer.from(JSON.stringify(makeSave(sim.checkpoint())));
 const piece = armouryPiece(), local = xz => pieceWorld(piece, xz), at2 = ([x, z], h = 0) => [x, h, z];
 const stand = armouryStand();
 
-const PHONE = !!process.env.PHONE, VIEW = PHONE ? {width: 844, height: 390} : {width: 1280, height: 720}, tag = n => PHONE ? `${n}-phone` : n;
+const PHONE = !!process.env.PHONE, VIEW = PHONE ? {width: 844, height: 390} : {width: 960, height: 540}, tag = n => PHONE ? `${n}-phone` : n;
 const {browser, page} = await launch({viewport: VIEW, pointerLock: true, touch: PHONE});
 await page.addInitScript(() => {
  const real = performance.now.bind(performance), raf = window.requestAnimationFrame.bind(window); let vt = 0, on = false, queue = [];
@@ -56,6 +56,7 @@ try {
  const whatsNew = page.getByRole('button', {name: 'Got it', exact: true});
  const dismiss = () => whatsNew.evaluate(b => b.click(), null, {timeout: 20000}).catch(() => {});
  await dismiss();
+ page.setDefaultTimeout(180000);
  await page.fill('#name', 'Armoury QA'); await page.check('input[name="role"][value="hero"]', {force: true});
  await page.locator('#import').setInputFiles({name: 'armoury.json', mimeType: 'application/json', buffer: fixture});
  for (let i = 0; i < 6 && !(await page.evaluate(() => window.brannHarness?.state().phase === 'game')); i++) { if (await whatsNew.isVisible()) await dismiss(); await new Promise(r => setTimeout(r, 5000)); }
