@@ -1,9 +1,13 @@
 """Kingsfell, Briar Scout look (stage 1 / L1 proof) - reproducible Blender (bpy 4.5/5.0) builder.
 
-Mitch's 2026-10-17 reference: a scout's bearded hatchet. Hammered bright steel, an olive enamel panel framed in brass
-along the spine with a gold oak branch and an amber acorn set in it, a warm spiral-grooved haft with brass bands, an
-olive woven grip, a leather strap and an amber acorn pommel. Same runtime contract as build_kingsfell.py (node and
-material names), so the luminance, Timberfall and grips carry over. This is the L1 shape-and-material proof.
+Mitch's 2026-10-17 reference: a scout's bearded hatchet, rebuilt (round 3, 2026-10-18) so every part could be made and
+assembled by a smith: one forged head whose eye flows into the cheeks, with lugs riveted down the haft and a square
+hammer poll behind it (for driving tent stakes and wedges); a long hooked beard; a brass-framed olive enamel plate
+riveted to the cheek, inlaid with a gold briar bramble (thorns, rose leaves, red enamel hips) and an amber acorn held
+in a brass cap and claws; a ground edge with a hand-ground grind line and faint temper colours; a hickory haft with a
+gentle forward bow, a swell at the throat, an olive woven grip, a leather keeper and an amber acorn pommel.
+Same runtime contract as build_kingsfell.py (node and material names), so the luminance, Timberfall and grips carry
+over. This is the L1 shape-and-material proof.
 Previous look (kept for comparison):
 
 Run:  python3.11 build_kingsfell.py -- [--out path.glb] [--render dir] [--samples 48] [--views a,b]
@@ -37,10 +41,10 @@ TAU = math.tau
 rng = np.random.default_rng(7)
 
 # ------------------------------------------------------------------ dimensions (shared with the runtime)
-EDGE_C = (0.020, 0.730)       # edge arc centre (x, z): a bearded axe, the edge runs long and the beard drops low
-EDGE_R = 0.230                # edge arc radius (apex)
-A_HI = math.asin((0.920 - EDGE_C[1]) / EDGE_R)     # arc angle up to the horn tip (z .92)
-A_LO = math.asin((EDGE_C[1] - 0.515) / EDGE_R)     # arc angle down to the beard tip (z .515): longer than the horn
+EDGE_C = (-0.070, 0.685)      # edge arc centre (x, z): a bearded axe, the edge runs long and fairly flat, the beard drops low
+EDGE_R = 0.350                # edge arc radius (apex)
+A_HI = math.asin((0.925 - EDGE_C[1]) / EDGE_R)     # arc angle up to the horn tip (z .925)
+A_LO = math.asin((EDGE_C[1] - 0.440) / EDGE_R)     # arc angle down to the beard tip (z .44), a hand's width below the eye
 EDGE_SPAN = max(A_LO, A_HI)
 EYE_X = 0.022                 # inner boundary of the blade (inside the eye)
 EYE_Z = (0.692, 0.828)        # blade root on the eye, bottom and top
@@ -60,8 +64,10 @@ def bezier(p0, p1, p2, p3, u):
     return w**3 * p0 + 3 * w * w * u * p1 + 3 * w * u * u * p2 + u**3 * p3
 A_B, A_T = np.array([EYE_X, EYE_Z[0]]), np.array([EYE_X, EYE_Z[1]])
 B_TIP, H_TIP = edge_point(0), edge_point(1)
-def top(s): return bezier(A_T, (0.065, 0.840), (0.115, 0.866), H_TIP, s)      # the spine rises to a sharp horn
-def bottom(s): return bezier(A_B, (0.088, 0.684), (0.122, 0.628), B_TIP, s)   # a deep hooked beard
+TOP_C = ((0.070, 0.842), (0.130, 0.878))      # the spine rises to a sharp horn
+BOT_C = ((0.080, 0.684), (0.150, 0.615))      # a long beard, scooped deep so it hooks
+def top(s): return bezier(A_T, *TOP_C, H_TIP, s)
+def bottom(s): return bezier(A_B, *BOT_C, B_TIP, s)
 def left(t): return A_B + (A_T - A_B) * t
 def blade(s, t):
     """Coons patch over the four boundary curves: s = 0 eye .. 1 edge, t = 0 beard .. 1 horn."""
@@ -72,6 +78,7 @@ def chamfer(t):
     return 0.5 + 0.5 * min(1.0, k)
 def cheek_thickness(s, t):
     base = 0.0150 + (0.0045 - 0.0150) * (s / SB) ** 0.8
+    base += (.0245 - base) * math.exp(-(s / .085) ** 2)     # the cheeks swell into the eye: one forging, not a plate on a tube
     th = base * chamfer(t) * (1 + .14 * math.sin(math.pi * t) * (1 - s))
     # the heartstone sits on a low forged boss, and a shallow hollow grind runs just inside the bevel: both catch light
     x, z = blade(s, t); d = math.hypot(x - HEART[0], (z - HEART[1]) * 1.12)
@@ -111,8 +118,8 @@ def normal_map(name, hgt, strength):
     n = np.stack([-gx_ * strength, -gy_ * strength, np.ones_like(hgt)], -1); n /= np.linalg.norm(n, axis=-1, keepdims=True)
     return image(name, n * .5 + .5, colour=False)
 
-# Cheek UV: planar over the head, u = x / 0.26, v = (z - 0.58) / 0.36.
-CU, CV, CZ = 0.26, 0.44, 0.50
+# Cheek UV: planar over the head, u = x / CU, v = (z - CZ) / CV.
+CU, CV, CZ = 0.30, 0.53, 0.42
 def cheek_uv(x, z): return x / CU, (z - CZ) / CV
 def bez_vec(p0, p1, p2, p3, u):
     w = 1 - u
@@ -121,62 +128,152 @@ def blade_vec(S, T):
     """Vectorised blade(s, t) -> (x, z)."""
     a = -A_LO + (A_LO + A_HI) * T
     ex, ez = EDGE_C[0] + EDGE_R * np.cos(a), EDGE_C[1] + EDGE_R * np.sin(a)
-    tx, tz = bez_vec(A_T, (0.065, 0.840), (0.115, 0.866), H_TIP, S)
-    bx, bz = bez_vec(A_B, (0.088, 0.684), (0.122, 0.628), B_TIP, S)
+    tx, tz = bez_vec(A_T, *TOP_C, H_TIP, S)
+    bx, bz = bez_vec(A_B, *BOT_C, B_TIP, S)
     lx, lz = A_B[0] + (A_T[0] - A_B[0]) * T, A_B[1] + (A_T[1] - A_B[1]) * T
     cx = (1 - S) * (1 - T) * A_B[0] + S * (1 - T) * B_TIP[0] + (1 - S) * T * A_T[0] + S * T * H_TIP[0]
     cz = (1 - S) * (1 - T) * A_B[1] + S * (1 - T) * B_TIP[1] + (1 - S) * T * A_T[1] + S * T * H_TIP[1]
     return (1 - S) * lx + S * ex + (1 - T) * bx + T * tx - cx, (1 - S) * lz + S * ez + (1 - T) * bz + T * tz - cz
-def st_raster(n):
+def st_raster(nw, nh):
     """Blade parameters (s, t) per cheek-texture pixel (nan off the blade)."""
-    S, T = np.meshgrid(np.linspace(0, 1, 2600), np.linspace(0, 1, 2600))
+    S, T = np.meshgrid(np.linspace(0, 1, 3200), np.linspace(0, 1, 3200))
     x, z = blade_vec(S, T)
-    px = np.clip(np.round(x / CU * (n - 1)).astype(int), 0, n - 1); pz = np.clip(np.round((z - CZ) / CV * (n - 1)).astype(int), 0, n - 1)
-    sm = np.full((n, n), np.nan); tm = np.full((n, n), np.nan); sm[pz, px] = S; tm[pz, px] = T
+    px = np.clip(np.round(x / CU * (nw - 1)).astype(int), 0, nw - 1); pz = np.clip(np.round((z - CZ) / CV * (nh - 1)).astype(int), 0, nh - 1)
+    sm = np.full((nh, nw), np.nan); tm = np.full((nh, nw), np.nan); sm[pz, px] = S; tm[pz, px] = T
     return sm, tm
 def erode(mask, k):
     m = mask.copy()
     for _ in range(k):
         m = m & np.roll(m, 1, 0) & np.roll(m, -1, 0) & np.roll(m, 1, 1) & np.roll(m, -1, 1)
     return m
-# the enamel panel, in blade (s, t): along the spine, swooping down by the eye round the acorn, a rounded nose forward
+# The enamel plate, in blade (s, t): a banner along the spine that swells round the acorn by the eye and ends in a rounded
+# nose well short of the bevel (nothing is inlaid where the edge will be ground). The plate mesh and the texture share it.
+PS0, PS1, PSN, PT_HI = .035, .78, .60, .925
+def panel_lo(s):
+    s = np.asarray(s, np.float64)
+    lo = .78 - .36 * np.exp(-((s - .22) / .20) ** 2)
+    k = np.clip((s - PSN) / (PS1 - PSN), 0, 1)
+    return PT_HI - (PT_HI - lo) * np.sqrt(np.clip(1 - k ** 2, 0, 1))
+def panel_st(p, q):
+    s = PS0 + (PS1 - PS0) * p; return s, panel_lo(s) + (PT_HI - panel_lo(s)) * q
 def panel_mask(sm, tm):
     sm = np.nan_to_num(sm, nan=-1); tm = np.nan_to_num(tm, nan=-1)
-    tb = .74 - .40 * np.exp(-(sm / .30) ** 2)
-    return (sm > .025) & (tm > tb) & (tm < .915) & (sm < .72 - 2.6 * (tm - .84) ** 2)
-# the gold oak branch: its stem is the vein mesh (it carries the acorn's light to the edge); leaves are inlaid in the panel
-BRANCH = [(.16, .62), (.28, .80), (.46, .84), (.68, .845)]
-def branch_xz(u):
-    s_, t_ = bezier(*BRANCH, u); return np.array(blade(s_, t_))
-def leaf_mask(x, z):
-    out = np.zeros_like(x, bool)
-    for k, u in enumerate((.22, .34, .46, .58, .70, .82)):
-        p = branch_xz(u); d = branch_xz(min(1, u + .02)) - branch_xz(max(0, u - .02)); d /= np.linalg.norm(d)
-        side = 1 if k % 2 else -1; ang = math.atan2(d[1], d[0]) + side * .75
-        ca, sa = math.cos(ang), math.sin(ang); dx, dz = x - p[0], z - p[1]
-        a = (dx * ca + dz * sa) / .026; b = (-dx * sa + dz * ca) / .026          # leaf frame, 26 mm long
-        tt = np.clip(a, 0, 1); w = .24 * np.sin(np.pi * tt) ** .8 * (.80 + .20 * np.abs(np.sin(tt * np.pi * 3.5)))
-        out |= (a > 0) & (a < 1) & (np.abs(b) < w) & (np.abs(b) > .018)   # the gap is the leaf's midrib
-    return out
-def ring_textures(n=1024):
-    v, u = np.mgrid[0:n, 0:n] / (n - 1)
+    return (sm > PS0) & (sm < PS1) & (tm > panel_lo(sm)) & (tm < PT_HI)
+PLATE = .0011                 # the plate stands this proud of the cheek
+# The briar: one bramble cane, cut by the eye, arching over the acorn's stalk and then running out along the banner. Its stem is the vein mesh (it carries the acorn's light); thorns, rose leaves and hips are inlaid round it.
+BRIAR_ST = [(.07, .66), (.09, .76), (.15, .825), (.24, .84), (.32, .81), (.40, .84), (.48, .885), (.56, .862), (.64, .892), (.72, .878)]
+def catmull(pts, n):
+    P = [np.array(pts[0]) * 2 - np.array(pts[1])] + [np.array(p) for p in pts] + [np.array(pts[-1]) * 2 - np.array(pts[-2])]
+    out = []
+    for i in range(1, len(P) - 2):
+        for k in range(n):
+            u = k / n; p0, p1, p2, p3 = P[i - 1], P[i], P[i + 1], P[i + 2]
+            out.append(.5 * (2 * p1 + (-p0 + p2) * u + (2 * p0 - 5 * p1 + 4 * p2 - p3) * u * u + (-p0 + 3 * p1 - 3 * p2 + p3) * u ** 3))
+    out.append(np.array(pts[-1])); return out
+BRIAR = catmull(BRIAR_ST, 8)                                    # (s, t) along the cane
+BRIAR_XZ = np.array([blade(s_, t_) for s_, t_ in BRIAR])
+_seg = np.linalg.norm(np.diff(BRIAR_XZ, axis=0), axis=1); BRIAR_LEN = np.concatenate([[0], np.cumsum(_seg)])
+def briar_at(f):
+    """Point and unit tangent (world x, z) at arc-length fraction f of the cane."""
+    L = f * BRIAR_LEN[-1]; i = int(np.clip(np.searchsorted(BRIAR_LEN, L) - 1, 0, len(_seg) - 1))
+    w = (L - BRIAR_LEN[i]) / max(_seg[i], 1e-9); d = BRIAR_XZ[i + 1] - BRIAR_XZ[i]
+    return BRIAR_XZ[i] + d * w, d / np.linalg.norm(d)
+BRIAR_HIPS = ((.47, 1, .0050), (.74, -1, .0044), (1.0, 0, .0056))       # (fraction, side, radius): red enamel rose hips
+BRIAR_LEAVES = ((.20, -1), (.60, 1), (.88, 1))                           # three-leaflet rose leaves
+def seg_dist(x, z, pts):
+    """Distance from every pixel to a polyline (world x, z)."""
+    best = np.full(x.shape, 9.0)
+    for a, b in zip(pts, pts[1:]):
+        d = b - a; L2 = max(d @ d, 1e-12)
+        h = np.clip(((x - a[0]) * d[0] + (z - a[1]) * d[1]) / L2, 0, 1)
+        best = np.minimum(best, np.hypot(x - a[0] - h * d[0], z - a[1] - h * d[1]))
+    return best
+def local(x, z, p, ang):
+    ca, sa = math.cos(ang), math.sin(ang); dx, dz = x - p[0], z - p[1]
+    return dx * ca + dz * sa, -dx * sa + dz * ca
+def briar_masks(x, z):
+    """(stem outline, thorns, leaves, leaf veins, hips, hip crowns) as boolean / float masks."""
+    stem = seg_dist(x, z, BRIAR_XZ) < .0036                   # the dark keyline round the raised stem
+    thorns = np.zeros_like(x, bool)
+    n = int(BRIAR_LEN[-1] / .0105)
+    for k in range(1, n):
+        f = k / n; p, d = briar_at(f); side = 1 if k % 2 else -1
+        nrm = np.array([-d[1], d[0]]) * side
+        base = p + nrm * .0018; ang = math.atan2(nrm[1] - d[1] * .9, nrm[0] - d[0] * .9)   # hooked back along the cane
+        a, b = local(x, z, base, ang)
+        thorns |= (a > 0) & (a < .0060) & (np.abs(b) < .0022 * np.clip(1 - a / .0060, 0, 1) ** 1.3)
+    leaves = np.zeros_like(x, bool); veins = np.zeros_like(x, bool)
+    for f, side in BRIAR_LEAVES:
+        p, d = briar_at(f); nrm = np.array([-d[1], d[0]]) * side
+        stalk_dir = nrm * .8 + d * .6; stalk_dir /= np.linalg.norm(stalk_dir)
+        tip = p + stalk_dir * .0095; ang0 = math.atan2(stalk_dir[1], stalk_dir[0])
+        a, b = local(x, z, p, ang0); veins |= (a > 0) & (a < .0095) & (np.abs(b) < .0006)
+        for pos, da, L in ((tip, 0.0, .0140), (p + stalk_dir * .005, .95, .0115), (p + stalk_dir * .005, -.95, .0115)):
+            a, b = local(x, z, pos, ang0 + da)
+            tt = np.clip(a / L, 0, 1); w = .40 * L * np.sin(np.pi * tt ** .85) * (.86 + .14 * np.abs(np.sin(tt * np.pi * 6)))  # serrated
+            leaf = (a > 0) & (a < L) & (np.abs(b) < w); leaves |= leaf
+            veins |= leaf & (np.abs(b) < .00035)
+            for j in (.3, .55, .78):   # side veins
+                veins |= leaf & (np.abs(np.abs(b) - (a - j * L) * .9) < .0003) & (a > j * L)
+    hips = np.zeros_like(x); crowns = np.zeros_like(x, bool)
+    for f, side, r in BRIAR_HIPS:
+        p, d = briar_at(f)
+        dirv = d if side == 0 else (np.array([-d[1], d[0]]) * side * .85 + d * .5)
+        dirv = dirv / np.linalg.norm(dirv); c = p + dirv * (r * 1.35 + (.002 if side else .0008))
+        a, b = local(x, z, c, math.atan2(dirv[1], dirv[0]))
+        e = (a / (r * 1.3)) ** 2 + (b / r) ** 2
+        hips = np.maximum(hips, np.clip(1 - e, 0, 1))
+        a2, b2 = local(x, z, c + dirv * r * 1.3, math.atan2(dirv[1], dirv[0]))     # the dried sepals at the tip
+        crowns |= (np.hypot(a2, b2) < r * .55) & (np.abs(np.sin(np.arctan2(b2, a2) * 2.5)) > .45)
+        if side:
+            a, b = local(x, z, p, math.atan2(dirv[1], dirv[0])); stem |= (a > 0) & (a < r * .6 + .002) & (np.abs(b) < .0006)
+    return stem, thorns, leaves, veins, hips, crowns
+def ring_textures(nw=1024, nh=1808):
+    v, u = np.mgrid[0:nh, 0:nw] / np.array([nh - 1, nw - 1])[:, None, None]
     x, z = u * CU, v * CV + CZ
-    sm, tm = st_raster(n)
-    panel = panel_mask(sm, tm); inner = erode(panel, 14); rim = panel & ~inner
-    leaves = leaf_mask(x, z) & erode(panel, 20)
-    sa, sr, sh = forged_parts(u * 1.8, v * 3.0)   # deliberate hammer facets, planished smooth                     # hammered steel, the cells a little larger here
-    sa = sa * .35 + srgb((.47, .475, .49)) * .65; sr = sr * .35 + .30 * .65   # planished: the hammer marks read faintly
-    # forge scale lingers darker along the spine; the striking face is bright
-    spine = np.clip((np.nan_to_num(tm, nan=0) - .55) / .4, 0, 1)
-    sa = sa * (1 - .22 * spine[..., None])
-    olive = srgb((.22, .28, .12)) * (.92 + .08 * fbm(x * 90, z * 90, 3, 71)[..., None])
-    brass = srgb((.78, .60, .30)); gold = srgb((.86, .66, .28))
-    alb = np.where(inner[..., None], olive, sa); alb = np.where(rim[..., None], brass, alb); alb = np.where(leaves[..., None], gold, alb)
-    rough = np.where(inner, .34, sr); rough = np.where(rim | leaves, .30, rough)
-    metal = np.where(inner & ~leaves, 0.0, 1.0)
+    sm, tm = st_raster(nw, nh)
+    panel = panel_mask(sm, tm); inner = erode(panel, 6); rim = panel & ~inner; field = erode(panel, 9)
+    stem, thorns, leaves, lveins, hips, crowns = briar_masks(x, z)
+    gold = (thorns | leaves | lveins) & field; keyline = stem & field & ~gold
+    hipm = (hips > 0) & field; hipr = hipm & (hips < .28)            # each hip sits in a thin brass cell
+    # --- steel: one forging. Planished (the hammer marks read faintly) from the eye out to a hand-ground grind line;
+    # beyond it the bevel's run-up is ground bright with fine strokes along the edge. A faint temper rainbow sits just
+    # inside the grind line, forge scale lingers dark by the eye and along the spine, and use rubs the high spots bright.
+    sa, sr, sh = forged_parts(u * 1.3, v * 2.2)
+    sa = sa * .20 + srgb((.46, .465, .48)) * .80; sr = sr * .25 + .30 * .75
+    smv = np.nan_to_num(sm, nan=0); tmv = np.nan_to_num(tm, nan=.5)
+    wob = .012 * fbm(x * 30, z * 30, 3, 81)
+    gl = .70 + wob
+    ground = np.clip((smv - gl) / .006, 0, 1)
+    rad = np.hypot(x - EDGE_C[0], z - EDGE_C[1]); ang = np.arctan2(z - EDGE_C[1], x - EDGE_C[0])
+    strokes = .5 + .5 * np.sin(rad * 700 + fbm(ang * 40, rad * 30, 2, 82) * 4)
+    galb = srgb((.60, .61, .63)) * (.92 + .08 * strokes[..., None])
+    sa = sa * (1 - ground[..., None]) + galb * ground[..., None]
+    sr = sr * (1 - ground) + (.20 + .05 * strokes) * ground
+    sh = sh * (1 - ground) + strokes * .08 * ground
+    band = smv - gl
+    temper = [((.70, .58, .34), -.035, .012), ((.55, .38, .32), -.020, .010), ((.34, .40, .58), -.008, .008)]   # straw, bronze, blue
+    for col, c, w in temper:
+        k = np.exp(-((band - c) / w) ** 2)[..., None] * .16
+        sa = sa * (1 - k) + srgb(col) * sa.mean(-1, keepdims=True) / .47 * k
+    scale = np.clip(1 - smv / .22, 0, 1) * .30 + np.clip((tmv - .82) / .15, 0, 1) * .18
+    sa = sa * (1 - scale[..., None]); sr = sr + scale * .18
+    # --- the plate: olive enamel in a brass frame; the gold briar inlay stands proud, the hips are red enamel in brass cells
+    olive = srgb((.22, .29, .13)) * (.90 + .10 * fbm(x * 120, z * 120, 3, 71)[..., None])
+    olive = olive * (1 - .25 * np.clip(1 - np.abs(np.nan_to_num(tm, nan=0) - .5), 0, 1)[..., None] * 0)
+    brass = srgb((.78, .60, .30)); goldc = srgb((.88, .67, .29)); keyc = srgb((.10, .12, .05))
+    hipc = srgb((.66, .13, .05)) * (.75 + .45 * hips[..., None])
+    alb = np.where(inner[..., None], olive, sa); alb = np.where(rim[..., None], brass, alb)
+    alb = np.where(keyline[..., None], keyc, alb); alb = np.where(gold[..., None], goldc, alb)
+    alb = np.where((lveins & leaves & field)[..., None], goldc * .62, alb)
+    alb = np.where(hipm[..., None], hipc, alb); alb = np.where(hipr[..., None], brass, alb)
+    alb = np.where((crowns & field)[..., None], srgb((.22, .10, .04)), alb)
+    rough = np.where(inner, .30, sr); rough = np.where(rim | gold | hipr, .28, rough); rough = np.where(hipm & ~hipr, .18, rough)
+    metal = np.where(panel & ~(rim | gold | hipr), 0.0, 1.0)
     mr = np.stack([np.zeros_like(rough), np.clip(rough, .12, .9), metal], -1)
-    hgt = sh * (~panel) + rim * .9 - inner * .5 + leaves * .6
-    return image('KF_Ring_Albedo', alb), image('KF_Ring_MR', mr, colour=False), normal_map('KF_Ring_Normal', hgt * .07 + (rim * .9 - inner * .5 + leaves * .6) * .55, 3.0)
+    relief = rim * .9 + gold * .7 - (lveins & leaves) * .35 + hips * 1.4 + keyline * -.3
+    hgt = sh * .03 * (~panel) + relief * .55
+    return image('KF_Ring_Albedo', alb), image('KF_Ring_MR', mr, colour=False), normal_map('KF_Ring_Normal', hgt, 3.0)
 def edge_textures(n=512):
     v, u = np.mgrid[0:n, 0:n] / (n - 1)
     x, z = u * CU, v * CV + CZ
@@ -222,7 +319,8 @@ def forged_parts(u, v):
 def socket_textures(n=512):
     """Blackened forged steel with a gold-inlaid interlace: two vines braided round the eye, an oak leaf at each crossing."""
     v, u = np.mgrid[0:n, 0:n] / (n - 1)
-    fa, fm_, fn = forged_parts(u, v)
+    fa, fm_, fn = forged_parts(u * 1.4, v * 1.4)
+    fa = fa * .25 + srgb((.47, .475, .49)) * .75; fm_ = fm_ * .30 + .34 * .70; fn = fn * .30   # planished like the cheeks: one forging
     a = v - .5 - .26 * np.sin(TAU * u); b = v - .5 + .26 * np.sin(TAU * u)
     over = np.sin(TAU * u) > 0                                    # which vine passes over at each crossing
     ga = np.exp(-(a / .032) ** 6); gb = np.exp(-(b / .032) ** 6)
@@ -233,10 +331,10 @@ def socket_textures(n=512):
     gold = np.zeros_like(u)   # Briar: plain hammered socket
     goldc = srgb((.78, .52, .19)) * (0.85 + .15 * fbm(u * 40, v * 40, 2, 61)[..., None])
     alb = fa * (1 - gold[..., None]) + goldc * gold[..., None]
-    rough = fm_ * (1 - gold) + .24 * gold; metal = gold * 1.0 + (1 - gold) * 0.0
+    rough = fm_ * (1 - gold) + .24 * gold; metal = np.ones_like(gold)
     mr = np.stack([np.zeros_like(rough), rough, metal], -1)
     hgt = fn - gold * .35 + np.clip(gold * 1.2, 0, 1) * .0                          # inlay sits just below the steel
-    return image('KF_Socket_Albedo', alb), image('KF_Socket_MR', mr, colour=False), normal_map('KF_Socket_Normal', hgt, 3.5)
+    return image('KF_Socket_Albedo', alb), image('KF_Socket_MR', mr, colour=False), normal_map('KF_Socket_Normal', hgt, 1.8)
 def stamp_textures(n=256):
     """The smith's mark punched into the poll: a crowned tree in a ring."""
     v, u = np.mgrid[0:n, 0:n] / (n - 1)
@@ -253,20 +351,22 @@ def stamp_textures(n=256):
     rough = np.clip(fm_ + .15 * mark, .3, .9); mr = np.stack([np.zeros_like(rough), rough, np.zeros_like(rough)], -1)
     return image('KF_Stamp_Albedo', alb), image('KF_Stamp_MR', mr, colour=False), normal_map('KF_Stamp_Normal', fn * .5 - mark * .9, 8)
 def wood_textures(w=256, h=1024):
+    """Oiled hickory: honey sapwood with long, slightly wandering darker grain, a few cathedral arches where the
+    growth rings break the surface, fine pores, and the oil darkened and polished where the hands work."""
     v, u = np.mgrid[0:h, 0:w].astype(np.float64); v /= h - 1; u /= w - 1
-    grain = np.sin((u * 26 + fbm(u * 3, v * 2, 4, 41) * 1.8 + fbm(u * 20, v * 40, 2, 43) * .15) * TAU)
-    fine = fbm(u * 60, v * 400, 2, 47)
-    t = 0.5 + 0.5 * np.tanh(grain * 1.8)
-    alb = srgb((.40, .17, .075)) + (srgb((.58, .29, .13)) - srgb((.40, .17, .075))) * t[..., None]
-    alb *= (0.92 + 0.08 * fine[..., None])
-    # two carved spiral grooves wind down the haft
-    spiral = np.maximum(np.exp(-((((u + v * 3.2) % 1) - .5) / .025) ** 2), np.exp(-((((u - v * 3.2 + .25) % 1) - .5) / .025) ** 2))
-    alb = alb * (1 - .45 * spiral[..., None])
-    rough = np.clip(.62 - .12 * t + .04 * fine, .3, .85)
+    wander = fbm(u * 2.5, v * 1.6, 4, 41) * 1.1 + .55 * np.sin(v * TAU * 1.3 + u * TAU)          # rings sliced at a shallow angle
+    ring = (u * 14 + wander + fbm(u * 24, v * 30, 2, 43) * .10) % 1
+    late = np.clip((ring - .62) / .10, 0, 1) * np.clip((1 - ring) / .06, 0, 1)        # hard dark latewood, soft light earlywood
+    pores = (fbm(u * 90, v * 900, 2, 47) > .42) * (ring < .62) * .5
+    fine = fbm(u * 60, v * 420, 2, 49)
+    light, dark = srgb((.62, .39, .21)), srgb((.37, .19, .085))
+    alb = light + (dark - light) * (late * .85 + pores * .25)[..., None]
+    alb *= (0.93 + 0.07 * fine[..., None])
+    alb *= (0.94 + .06 * fbm(u * 4, v * 3, 3, 45)[..., None])          # the odd darker streak of heartwood
+    rough = np.clip(.52 - .10 * late + .05 * fine, .3, .85)
     mr = np.stack([np.zeros_like(rough), rough, np.zeros_like(rough)], -1)
-    # open-pored ash: the soft earlywood sinks between the hard grain lines; years of hands polish the ridges
-    hgt = t - spiral * 2.5
-    return image('KF_Wood_Albedo', alb), image('KF_Wood_MR', mr, colour=False), normal_map('KF_Wood_Normal', hgt[::2, ::2], 2)   # half-res relief is plenty on a 3 cm haft
+    hgt = late * .6 - pores * .5
+    return image('KF_Wood_Albedo', alb), image('KF_Wood_MR', mr, colour=False), normal_map('KF_Wood_Normal', hgt[::2, ::2], 1.6)   # half-res relief is plenty on a 3 cm haft
 def leather_textures(n=256):
     v, u = np.mgrid[0:n, 0:n] / (n - 1)
     # olive cord woven in a diagonal basket weave
@@ -402,70 +502,102 @@ def heart_st():
             if d < best[0]: best = (d, s, t)
     return best[1], best[2]
 HS, HT = heart_st()
-TRUNKS = [  # the oak branch: (start, c1, c2, fork) in blade (s, t), then two twigs out to the bevel; widths in metres
-    ([(HS + .05, HT + .07), (.28, .80), (.46, .84), (.66, .846)], (SB - .003, .93), (SB - .003, .76), .0050),
-]
-FORK_U = .58
-def path_points(ctrl, n):
-    return [(k / n, *bezier(*ctrl, k / n)) for k in range(n + 1)]
-def vein_ribbons():
-    """Yields (points[(u, s, t)], w0, w1) for every trunk and twig. u is the light's path: 0 heart .. 1 edge."""
-    for ctrl, end_a, end_b, w in TRUNKS:
-        yield [(FORK_U * u, s_, t_) for u, s_, t_ in path_points(ctrl, 10)], w, w * .62
-        fork = np.array(ctrl[-1]); d = fork - np.array(ctrl[-2]); d = d / np.linalg.norm(d)
-        for end in (end_a, end_b):
-            end = np.array(end); c1 = fork + d * .07; c2 = end - np.array([.06, 0])
-            yield [(FORK_U + (1 - FORK_U) * u, s_, t_) for u, s_, t_ in path_points([fork, c1, c2, end], 8)], w * .6, w * .34
 def build_veins():
-    core = bmesh.new(); groove = bmesh.new(); uv_of = {}
+    """The briar cane: a raised gold stem on the plate. Its uv.x runs 0 at the cut end by the eye .. 1 at the tip hip."""
+    core = bmesh.new(); uv_of = {}
     for side in (-1, 1):
-        for pts, w0, w1 in vein_ribbons():
-            xz = [Vector((*blade(s_, t_), 0)) for _, s_, t_ in pts]
-            for bm, scale, lifts, tag in ((groove, 1.75, ((-1, .0002), (1, .0002)), False), (core, 1.0, ((-1, .00045), (0, .00105), (1, .00045)), True)):
-                rows = []
-                for k, (u, s_, t_) in enumerate(pts):
-                    q = xz[min(k + 1, len(xz) - 1)] - xz[max(k - 1, 0)]; nrm = Vector((-q.y, q.x, 0)).normalized()
-                    w = (w0 + (w1 - w0) * (k / (len(pts) - 1))) * scale; base = half_thickness(s_, t_)
-                    row = []
-                    for a, lift in lifts:
-                        c = xz[k] + nrm * a * w * .5
-                        v = bm.verts.new((c.x, side * (base + lift), c.y)); row.append(v)
-                        if tag: uv_of[v] = (u, (a + 1) / 2)
-                    rows.append(row)
-                for r0, r1 in zip(rows, rows[1:]):
-                    for a in range(len(r0) - 1): bm.faces.new((r0[a], r1[a], r1[a + 1], r0[a + 1]))
+        rows = []
+        for k, (s_, t_) in enumerate(BRIAR):
+            u = BRIAR_LEN[k] / BRIAR_LEN[-1]
+            q = BRIAR_XZ[min(k + 1, len(BRIAR) - 1)] - BRIAR_XZ[max(k - 1, 0)]; nrm = np.array([-q[1], q[0]]) / np.linalg.norm(q)
+            w = .0044 + (.0028 - .0044) * u; base = half_thickness(s_, t_) + PLATE
+            row = []
+            for a, lift in ((-1, .0001), (-.5, .00075), (0, .0010), (.5, .00075), (1, .0001)):
+                c = BRIAR_XZ[k] + nrm * a * w * .5
+                v = core.verts.new((c[0], side * (base + lift), c[1])); row.append(v); uv_of[v] = (u, (a + 1) / 2)
+            rows.append(row)
+        for r0, r1 in zip(rows, rows[1:]):
+            for a in range(len(r0) - 1): core.faces.new((r0[a], r1[a], r1[a + 1], r0[a + 1]))
     layer = core.loops.layers.uv.verify()
     for f in core.faces:
         for l in f.loops: l[layer].uv = uv_of[l.vert]
-    set_uvs(groove, lambda l: (l.vert.co.x * 4, l.vert.co.z * 4))
-    mesh_obj('Veins_Groove', groove, 'KF_Steel_Forged', smooth_angle=50)
     return mesh_obj('Veins_Gold', core, 'KF_Vein', smooth_angle=50)
+
+# ------------------------------------------------------------------ the enamel plate: a separate riveted part on each cheek
+def panel_plate():
+    bm = bmesh.new(); NP, NQ = 30, 6
+    for side in (-1, 1):
+        top, low = [], []
+        for i in range(NP + 1):
+            p = min(i / NP, .996); tr, lr = [], []
+            for j in range(NQ + 1):
+                s_, t_ = panel_st(p, j / NQ); s_, t_ = float(s_), float(t_); x, z = blade(s_, t_); h = half_thickness(s_, t_)
+                tr.append(bm.verts.new((x, side * (h + PLATE), z))); lr.append(bm.verts.new((x, side * (h - .0004), z)))
+            top.append(tr); low.append(lr)
+        for i in range(NP):
+            for j in range(NQ):
+                f = (top[i][j], top[i + 1][j], top[i + 1][j + 1], top[i][j + 1]); bm.faces.new(f if side < 0 else tuple(reversed(f)))
+        ring = [(i, 0) for i in range(NP)] + [(NP, j) for j in range(NQ)] + [(i, NQ) for i in range(NP, 0, -1)] + [(0, j) for j in range(NQ, 0, -1)]
+        for (i0, j0), (i1, j1) in zip(ring, ring[1:] + ring[:1]):      # the plate's edge: a little wall down into the cheek
+            f = (top[i0][j0], low[i0][j0], low[i1][j1], top[i1][j1]); bm.faces.new(f if side < 0 else tuple(reversed(f)))
+    set_uvs(bm, lambda l: cheek_uv(l.vert.co.x, l.vert.co.z))
+    return mesh_obj('Panel_Plate', bm, 'KF_Steel_Ring', smooth_angle=40)
+panel_plate()
 build_veins()
 
-# ------------------------------------------------------------------ heartstone: a faceted amber cabochon in a gold bezel, both cheeks
+# ------------------------------------------------------------------ heartstone: an amber acorn held in a brass cap and three claws
+GEM_R, GEM_RZ, GEM_H = .0165, .0205, .0095
+def gem_lift(x, z):
+    rho = math.sqrt(((x - HEART[0]) / GEM_R) ** 2 + ((z - HEART[1]) / GEM_RZ) ** 2)
+    return .0006 + GEM_H * math.sqrt(max(0.0, 1 - min(rho, 1) ** 2)) ** 1.15
 def heartstone():
-    gem = bmesh.new(); bez = bmesh.new()
+    gem = bmesh.new(); brass = bmesh.new()
     for side in (-1, 1):
-        base = half_thickness(HS, HT)
-        c = Vector((HEART[0], side * base, HEART[1]))
-        # bezel: a crisp 10-sided gold ring standing proud of the cheek
-        outer = [Vector((c.x + math.cos(a) * (HEART_R + .007), c.y, c.z + math.sin(a) * (HEART_R + .007))) for a in np.linspace(0, TAU, 11)[:-1]]
+        y0 = half_thickness(HS, HT) + PLATE
+        def P(x, z, extra=0.0): return (x, side * (y0 + gem_lift(x, z) + extra), z)
+        # the amber: a smooth oval cabochon
         rings = []
-        for r, lift in ((HEART_R + .0045, -.002), (HEART_R + .0045, .0025), (HEART_R + .0012, .0035), (HEART_R - .001, .0022)):
-            rings.append([bez.verts.new((c.x + math.cos(a) * r, c.y + side * lift, c.z + math.sin(a) * r * 1.25)) for a in np.linspace(0, TAU, 11)[:-1] + math.pi / 10])
-        loft(bez, rings)
-        # amber: a stepped faceted dome (table on top), 10 facets per tier
-        tiers = [(HEART_R + .0005, .0008), (HEART_R * .86, .0055), (HEART_R * .55, .0080), (HEART_R * .0, .0088)]
-        rings = []
-        for r, lift in tiers[:-1]:
-            rings.append([gem.verts.new((c.x + math.cos(a) * r, c.y + side * lift, c.z + math.sin(a) * r * 1.25)) for a in np.linspace(0, TAU, 11)[:-1]])
+        for rho in (1.0, .92, .76, .54, .26):
+            rings.append([gem.verts.new(P(HEART[0] + math.cos(a) * GEM_R * rho, HEART[1] + math.sin(a) * GEM_RZ * rho)) for a in np.linspace(0, TAU, 17)[:-1]])
         loft(gem, rings, cap_start=True)
-        apex = gem.verts.new((c.x, c.y + side * tiers[-1][1], c.z))
-        last = rings[-1]
-        for k in range(10): gem.faces.new((last[k], last[(k + 1) % 10], apex))
-    set_uvs(gem, lambda l: (0.5 + (l.vert.co.x - HEART[0]) / (HEART_R * 2), 0.5 + (l.vert.co.z - HEART[1]) / (HEART_R * 2)))
-    mesh_obj('Heart_Amber', gem, 'KF_Amber', flat=True)
-    mesh_obj('Heart_Bezel', bez, 'KF_Gold', smooth_angle=35)
+        apex = gem.verts.new(P(*HEART)); last = rings[-1]
+        for k in range(16): gem.faces.new((last[k], last[(k + 1) % 16], apex))
+        # the setting's collar, seated in the plate
+        rings = []
+        for rho, lift in ((1.22, -.0015), (1.22, .0012), (1.12, .0024), (1.0, .0020), (.98, .0004)):
+            rings.append([brass.verts.new((HEART[0] + math.cos(a) * GEM_R * rho, side * (y0 + lift), HEART[1] + math.sin(a) * GEM_RZ * rho)) for a in np.linspace(0, TAU, 21)[:-1]])
+        loft(brass, rings)
+        # the acorn's cup: a brass cap over the top third, its scales chased in as rows, a stalk standing off it
+        z_cut = HEART[1] + GEM_RZ * .30; rows = []
+        for j, zf in enumerate(np.linspace(0, 1, 7)):
+            z = z_cut + (HEART[1] + GEM_RZ * 1.06 - z_cut) * zf
+            half = GEM_R * 1.07 * math.sqrt(max(0.0, 1 - ((z - HEART[1]) / (GEM_RZ * 1.07)) ** 2)) + 1e-4
+            scale = .0005 * (j % 2)
+            rows.append([brass.verts.new(P(HEART[0] + half * xf, min(z, HEART[1] + GEM_RZ * .995), .0010 + scale - .0008 * zf)) for xf in np.linspace(-1, 1, 11)])
+        for r0, r1 in zip(rows, rows[1:]):
+            for a in range(10):
+                f = (r0[a], r0[a + 1], r1[a + 1], r1[a]); brass.faces.new(f if side < 0 else tuple(reversed(f)))
+        lip = [brass.verts.new((v.co.x, side * (y0 - .0002), v.co.z)) for v in rows[0]]   # the cup's lower lip
+        for a in range(10):
+            f = (rows[0][a], lip[a], lip[a + 1], rows[0][a + 1]); brass.faces.new(f if side < 0 else tuple(reversed(f)))
+        st0 = Vector(P(HEART[0] + .002, HEART[1] + GEM_RZ * .9, .0012))
+        stalk = [brass.verts.new((st0.x + .0048 + math.cos(a) * .0011, st0.y, st0.z + .0060 + math.sin(a) * .0011)) for a in np.linspace(0, TAU, 7)[:-1]]
+        base = [brass.verts.new((st0.x + math.cos(a) * .0016, st0.y - side * .0008, st0.z + math.sin(a) * .0016)) for a in np.linspace(0, TAU, 7)[:-1]]
+        loft(brass, [base, stalk], cap_end=True)
+        # three claws round the bottom, folded over the amber
+        for ang in (-math.pi * .22, -math.pi * .5, -math.pi * .78):
+            ca, sa = math.cos(ang), math.sin(ang); prof = []
+            for rho, w, extra in ((1.20, .0030, .0008), (1.03, .0026, .0016), (.90, .0019, .0011), (.80, .0012, .0007)):
+                x, z = HEART[0] + ca * GEM_R * rho, HEART[1] + sa * GEM_RZ * rho
+                lift = (gem_lift(x, z) if rho < 1 else .0006 + (1.22 - rho) * .01) + extra
+                pr = []
+                for o, dy in ((-1, 0), (1, 0), (1, .0011), (-1, .0011)):
+                    pr.append(brass.verts.new((x - sa * o * w * .5, side * (y0 + lift + dy - .0011), z + ca * o * w * .5)))
+                prof.append(pr)
+            loft(brass, prof, True, True)
+    set_uvs(gem, lambda l: (0.5 + (l.vert.co.x - HEART[0]) / (GEM_R * 2), 0.5 + (l.vert.co.z - HEART[1]) / (GEM_R * 2)))
+    mesh_obj('Heart_Amber', gem, 'KF_Amber', smooth_angle=60)
+    mesh_obj('Heart_Bezel', brass, 'KF_Gold', smooth_angle=35)
 heartstone()
 
 # ------------------------------------------------------------------ eye (socket), poll and fittings
@@ -476,10 +608,20 @@ def oct_profile_obj(name, mat, profile, rx_scale=1.0, cx=0.0, flat=False, smooth
     loft(bm, rings, True, True)
     if uvbox: set_uvs(bm, lambda l: ((l.vert.co.x + l.vert.co.y) * 4.0, l.vert.co.z * 4.0))
     return mesh_obj(name, bm, mat, smooth, flat)
-# the eye: an octagonal collar, flared top and bottom
-sock = oct_profile_obj('Head_Socket', 'KF_Steel_Socket', [
-    (EYE[0], .030, .030), (EYE[0] + .010, .036, .033), (EYE[0] + .020, .033, .0305),
-    (EYE[1] - .022, .033, .0305), (EYE[1] - .010, .037, .034), (EYE[1], .031, .031)], cx=.004, uvbox=False)
+# the eye: forged from the same bar as the cheeks, a waisted teardrop that runs forward into them, flared top and bottom
+def forged_eye(name, profile, cx=.004, sides=16):
+    bm = bmesh.new(); rings = []
+    for z, rx, ry in profile:
+        ring = []
+        for k in range(sides):
+            a = TAU * k / sides; c = math.cos(a)
+            ring.append(bm.verts.new((cx + c * rx * (1 + .20 * max(0.0, c)), math.sin(a) * ry, z)))
+        rings.append(ring)
+    loft(bm, rings, True, True)
+    return mesh_obj(name, bm, 'KF_Steel_Socket', smooth_angle=50)
+sock = forged_eye('Head_Socket', [
+    (EYE[0], .029, .0262), (EYE[0] + .006, .0335, .0298), (EYE[0] + .020, .0325, .0284), (POLL_Z, .0305, .0270),
+    (EYE[1] - .020, .0325, .0284), (EYE[1] - .006, .0335, .0298), (EYE[1], .029, .0262)])
 def socket_uv():
     me = sock.data; uvl = me.uv_layers.new(name='UVMap')
     for poly in me.polygons:
@@ -525,7 +667,6 @@ def poll():
 def band(name, z, r, ry, h, cx=0.0, mat='KF_Gold', sides=8):
     return oct_profile_obj(name, mat, [(z - h / 2, r, ry), (z - h / 2 + .001, r + .002, ry + .002), (z + h / 2 - .001, r + .002, ry + .002), (z + h / 2, r, ry)], cx=cx, uvbox=False)
 band('Band_Eye_Top', EYE[1] + .004, .028, .028, .007, cx=.003)
-band('Band_Eye_Base', EYE[0] - .004, .027, .027, .007, cx=.003)
 def poll_cap():
     bm = bmesh.new(); rings = []
     for x, hz, hy in ((-.089, .046, .031), (-.097, .046, .031)):
@@ -538,11 +679,12 @@ oct_profile_obj('Cap_Wedge', 'KF_Gold', [(HAFT[1] - .016, .019, .016), (HAFT[1] 
 # ------------------------------------------------------------------ haft, langets, grip, pommel
 def haft():
     bm = bmesh.new(); rings = []
-    zs = np.linspace(HAFT[0], HAFT[1], 22)
+    zs = np.linspace(HAFT[0], HAFT[1], 30)
     for z in zs:
         knob = max(0.0, (0.06 - z) / 0.12) ** 2           # swells toward the knob
-        neck = math.exp(-((z - 0.40) / 0.12) ** 2) * -.0015 # slimmer just above the grip
-        rx = .0232 * (1 + .24 * knob) + neck; ry = .0196 * (1 + .24 * knob) + neck
+        neck = math.exp(-((z - 0.36) / 0.10) ** 2) * -.0020 # slimmer just above the grip
+        throat = math.exp(-((z - 0.56) / 0.07) ** 2) * .0022 # a swell under the head for the choked-up hand
+        rx = .0232 * (1 + .24 * knob) + neck + throat; ry = .0196 * (1 + .24 * knob) + neck + throat * .8
         rings.append(ring_section(bm, (0, 0, z), rx, ry, 12, math.pi / 12))
     loft(bm, rings, True, True)
     def uv(l):
@@ -655,21 +797,41 @@ def charm():
     lathe('Charm_Cup', 'KF_Gold', [(zc - .004, .0071), (zc - .0005, .0074), (zc + .0025, .0058), (zc + .004, .0026), (zc + .0065, .0012)], 10, center=(.036, 0), smooth=40)
 
 # ------------------------------------------------------------------ Briar Scout fittings
-def round_poll():
-    """A short round hammered boss behind the eye with a brass rim at its face."""
-    bm = bmesh.new(); rings = []
-    for x, r in ((-.012, .030), (-.030, .028), (-.048, .029), (-.054, .027)):
-        rings.append([bm.verts.new((x, math.sin(a) * r, POLL_Z + math.cos(a) * r)) for a in np.linspace(0, TAU, 17)[:-1]])
+def chamfer_square(bm, x, hz, hy, c):
+    pts = [(hy, hz - c), (hy - c, hz), (-hy + c, hz), (-hy, hz - c), (-hy, -hz + c), (-hy + c, -hz), (hy - c, -hz), (hy, -hz + c)]
+    return [bm.verts.new((x, y, POLL_Z + z)) for y, z in pts]
+def hammer_poll():
+    """The poll is a square hammer face, forged out of the back of the eye: for driving tent stakes, wedges and pegs."""
+    bm = bmesh.new()
+    rings = [chamfer_square(bm, x, hz, hy, c) for x, hz, hy, c in (
+        (-.016, .040, .0262, .011), (-.034, .0285, .0215, .006), (-.050, .0285, .0225, .006),
+        (-.061, .0305, .0245, .0065), (-.0705, .0318, .0256, .0065), (-.0745, .0296, .0236, .0075))]
     loft(bm, rings, True, True)
-    set_uvs(bm, lambda l: (math.atan2(l.vert.co.y, l.vert.co.z - POLL_Z) / TAU + .5, l.vert.co.x * 6))
-    mesh_obj('Head_Poll', bm, 'KF_Steel_Socket', smooth_angle=40)
-    rim = bmesh.new(); rings = []
-    for x, r in ((-.049, .0305), (-.0505, .0322), (-.0565, .0322), (-.058, .029)):
-        rings.append([rim.verts.new((x, math.sin(a) * r, POLL_Z + math.cos(a) * r)) for a in np.linspace(0, TAU, 17)[:-1]])
-    loft(rim, rings, True, True)
-    mesh_obj('Poll_Band', rim, 'KF_Gold', smooth_angle=40)
-round_poll()
-band('Band_Below_Eye', EYE[0] - .022, .0236, .0236, .012)
+    # the striking face is ground flat and bright: it samples one smooth texel, not the hammer marks
+    set_uvs(bm, lambda l: (.5, .5) if l.face.normal.x < -.9 else ((l.vert.co.y + l.vert.co.x) * 5 + .5, (l.vert.co.z - POLL_Z) * 5 + .5))
+    mesh_obj('Head_Poll', bm, 'KF_Steel_Socket', smooth_angle=33)
+hammer_poll()
+def eye_lugs():
+    """Two lugs drawn down from the eye along the haft's cheeks (one forging with the eye), riveted through the haft."""
+    bm = bmesh.new()
+    pts = [(-.0215, EYE[0] + .006), (.0235, EYE[0] + .006), (.016, EYE[0] - .026), (.005, EYE[0] - .046), (-.007, EYE[0] - .036), (-.019, EYE[0] - .012)]
+    for side in (-1, 1):
+        th = lambda z: .0019 + .0058 * max(0.0, min(1.0, (z - (EYE[0] - .046)) / .052)) ** 1.4
+        outer = [bm.verts.new((x, side * (.0192 + th(z)), z)) for x, z in pts]
+        inner = [bm.verts.new((x * .96, side * .0186, z)) for x, z in pts]
+        bm.faces.new(outer); bm.faces.new(list(reversed(inner)))
+        for k in range(len(pts)):
+            bm.faces.new((outer[k], inner[k], inner[(k + 1) % len(pts)], outer[(k + 1) % len(pts)]))
+        c = Vector((.003, side * (.0192 + th(EYE[0] - .024)), EYE[0] - .024))     # a domed rivet through lug, haft and lug
+        ring = [bm.verts.new((c.x + math.cos(a) * .0034, c.y, c.z + math.sin(a) * .0034)) for a in np.linspace(0, TAU, 11)[:-1]]
+        mid = [bm.verts.new((c.x + math.cos(a) * .0024, c.y + side * .0012, c.z + math.sin(a) * .0024)) for a in np.linspace(0, TAU, 11)[:-1]]
+        top = bm.verts.new((c.x, c.y + side * .0017, c.z))
+        loft(bm, [ring, mid])
+        for k in range(10): bm.faces.new((mid[k], mid[(k + 1) % 10], top))
+    set_uvs(bm, lambda l: (l.vert.co.x * 5 + .5, (l.vert.co.z - EYE[0]) * 5 + .5))
+    return mesh_obj('Eye_Lugs', bm, 'KF_Steel_Socket', smooth_angle=40)
+eye_lugs()
+band('Band_Below_Eye', EYE[0] - .060, .0236, .0236, .010)
 band('Band_Grip_Base', GRIP[0] - .006, .0262, .0226, .010)
 band('Band_Low_A', -.004, .0268, .0234, .007)
 def strap():
@@ -694,7 +856,7 @@ def acorn_pommel():
     loft(bm, rings, True, False); tip = bm.verts.new((0, 0, zc - .044 * K))
     for k in range(12): bm.faces.new((rings[-1][k], rings[-1][(k + 1) % 12], tip))
     set_uvs(bm, lambda l: (.5, .5))
-    mesh_obj('Pommel_Amber', bm, 'KF_Amber', flat=True)
+    mesh_obj('Pommel_Amber', bm, 'KF_Amber', smooth_angle=70)
     # four brass oak leaves cupping the nut
     lv = bmesh.new()
     for k in range(4):
@@ -716,9 +878,10 @@ acorn_pommel()
 # under the beard. Everything below the eye follows it (haft, wrap, bands, keeper, pommel).
 def haft_bend(z):
     w = min(1.0, max(0.0, (EYE[0] - .02 - z) / (EYE[0] - .02 - HAFT[0])))
-    return .048 * w ** 1.6
+    return .024 * w ** 1.6
 def bend_lower():
-    for o in [o for o in SC.objects if o.type == 'MESH']:
+    head = ('Head_', 'Heart_', 'Veins_', 'Panel_', 'Eye_', 'Band_Eye', 'Cap_')   # the head is forged straight; only the haft bows
+    for o in [o for o in SC.objects if o.type == 'MESH' and not o.name.startswith(head)]:
         if o.name == 'Strap_Stud':
             o.location.x += haft_bend(o.location.z); continue
         me = o.data; co = np.zeros(len(me.vertices) * 3); me.vertices.foreach_get('co', co); co = co.reshape(-1, 3)
@@ -728,9 +891,10 @@ bend_lower()
 def panel_rivets():
     """The enamel is a separate plate: four brass rivets pin it to the cheek, through both faces."""
     bm = bmesh.new()
-    for s_, t_ in ((.07, .885), (.36, .885), (.62, .87), (.13, .50)):
+    for p_, q_ in ((.02, .80), (.02, .22), (.52, .62), (.88, .50)):
+        s_, t_ = (float(v) for v in panel_st(p_, q_))
         for side in (-1, 1):
-            c = on_cheek(s_, t_, 0, side)
+            c = on_cheek(s_, t_, PLATE, side)
             ring = [bm.verts.new((c.x + math.cos(a) * .0028, c.y, c.z + math.sin(a) * .0028)) for a in np.linspace(0, TAU, 9)[:-1]]
             top = bm.verts.new((c.x, c.y + side * .0016, c.z))
             for k in range(8):
@@ -742,8 +906,8 @@ panel_rivets()
 empty('Grip_Center', (0.0075 + haft_bend(0.120), 0, 0.120))
 for name, a in (('CuttingEdge_Bottom', -.9 * A_HI), ('CuttingEdge_Mid', 0.0), ('CuttingEdge_Top', .9 * A_HI)):   # symmetric about the arc's middle
     empty(name, (EDGE_C[0] + EDGE_R * math.cos(a), 0, EDGE_C[1] + EDGE_R * math.sin(a)))
-empty('Head_Center', (0.130, 0, 0.758))
-empty('Poll_Face', (-0.058, 0, POLL_Z))
+empty('Head_Center', (0.140, 0, 0.700))
+empty('Poll_Face', (-0.0745, 0, POLL_Z))
 empty('Heartstone', (HEART[0], 0, HEART[1]))
 
 # ------------------------------------------------------------------ baked contact shading
@@ -831,7 +995,7 @@ if RENDER:
         go = bpy.data.objects.new('heart', glow); go.location = (HEART[0], side * .03, HEART[1]); SC.collection.objects.link(go)
     cam = bpy.data.cameras.new('c'); co = bpy.data.objects.new('c', cam); SC.collection.objects.link(co); SC.camera = co
     views = {'full': ((.10, -1.55, .42), (.08, 0, .42), 42), 'three-quarter': ((1.0, -1.45, .95), (.07, 0, .45), 45),
-             'head': ((.10, -.74, .72), (.09, 0, .71), 50), 'edge-on': ((1.0, -.05, .76), (.12, 0, .75), 60),
+             'head': ((.10, -.86, .68), (.10, 0, .68), 50), 'poll': ((-.40, -.34, .86), (-.03, 0, .74), 55), 'edge-on': ((1.0, -.05, .76), (.12, 0, .75), 60),
              'heart': ((.08, -.26, .76), (.08, 0, .75), 55), 'back': ((-.9, 1.6, .75), (.06, 0, .45), 45),
              'first-person': ((-.30, -.36, .34), (.10, .05, .74), 30),
              'socket': ((-.12, -.40, .82), (-.02, 0, .76), 55), 'pommel': ((.08, -.30, .02), (0, 0, -.03), 55)}
