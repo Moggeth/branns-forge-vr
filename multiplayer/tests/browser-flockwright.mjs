@@ -15,7 +15,7 @@ const fixture = Buffer.from(JSON.stringify(makeSave(sim.checkpoint())));
 const piece = armouryPiece(), local = xz => pieceWorld(piece, xz), at2 = ([x, z], h = 0) => [x, h, z];
 const stand = armouryStand();
 
-const PHONE = !!process.env.PHONE, VIEW = PHONE ? {width: 844, height: 390} : {width: 960, height: 540}, tag = n => PHONE ? `${n}-phone` : n;
+const PHONE = !!process.env.PHONE, QUICK = !!process.env.QUICK, VIEW = PHONE ? {width: 844, height: 390} : QUICK ? {width: 640, height: 360} : {width: 960, height: 540}, tag = n => PHONE ? `${n}-phone` : n;
 const {browser, page} = await launch({viewport: VIEW, pointerLock: true, touch: PHONE});
 page.on('crash', () => console.log('renderer crashed'));
 // Real clock: the virtual frame clock crashed the software renderer on this long scene (2026-10-18).
@@ -79,14 +79,14 @@ try {
  const road = local([-2.2, 9.5]);
  await place(at2(road));
  await look(at2(local([0, 0]), h.me.position[1] + 2.2), 6); await frames(12);
- await shot(page, tag('armoury-front'));
+ if (!QUICK) await shot(page, tag('armoury-front'));
  const door = local([0, 3.4]);
  await place(at2(door));
  await look(at2(stand, h.me.position[1] + 1.1), 6); await frames(12);
- await shot(page, tag('armoury-inside'));
+ if (!QUICK) await shot(page, tag('armoury-inside'));
  await place(at2(local([.3, 1.5])));
  await look(at2(stand, h.me.position[1] + 1.15), 6); await frames(12);
- await shot(page, tag('armoury-stand'));
+ if (!QUICK) await shot(page, tag('armoury-stand'));
  await page.keyboard.press('KeyE'); await frames(30);
  h = await harness();
  record('taken', h.me.flockwright && h.me.tool === 'flockwright' ? 'pass' : 'fail', {tool: h.me.tool, owned: h.me.flockwright});
@@ -98,10 +98,10 @@ try {
  await shot(page, tag('flockwright-held'));
  // Hold right click to raise the ring sight, fire while sighted, then let go.
  if (!PHONE) { await page.mouse.down({button: 'right'}); await frames(15); await shot(page, 'flockwright-aim'); }
- const before = (await harness()).s.projectiles.length;
+ const before = (await harness()).me.attackTick;
  if (!PHONE) { await page.mouse.down(); await frames(1); await page.mouse.up(); }
  await frames(4); await shot(page, tag('flockwright-fire'));
- h = await harness(); record('fired', h.s.projectiles.some(p => p.heavy) || h.s.projectiles.length > before ? 'pass' : 'fail', {projectiles: h.s.projectiles.length});
+ h = await harness(); record('fired', h.me.attackTick !== before ? 'pass' : 'fail', {attackTick: [before, h.me.attackTick], projectiles: h.s.projectiles.length});
  await frames(20); await shot(page, tag('flockwright-reload'));
  if (!PHONE) await page.mouse.up({button: 'right'});
  const diag = await page.evaluate(() => document.querySelector('canvas')?.brannDiagnostics?.() ?? null);
