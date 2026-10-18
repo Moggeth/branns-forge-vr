@@ -71,4 +71,18 @@ test('a heavy bolt lands harder than a Siegebird bolt and does not feed the Sieg
   assert.equal(heavy.hits,0);
 });
 
+test('a save holding the tool without the Armoury unlock cannot fire it',()=>{
+  const {sim,hero}=rig();hero.tool='flockwright';hero.attackTick=-999;
+  assert.equal(act(sim,'host','fire',{origin:[hero.position[0],hero.position[1]+1.5,hero.position[2]],direction:[0,0,-1]}).code,'no_flockwright');
+});
+
+test('the local trigger waits for the host cooldown and fires only when it allows',async()=>{
+  const {createWeaponController}=await import('../client/weapon-controller.js');
+  let ready=false,now=0,shots=0;
+  const c=createWeaponController({getTool:()=>'flockwright',getAim:()=>({origin:[0,0,0],direction:[0,0,-1]}),fire:()=>shots++,canFlock:()=>ready,clock:()=>now,special:()=>{}});
+  c.begin();assert.equal(shots,0,'held back while the host cooldown runs');
+  ready=true;c.begin();assert.equal(shots,1,'fires the moment the host allows');
+  now+=100;c.begin();assert.equal(shots,1,'and not again inside the cycle');
+});
+
 console.log(`flockwright: ${count} checks`);

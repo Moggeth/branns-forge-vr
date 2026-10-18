@@ -164,6 +164,7 @@ export function createHeroView({lodDistance = HERO_LOD_DISTANCE, resolveWeapon =
     socket.add(visual); u.weapon = visual;
   }
   function disposeOwned(visual) {    // only per-visual allocations; template geometry/materials are shared
+    flockwright?.()?.forget(visual);
     const line = visual.userData.bowstring;
     if (line) { line.geometry.dispose(); line.material.dispose(); line.removeFromParent(); visual.userData.bowstring = null; }
     visual.removeFromParent();

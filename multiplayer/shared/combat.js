@@ -401,6 +401,7 @@ export function combatAction(state,p,m,ctx){
     const curve=m.curve===undefined?[0,0,0]:m.curve;if(!vec(curve,1.31)||Math.hypot(...curve)>1.31||m.draw!==undefined&&(!Number.isFinite(m.draw)||m.draw<0||m.draw>1))return fail('invalid_action');
     if(state.tick-p.attackTick<(p.tool==='bow'?33:p.tool==='flockwright'?FLOCKWRIGHT.acceptTicks:p.siegebird?.quick?SIEGEBIRD.quickAcceptTicks:SIEGEBIRD.acceptTicks))return fail('cooldown');if(state.projectiles.length>=COMBAT_LIMITS.projectiles)return fail('world_limit');
     if(p.tool==='flockwright'){
+      if(p.flockwright!==true)return fail('no_flockwright'); // only once taken down from the Armoury (shared/armoury.js)
       p.attackTick=state.tick;const id=ctx.nextId(state,'q');
       state.projectiles.push({id,ownerId:p.id,side:p.side||'party',kind:'bolt',heavy:true,position:[...m.origin],previousPosition:[...m.origin],velocity:m.direction.map(n=>n*FLOCKWRIGHT.speed),curve:[0,0,0],bornTick:state.tick,trail:[[...m.origin]]});
       return ok([{kind:'shoot',weapon:'flockwright',by:p.id,position:[...m.origin],id}]);
