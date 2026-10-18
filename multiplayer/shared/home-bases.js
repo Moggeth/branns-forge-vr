@@ -64,6 +64,10 @@ export const HOME_LAYOUT = movedTable('keep', {
 }, ['bellPost']);
 // The shared tavern ("The Muddled Mug") stands off the lane south of the Forge, its front toward the centre.
 export const NEUTRAL_TAVERN = movedPlaced('mug', Object.freeze({at: Object.freeze([6, -28]), yaw: Math.atan2(-6, 28)}));
+// The Armoury (shared/armoury.js) stands in the meadow off Dawnhold's gate, on the keep's right (keep-local [20, 20]),
+// its open front turned toward the gate so heroes heading out see the rack. Shared by both sides.
+const ARMOURY_AT = [-34, -5.72], ARMOURY_FACE = [-21.63, -21.63];
+export const ARMOURY = movedPlaced('armoury', Object.freeze({at: Object.freeze(ARMOURY_AT), yaw: Math.atan2(ARMOURY_FACE[0] - ARMOURY_AT[0], ARMOURY_FACE[1] - ARMOURY_AT[1])}));
 
 const flat = (a, b) => Math.hypot(a[0] - b[0], a[2] - b[2]);
 const sideKey = side => side === 'rivals' ? 'rivals' : 'party';
@@ -265,10 +269,16 @@ export const TOWN_SOLIDS = Object.freeze({
     {at: [0, -4], half: [5.7, .25]}, {at: [-5.5, -.1], half: [.25, 4.1]}, {at: [5.5, -.1], half: [.25, 4.1]},
     {at: [0, -2.9], half: [3.3, .4]}, ...[[-3, 1.6], [3, 1.6], [-3, -.6], [3, -.6]].map(at => ({at, r: .75})), {at: [-5.3, 3.8], r: .25}, {at: [5.3, 3.8], r: .25}]),
   quartermaster: Object.freeze([{at: [0, 0], half: [2.5, 1.75]}]),
+  // The Armoury: an open-fronted hall 7 x 5.4 (back and side walls solid), the weapon stand in the middle of the floor,
+  // corner posts at the front, and the practice butt and bolt barrel out front on the right.
+  armoury: Object.freeze([{at: [0, -2.5], half: [3.6, .25]}, {at: [-3.4, -.2], half: [.25, 2.5]}, {at: [3.4, -.2], half: [.25, 2.5]},
+    {at: [0, -.35], r: .55}, {at: [-3.35, 2.45], r: .25}, {at: [3.35, 2.45], r: .25}, {at: [4.85, 1.6], r: .65}, {at: [-4.25, 1.9], r: .4}]),
   mill: Object.freeze([{at: [0, 0], r: 2.7}, {at: [0, 3.3], r: .7}, {at: [-2, 3], r: .45}]),
 });
 /** The shared tavern's placement, in the same shape as homePiece(). */
 export const neutralTavern = () => ({x: NEUTRAL_TAVERN.at[0], z: NEUTRAL_TAVERN.at[1], yaw: NEUTRAL_TAVERN.yaw});
+/** The Armoury's placement, in the same shape as homePiece(). */
+export const armouryPiece = () => ({x: ARMOURY.at[0], z: ARMOURY.at[1], yaw: ARMOURY.yaw});
 function pushOut(position, placed, solids, radius) {
   for (const sol of solids) {
     const [u, v] = pieceLocal(placed, [position[0], position[2]]), [cu, cv] = sol.at;
@@ -319,6 +329,8 @@ export function resolveHomeStructures(state, position, radius = .3) {
   }
   const n = NEUTRAL_TAVERN.at;
   if (Math.abs(position[0] - n[0]) < 9 * TAVERN_SCALE && Math.abs(position[2] - n[1]) < 9 * TAVERN_SCALE) pushOut(position, neutralTavern(), TOWN_SOLIDS.neutralTavern, radius);
+  const a = ARMOURY.at;
+  if (Math.abs(position[0] - a[0]) < 7 + radius && Math.abs(position[2] - a[1]) < 7 + radius) pushOut(position, armouryPiece(), TOWN_SOLIDS.armoury, radius);
   return position;
 }
 

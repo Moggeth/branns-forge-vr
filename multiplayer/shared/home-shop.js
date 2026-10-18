@@ -74,10 +74,10 @@ export function fillDraughts(p) {
   p.draughts = draughtCap(p); return want;
 }
 
-// Save fields on a player: draughts, draughtTick, drinkTick, heartyUntil (all optional).
+// Save fields on a player: draughts, draughtTick, drinkTick, heartyUntil, flockwright (the Armoury's crossbow; all optional).
 export function validTownFields(p, tick) {
   const n = (v, a, b) => v === undefined || (Number.isFinite(v) && v >= a && v <= b);
   return n(p.draughts, 0, 2) && (p.draughts === undefined || Number.isInteger(p.draughts)) && n(p.draughtTick, -1e9, tick)
-    && n(p.drinkTick, -1e9, tick) && n(p.heartyUntil, 0, tick + 180 * 60);
+    && n(p.drinkTick, -1e9, tick) && n(p.heartyUntil, 0, tick + 180 * 60) && (p.flockwright === undefined || p.flockwright === true);
 }
-export const restoreTownFields = p => Object.fromEntries(['draughts', 'draughtTick', 'drinkTick', 'heartyUntil'].filter(k => p[k] !== undefined).map(k => [k, p[k]]));
+export const restoreTownFields = p => Object.fromEntries(['draughts', 'draughtTick', 'drinkTick', 'heartyUntil', 'flockwright'].filter(k => p[k] !== undefined).map(k => [k, p[k]]));

@@ -12,7 +12,7 @@ import {createEmberdewModel} from '../client/fire-presentation.js';
 const here = path.dirname(fileURLToPath(import.meta.url)), ROOT = path.join(here, '..');
 const ASSETS = path.join(ROOT, 'public', 'assets');
 // Same heights as game.js instantiate() for local weapons (reference game.js line 449).
-export const WEAPON_HEIGHTS = {axe: .7, pick: .75, hammer: .95, crossbow: .48, bow: 1.25, wyrmspout: .4, stormreel: .5, staff: 1.6};
+export const WEAPON_HEIGHTS = {axe: .7, pick: .75, hammer: .95, crossbow: .48, bow: 1.25, wyrmspout: .4, stormreel: .5, staff: 1.6, flockwright: .25};
 const fail = [], ok = (c, m) => { if (!c) fail.push(m); };
 globalThis.self ??= globalThis;   // GLTFLoader image path; textures cannot decode in Node (no DOM) and load as null
 const quiet = [console.warn, console.error]; console.warn = console.error = () => {};   // texture warnings only; geometry/nodes are what we test
@@ -84,7 +84,7 @@ for (const tool of HERO_WEAPONS.tools) {
   const f = weaponForward(w, tool), haft = new THREE.Vector3(...ASSET_POSES[tool].up).applyQuaternion(w.getWorldQuaternion(new THREE.Quaternion()));   // contract up (haft for melee)
   report.restAxes[tool] = {forward: f.toArray().map(v => +v.toFixed(3)), up: haft.toArray().map(v => +v.toFixed(3))};
   // Idle-pose (t=0) hand: ranged aim axes point hero-forward; melee edge leads forward/down with the haft rising, perpendicular.
-  if (['crossbow', 'bow', 'wyrmspout', 'flask', 'stormreel', 'staff'].includes(tool)) ok(f.z < -.9, `${tool} aim axis not hero-forward in idle (${f.toArray()})`);
+  if (['crossbow', 'bow', 'wyrmspout', 'flask', 'stormreel', 'staff', 'flockwright'].includes(tool)) ok(f.z < -.9, `${tool} aim axis not hero-forward in idle (${f.toArray()})`);
   else ok(f.z < -.6 && f.y < -.3 && haft.y > .6 && haft.z < -.3 && Math.abs(f.dot(haft)) < .02, `${tool} melee edge/haft not forward-down / up-forward (${f.toArray()} / ${haft.toArray()})`);
 }
 

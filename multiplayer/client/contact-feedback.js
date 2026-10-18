@@ -146,6 +146,7 @@ export function createContactFeedback({sources = () => [], playerId = () => null
       if (disposed) return false; drawFull = false;
       if (used === 'bow') { const bow = toolHand('bow', weaponHand()); const a = pulse(bow, {amplitude: .4, duration: 22});
         pulse(otherHand(bow), {amplitude: .25, duration: 12}); return a; }
+      if (used === 'flockwright') return pulse(toolHand(used, weaponHand()), {amplitude: .7, duration: 40});
       if (used === 'crossbow') return pulse(toolHand(used, weaponHand()), golden ? {amplitude: .85, duration: 60} : {amplitude: .55, duration: 28});
       return false;
     },

@@ -200,6 +200,7 @@ body.xr .hud-bottom { display: none; }   /* VR draws its own controls; free the 
 .bf-chip { scroll-snap-align: start; flex: none; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
 .bf-chip svg, .bf-act svg, .bf-special svg { width: 22px; height: 22px; }
 /* selected weapon/spell styling is left to combat-hud.css (gold fill reads strongest; checked in preview) */
+.bf-chip[hidden] { display: none; }
 .bf-chip.bf-new::after {   /* tiny "new" spark for the two newest weapons; purely decorative */
   content: ""; position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; border-radius: 50%;
   background: var(--bf-ember-hot); box-shadow: 0 0 6px var(--bf-ember);
