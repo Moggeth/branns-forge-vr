@@ -21,7 +21,7 @@ export const XP_REWARD = Object.freeze({skeleton: 20, golem: 60, ent: 45, stumpl
 export const TALENTS = Object.freeze({
   axe: Object.freeze({
     limbsplitter: Object.freeze({name: 'Limbsplitter', text: 'Every swing that lands on an arm, leg or head lops it clean off.'}),
-    whirlwind: Object.freeze({name: 'Whirlwind', text: 'Your cleave becomes a full spin with 30% more reach, and recharges in 4 seconds instead of 6.'}),
+    whirlwind: Object.freeze({name: 'Whirlwind', text: 'Timberfall cuts in a full spin round you with 30% more reach, and recharges in 5 seconds instead of 7.'}),
   }),
   pick: Object.freeze({
     motherlode: Object.freeze({name: 'Motherlode', text: 'Ore cracks one strike sooner and drops twice as much.'}),

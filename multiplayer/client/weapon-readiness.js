@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {createPickLuminance} from './pick-luminance.js';
-import {createAxeLuminance} from './axe-luminance.js';
+import {createKingsfellLuminance} from './kingsfell-luminance.js';
 
 // Diegetic weapon readiness for Brann's Forge held tools.
 //
@@ -12,13 +12,13 @@ import {createAxeLuminance} from './axe-luminance.js';
 // - One Group `readiness:<tool>` is added under that host. Existing geometry, node names, socket names and
 //   parent transforms are never written. Surfaces are found by scanning authored vertices once.
 // - Inputs are fractions owned by the shared simulation; this module never runs its own timers.
-//   axe: specialReady (6 s cleave) · pick/hammer: specialReady (4 s special) · crossbow: attackReady (1.0 s songbird reload) · bow: attackReady (0.55 s,
+//   axe: specialReady (Timberfall) · pick/hammer: specialReady (4 s special) · crossbow: attackReady (1.0 s songbird reload) · bow: attackReady (0.55 s,
 //   curve adds nothing) · limb: attackReady (0.53 s) · wyrmspout: heat + overheated (3 s lock) and
 //   specialReady (6 s Gout) · flask: specialReady (12 s Cinder Cluster; the 1 s toss needs no indicator).
 // - Max 3 draw calls per tool, no lights, every descendant has userData.ignoreContact = true.
 
 export const READINESS_TIMINGS = Object.freeze({
-  axe: {special: 6}, pick: {special: 4}, hammer: {special: 4}, crossbow: {attack: 1}, bow: {attack: .55},
+  axe: {special: 7}, pick: {special: 4}, hammer: {special: 4}, crossbow: {attack: 1}, bow: {attack: .55},
   limb: {attack: .53}, wyrmspout: {vent: 6, overheatLock: 3}, flask: {special: 12},
 });
 
@@ -222,24 +222,11 @@ const PALETTES = {
 
 // ---------------------------------------------------------------- per-tool authored layouts
 const BUILD = {
-  // Gold edge runes: six diamonds beside the brass edge line on both cheeks, filling heel → toe.
+  // Kingsfell: the head's own light is the indicator. The amber heart kindles, sap runs down the gold veins and lights
+  // the honed edge (client/kingsfell-luminance.js); one edge ribbon draw.
   axe(owner, host, find) {
-    const pts = collectPoints(host, ['Head_Blade', 'Head_CuttingEdge', 'Inlay_Brass_EdgeLine_PosY', 'Inlay_Brass_EdgeLine_NegY', 'Embellish_Gold_CheekStuds'].map(find));
-    const edge = hostPosition(host, find('CuttingEdge_Mid')), x = edge.x - .136, transforms = [], steps = [];
-    const ys = [.565, .6, .635, .67, .705, .74].map(y => y + edge.y - .625);
-    for (const side of [1, -1]) ys.forEach((y, i) => {
-      const n = new THREE.Vector3(0, 0, side);
-      const zIn = surface(pts, _v.set(x - .007, y, 0), n, .006, .008), zOut = surface(pts, _v.set(x + .007, y, 0), n, .006, .006);
-      const z = Math.max(zIn, zOut, surface(pts, _v.set(x, y, 0), n, .008, .007)) + .0006;
-      // Lie on the tapering cheek: tilt the plate normal toward the edge by the measured local slope.
-      const q = basis(new THREE.Vector3(0, 0, side), new THREE.Vector3(0, 1, 0))
-        .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), side * Math.atan2(zIn - zOut, .014)));
-      transforms.push([new THREE.Vector3(x, y, side * z), q]); steps.push(i);
-    });
-    const strip = new Strip(owner, named(diamondGeometry(.011, .024, .0011), 'axe-rune'), glowMaterial({color: 0x7a5a24, metalness: .85, roughness: .35}), transforms, steps, PALETTES.gold);
-    // The head's own light carries the charge too: discharge on use, blossom → vine → edge line → honed edge.
-    const luminance = createAxeLuminance(owner, host, find); if (luminance) owner.cleanup.push(luminance.dispose);
-    return {special: strip, luminance};
+    const luminance = createKingsfellLuminance(owner, host, find); if (luminance) owner.cleanup.push(luminance.dispose);
+    return {special: {paint() {}}, luminance};
   },
   // Blue crystal nodes in brass settings: three tiers on four faces under the head, filling up toward it.
   pick(owner, host, find) {

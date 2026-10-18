@@ -1,0 +1,42 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Timberfall lab</title>
+<style>body{margin:0;background:#172223;color:#efdfbc;font:13px system-ui;height:100vh;display:flex;flex-direction:column}header{padding:6px 10px}button{padding:8px;margin:2px}canvas{flex:1;min-height:0;width:100%}#error{color:#ff7777}body.clean header{display:none}</style>
+<header>Timberfall — actual game renderer, local authority. Hold the button to aim, release to hew.
+<button id="aim">Hold to aim</button><button id="run">Run authority</button>
+<span id="status"></span><div id="error"></div></header><canvas id="world" aria-label="Timberfall review world"></canvas>
+<script type="module">
+// Kingsfell's Timberfall review: the real createGame renderer and a local shared simulation. The hero stands in front
+// of the longest line of trees near the valley centre (same search as tests/timberfall.mjs) with Kingsfell in hand.
+// review.aim(true|false) holds/releases Special; review.step(n) advances the authority by hand. ?clean hides the
+// toolbar, ?auto runs the authority at 60 Hz, ?foes=n adds skeletons down the lane. Not shipped.
+import {createGame} from '../client/game.js';
+import {createSimulation,loadSimulation,terrainHeight} from '../shared/simulation.js';
+import {createEnemy} from '../shared/combat.js';
+import {worldTrees} from '../shared/world-content.js';
+import {planTimberfall} from '../shared/timberfall.js';
+const $=id=>document.getElementById(id),q=new URLSearchParams(location.search);if(q.has('clean'))document.body.classList.add('clean');
+let sim=createSimulation({room:'TIMBERFALL_REVIEW'}),seq=0;
+sim.addPlayer({id:'hero',name:'Reviewer'});
+const save=sim.checkpoint(),p0=save.players[0];
+let best=null;const back=Number(q.get('back')||5);
+for(const t of worldTrees(save).filter(t=>Math.abs(t.x)<34&&Math.abs(t.z)<34))for(let k=0;k<24;k++){
+ const a=k/24*Math.PI*2,x=t.x+Math.sin(a)*back,z=t.z+Math.cos(a)*back,yaw=Math.atan2(x-t.x,z-t.z);if(Math.hypot(x,z)<9)continue;
+ const plan=planTimberfall(save,{...p0,position:[x,terrainHeight(save,x,z),z],yaw});if(!best||plan.trees.length>best.n)best={x,z,yaw,n:plan.trees.length};}
+const pick=q.get('at')?q.get('at').split(',').map(Number):[best.x,best.z,best.yaw];
+p0.position=[pick[0],terrainHeight(save,pick[0],pick[1]),pick[1]];p0.yaw=pick[2];p0.tool='axe';
+const fx=-Math.sin(pick[2]),fz=-Math.cos(pick[2]);
+save.enemies=Array.from({length:Number(q.get('foes')||0)},(_,i)=>{const d=6+i*3.5,x=pick[0]+fx*d+(i%2?.6:-.6)*fz,z=pick[1]+fz*d-(i%2?.6:-.6)*fx;return Object.assign(createEnemy(`foe${i}`,[x,terrainHeight(save,x,z),z],i===2?'golem':undefined),{yaw:pick[2]+Math.PI});});
+sim=loadSimulation(save);
+window.addEventListener('error',e=>$('error').textContent=e.message);window.addEventListener('unhandledrejection',e=>$('error').textContent=String(e.reason));
+const game=createGame({canvas:$('world'),onStatus:text=>$('status').textContent=text,
+ onAction:(action,extra)=>{const r=sim.command('hero',{type:'action',seq:++seq,action,...extra});for(const e of r.events||[])game.handleEvent(e);$('status').textContent=action+': '+(r.ok?'ok':r.code);publish();},
+ onInput:input=>sim.command('hero',{type:'input',seq:++seq,...input,move:{x:0,z:0}})});
+function publish(){game.applySnapshot(sim.snapshot(),'hero');}
+function step(n=1){for(let i=0;i<n;i++)for(const e of sim.step())game.handleEvent(e);publish();}
+const pitch=Number(q.get('pitch')||-.16);
+publish();game.setRole('hero');game.setActive(true);game.equip('axe');game.setLook(pick[2],pitch);
+window.review={step,aim:down=>game.specialPress(down),swing:()=>game.strike(),setLook:(y,p)=>game.setLook(y,p),stats:()=>game.diagnostics(),snapshot:()=>sim.snapshot(),best,yaw:pick[2]};
+$('aim').onpointerdown=()=>review.aim(true);$('aim').onpointerup=()=>review.aim(false);
+let timer=null;$('run').onclick=()=>{if(timer){clearInterval(timer);timer=null;}else timer=setInterval(()=>step(1),1000/60);};
+if(q.has('auto'))timer=setInterval(()=>step(1),1000/60);
+window.addEventListener('pagehide',()=>game.dispose());
+</script></html>

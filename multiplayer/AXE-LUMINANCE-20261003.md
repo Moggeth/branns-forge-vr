@@ -1,5 +1,7 @@
 # Orchard's Edge axe luminance (2026-10-03)
 
+> Retired 2026-10-16: the Orchard's Edge axe was replaced by Kingsfell (`client/kingsfell-luminance.js`, `shared/timberfall.js`). Kept as history.
+
 The axe counterpart of `PICK-LUMINANCE-20261003.md`. The honed edge is now the axe's light source and the brass vine
 is the conduit that feeds it, and both show the special's recharge. No GLB, node, socket, bounds or
 simulation change; `client/axe-luminance.js` and `client/axe-ready-cue.js` are presentation only.

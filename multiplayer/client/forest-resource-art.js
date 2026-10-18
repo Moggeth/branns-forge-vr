@@ -147,7 +147,7 @@ const DEPOSIT = {
 for (const [k, v] of Object.entries({iron: 'nodule', mithril: 'seam', crystal: 'geode'})) DEPOSIT[k].style = v;
 const DEPOSIT_ALIAS = {iron: 'iron', iron_vein: 'iron', mithril: 'mithril', mithril_seam: 'mithril', crystal: 'crystal', crystal_fault: 'crystal', gems: 'crystal', copper: 'copper', gold: 'gold', star: 'star'};
 export const BAR_STACK_MAX = 24;
-export const PICKUP_KINDS = Object.freeze(['ironOre', 'mithrilOre', 'starOre', 'iron', 'mithril', 'starMetal', 'crystal', 'copperOre', 'goldOre', 'copper', 'gold']);
+export const PICKUP_KINDS = Object.freeze(['ironOre', 'mithrilOre', 'starOre', 'iron', 'mithril', 'starMetal', 'crystal', 'copperOre', 'goldOre', 'copper', 'gold', 'amber']);
 export const DEPOSIT_KINDS = Object.freeze(['iron', 'mithril', 'crystal', 'copper', 'gold', 'star']);
 export const HELD_SCALE = .5; // hero/held ore: same asset at half scale
 
@@ -207,6 +207,16 @@ export function createResourceArt() {
   sitOnFloorGroup([base, cr], .27);
   return {parts: [[own(base), stoneMat('crystalPickup', 0)], [own(cr), crystalMat('crystal', DEPOSIT.crystal.emissive, [.92, .85, 1])]]};
  }
+ // Amber (Kingsfell's heartwood, 2026-10-16): a split wedge of heartwood holding three drops of old resin, the same
+ // stone as the axe's heartstone. The resin uses the crystal shader (warm core glow + rim), so it reads at a glance.
+ function amberPickup() { const seed = 6161, wood = rockLump({detail: 1, sx: .95, sy: .3, sz: .62, seed, cuts: 4, strata: .12, rough: .22, bed: -.5});
+  paint(wood, strataPaint([[.42, .27, .15], [.55, .36, .2], [.33, .2, .11], [.5, .32, .17]], {freq: 9}));
+  const drops = [[0, .22, .05, .5, .44, .42], [.36, .14, -.18, .32, .3, .3], [-.32, .13, .2, .28, .26, .27]].map(([x, y, z, sx, sy, sz], i) => {
+   const d = rockLump({detail: 2, sx, sy, sz, seed: seed + 7 + i, cuts: 2, strata: 9, rough: .12, bed: -.7}); d.translate(x, y, z);
+   paint(d, (q, n, j, out) => { const k = .55 + .45 * Math.max(0, n.y); out[0] = 1 * k; out[1] = .55 * k; out[2] = .12 * k; }); return d; });
+  sitOnFloorGroup([wood, ...drops], .26);
+  return {parts: [[own(wood), stoneMat('amberWood', 0x3a1c06)], [own(mergeFlat(drops)), crystalMat('amber', 0xd2700f, [1, .8, .42])]]};
+ }
  function depositKit(kind, variant) { const d = DEPOSIT[kind], st = d.style, seed = 1000 + kind.length * 131 + variant * 7919, r = rng(seed), lumps = [];
   const shape = d.shape || {iron: [.78, .5, .62, 0], mithril: [.5, .66, .44, .2], crystal: [.68, .56, .6, 0]}[kind];
   const main = rockLump({detail: 3, sx: shape[0], sy: shape[1], sz: shape[2], seed, cuts: st === 'geode' ? 3 : 5, strata: .16, rough: .3, bed: -.62}); main.rotateZ(shape[3]); main.translate(0, .32, 0); lumps.push(main);
@@ -242,7 +252,7 @@ export function createResourceArt() {
   for (const [g, m, n] of parts) { const mesh = new T.Mesh(g, m); mesh.name = n || m.name; mesh.castShadow = mesh.receiveShadow = true; host.add(mesh); } return root; }
  return {
   pickup(kind) { if (!PICKUP_KINDS.includes(kind)) return null; let kit = pickups.get(kind);
-   if (!kit) { kit = kind.endsWith('Ore') ? orePickup(kind) : kind === 'crystal' ? crystalPickup() : ingotPickup(kind); pickups.set(kind, kit); }
+   if (!kit) { kit = kind.endsWith('Ore') ? orePickup(kind) : kind === 'crystal' ? crystalPickup() : kind === 'amber' ? amberPickup() : ingotPickup(kind); pickups.set(kind, kit); }
    const g = build(kit.parts, 'Pickup:' + kind); g.userData.authoredPickup = true; g.userData.resourceArt = kind; return g; },
   barStack(kind, count) { if (!METAL[kind]) return null; const n = Math.max(1, Math.min(BAR_STACK_MAX, count | 0)), k = 'stack:' + kind + ':' + n; let kit = pickups.get(k);
    if (!kit) { kit = barStackKit(kind, n); pickups.set(k, kit); }

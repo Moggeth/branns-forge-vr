@@ -167,7 +167,7 @@ export function createViewPunch({reducedMotion = false, stiffness = 260, damping
 /** Kicks for shots leaving each ranged weapon (pitch climbs with the muzzle, never enough to lose the target). */
 export const SHOT_PUNCH = Object.freeze({
   crossbow: [.012, 0, -.004], bow: [.004, 0, .003], stormreel: [.01, .002, -.006], gout: [.016, 0, 0],
-  flask: [-.004, .004, .004], nova: [.008, 0, 0],
+  flask: [-.004, .004, .004], nova: [.008, 0, 0], axeHew: [-.022, 0, .006], // Timberfall: the view dips with the hew
 });
 
 /**

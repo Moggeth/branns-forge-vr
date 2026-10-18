@@ -31,15 +31,30 @@ function slamChannel(keys,i,u,c){
  return k0[1][c]*(2*t3-3*t2+1)+tan(i)*(t3-2*t2+t)+k1[1][c]*(-2*t3+3*t2)+tan(i+1)*(t3-t2);
 }
 
-export function createPickWallMotion({reducedMotion=false}={}){
+// Kingsfell's Timberfall hew (2026-10-16) reuses the same hold / slam / relax machine with its own keys: the axe
+// rises overhead and tips back while you aim, then comes down in a two-handed hew into the ground at the strike.
+export const AXE_HEW_MOTION=Object.freeze({rise:.24,slam:.6,relax:.24,strike:.34});
+const AXE_HOLD=[-.05,.14,.06,30,-10,-6];
+const AXE_SLAM=[
+ [0,   null],
+ [.16, [-.11,.26,.09,48,-14,-10]],  // last gather: the head goes further back over the shoulder
+ [.34, [-.12,-.17,-.27,-98,-4,4]],  // STRIKE: hewn down into the ground in front
+ [.5,  [-.11,-.13,-.23,-86,-3,3]],  // the blade bites and rebounds a touch
+ [.72, [-.07,-.06,-.12,-48,-2,2]],
+ [1,   [0,0,0,0,0,0]],
+];
+export const MOTION_PROFILES=Object.freeze({pick:{timing:PICK_WALL_MOTION,hold:HOLD,slam:SLAM},axe:{timing:AXE_HEW_MOTION,hold:AXE_HOLD,slam:AXE_SLAM}});
+
+export function createPickWallMotion({reducedMotion=false,profile='pick'}={}){
+ const {timing:M,hold:HOLD_K,slam:SLAM_K}=MOTION_PROFILES[profile]||MOTION_PROFILES.pick;
  // phase: null | 'hold' | 'slam' | 'relax'; at = phase start (seconds); from = channel values the phase started from
  let phase=null,at=0,from=null;const values=new Array(6).fill(0);
  const offset=new T.Vector3(),quaternion=new T.Quaternion(),_q=new T.Quaternion();
  const result={offset,quaternion,focus:0,phase:null};
  function holdValues(t){
-  const rise=easeOut(clamp01(t/PICK_WALL_MOTION.rise)),k=scaled(HOLD,rise);
+  const rise=easeOut(clamp01(t/M.rise)),k=scaled(HOLD_K,rise);
   if(!reducedMotion&&t>0){ // breathing + a fine shiver that grows as the charge settles
-   const settle=smooth(clamp01((t-PICK_WALL_MOTION.rise)/.5));
+   const settle=smooth(clamp01((t-M.rise)/.5));
    k[1]+=Math.sin(t*2.6)*.006*settle;k[3]+=Math.sin(t*2.6+.6)*1.6*settle;
    k[0]+=Math.sin(t*37)*.0016*settle;k[1]+=Math.sin(t*43+1.3)*.0014*settle;k[4]+=Math.sin(t*31)*.5*settle;
   }
@@ -48,14 +63,14 @@ export function createPickWallMotion({reducedMotion=false}={}){
  function current(now){
   if(!phase)return null;
   const t=Math.max(0,now-at);
-  if(phase==='hold'){const k=holdValues(t);return {k,focus:easeOut(clamp01(t/(PICK_WALL_MOTION.rise*1.6)))};}
+  if(phase==='hold'){const k=holdValues(t);return {k,focus:easeOut(clamp01(t/(M.rise*1.6)))};}
   if(phase==='slam'){
-   const u=t/PICK_WALL_MOTION.slam;if(u>=1){phase=null;return null;}
-   const keys=SLAM.map(([time,k])=>[time,k||from]);let i=0;while(i<keys.length-2&&u>=keys[i+1][0])i++;
+   const u=t/M.slam;if(u>=1){phase=null;return null;}
+   const keys=SLAM_K.map(([time,k])=>[time,k||from]);let i=0;while(i<keys.length-2&&u>=keys[i+1][0])i++;
    const k=[0,1,2,3,4,5].map(c=>slamChannel(keys,i,u,c));
-   return {k,focus:u<PICK_WALL_MOTION.strike?1:Math.max(0,1-(u-PICK_WALL_MOTION.strike)/.3)};
+   return {k,focus:u<M.strike?1:Math.max(0,1-(u-M.strike)/.3)};
   }
-  const u=t/PICK_WALL_MOTION.relax;if(u>=1){phase=null;return null;}
+  const u=t/M.relax;if(u>=1){phase=null;return null;}
   const s=1-smooth(u);return {k:scaled(from,s),focus:0};
  }
  function snapshot(now){const c=current(now);return c?c.k.slice():values.fill(0).slice();}

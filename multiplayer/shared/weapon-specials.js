@@ -30,7 +30,7 @@ export function ridgeMinerals(seed,castId,count){
 }
 /** Prepare the complete cast before allocating IDs, cooldown or damage. */
 export function terrainSpecial(state,p,ctx,hitEnemyPart,m={}) {
-  if(p.tool==='axe')return axeCleave(state,p,ctx,hitEnemyPart); // the cleave owns its own cooldown; old axe_sunder edits/deposits still load
+  if(p.tool==='axe')return axeCleave(state,p,ctx,hitEnemyPart,m.point); // the cleave owns its own cooldown; old axe_sunder edits/deposits still load
   if(p.tool!=='pick')return null;
   if(state.tick-(p.specialTick??-1000)<specialCooldown('pick'))return fail('cooldown');
   return crystalWall(state,p,ctx,m,hitEnemyPart);
