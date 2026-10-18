@@ -1,3 +1,27 @@
+import {thingLimit} from './world-extent.js';
+import {worldFor} from './worldgen/registry.js';
+import {activeChunks, chunkContent, generatedTree, isGeneratedTreeId} from './worldgen/content.js';
+// Generated worlds: the live trees are the generated ones in the active chunks around Heroes, minus trees whose
+// stumps have rotted away (state.wilds.felled). Memoised per world + window so repeated calls in a tick are cheap.
+const wildsMemo = {key: '', trees: []};
+export function wildsTreeKey(state) {
+  const w = state.world; if (!w) return '';
+  return `${w.seed}|${w.preset}|${w.size}|${activeChunks(state).map(c => c.join(',')).join(';')}|${(state.wilds?.felled || []).length}:${state.wilds?.felledRev || 0}`;
+}
+function wildsTrees(state) {
+  const key = wildsTreeKey(state);
+  if (key !== wildsMemo.key) {
+    const world = worldFor(state), gone = new Set((state.wilds?.felled || []).map(f => f[0])), out = [];
+    for (const [cx, cz] of activeChunks(state)) for (const t of chunkContent(world, cx, cz).trees) if (!gone.has(t.id)) out.push(t);
+    wildsMemo.key = key; wildsMemo.trees = out;
+  }
+  return wildsMemo.trees.map(t => ({id: t.id, x: t.x, z: t.z, height: t.height, variant: t.variant}));
+}
+/** Every tree id a save may name: the live list, plus (in generated worlds) any well-formed generated tree id. */
+export function treeIdSet(saved) {
+  const ids = new Set(worldTrees(saved).map(t => t.id)), world = saved.world ? worldFor(saved) : null;
+  return {has: id => ids.has(id) || !!world && isGeneratedTreeId(id) && !!generatedTree(world, id), get size() { return ids.size; }, live: ids};
+}
 import {HOME,HOME_SITES,NEUTRAL_TAVERN} from './home-bases.js';
 import {keepCarve,inKeepApproach} from './keep-sites.js';
 // The keeps (with their carved bowl, pass and hollow) and the shared tavern's yard stay clear of wild trees and new ore.
@@ -41,9 +65,9 @@ export function renewGeology(state,ctx,events=[]){
  return false;
 }
 export function worldTrees(state) {
-  const trees = baseTrees.map(([x,z,height], i) => ({id: `tree${i + 1}`, x, z, height, variant: i % 3}));
-  for (let i = 0; i < 14; i++) { const h = hash(state.seed, i); const a = (h % 6283) / 1000; const r = 25 + ((h >>> 12) % 25); trees.push({id:`outer${i + 1}`, x:+(Math.cos(a)*r).toFixed(3), z:+(Math.sin(a)*r).toFixed(3), height:5 + (h % 30)/10, variant:(h>>>8)%3}); }
-  if(state.landmarks) trees.splice(0,trees.length,...clearLandmarkTrees(trees));
+  const trees = state.world ? wildsTrees(state) : baseTrees.map(([x,z,height], i) => ({id: `tree${i + 1}`, x, z, height, variant: i % 3}));
+  if (!state.world) for (let i = 0; i < 14; i++) { const h = hash(state.seed, i); const a = (h % 6283) / 1000; const r = 25 + ((h >>> 12) % 25); trees.push({id:`outer${i + 1}`, x:+(Math.cos(a)*r).toFixed(3), z:+(Math.sin(a)*r).toFixed(3), height:5 + (h % 30)/10, variant:(h>>>8)%3}); }
+  if(state.landmarks&&!state.world) trees.splice(0,trees.length,...clearLandmarkTrees(trees));
   // Home-base worlds keep both domes clear of wild trees (shared/home-bases.js).
   if(state.battle?.v===2) trees.splice(0,trees.length,...trees.filter(t=>!insideHome(t.x,t.z,2)));
   for (const g of state.groves || []) {
@@ -67,10 +91,10 @@ export function worldTrees(state) {
 export function restoreTreeRoots(saved) {
   const roots = saved.treeRoots ?? [];
   if (!Array.isArray(roots) || roots.length > 1024) throw Error('Invalid tree roots');
-  const ids = new Set(worldTrees({...saved, treeRoots: []}).map(t => t.id)), seen = new Set();
+  const ids = treeIdSet({...saved, treeRoots: []}), seen = new Set();
   for (const root of roots) {
     if (!root || typeof root !== 'object' || Array.isArray(root) || Object.keys(root).some(k => !['id', 'x', 'z'].includes(k)) ||
-      !ids.has(root.id) || seen.has(root.id) || !Number.isFinite(root.x) || !Number.isFinite(root.z) || Math.abs(root.x) > 55 || Math.abs(root.z) > 55) throw Error('Invalid tree root');
+      !ids.has(root.id) || seen.has(root.id) || !Number.isFinite(root.x) || !Number.isFinite(root.z) || Math.abs(root.x) > thingLimit() || Math.abs(root.z) > thingLimit()) throw Error('Invalid tree root');
     seen.add(root.id);
   }
   return roots.map(({id, x, z}) => ({id, x, z}));

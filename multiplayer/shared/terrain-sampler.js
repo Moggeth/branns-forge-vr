@@ -13,7 +13,7 @@ export function createTerrainSampler(initial={edits:[]}) {
   samples++;valid[index]=1;return heights[index]=rawTerrainHeight(state,x,z);
  }
  function setState(next) {
-  state=next;const edits=next.edits||[],tick=next.tick??Infinity,nextFoundationKey=foundationTerrainKey(next),nextKey=terrainFrameKey(edits,tick)+'|'+nextFoundationKey;
+  state=next;const edits=next.edits||[],tick=next.tick??Infinity,nextFoundationKey=foundationTerrainKey(next)+(next.world?'|'+next.world.seed+'|'+next.world.preset+'|'+next.world.size:''),nextKey=terrainFrameKey(edits,tick)+'|'+nextFoundationKey;
   if(nextKey===key)return false;
   // IDs identify edits in real snapshots. Anonymous authoring/test edits take the safe full path.
   const unique=new Set(edits.map(e=>e.id));

@@ -1,5 +1,6 @@
 // One bounded heat/fuel field consumed by all fire sources. Fixed 10 Hz ecology,
 // 60 Hz packet flight remains in combat.js. No renderer or client hit authority.
+import {posLimit,thingLimit,extentLimit} from './world-extent.js';
 import {applyEnemyScorch,partPosition,PARTS,hitEnemyPart} from './combat.js';
 import {hasTalent} from './hero-progress.js';
 import {entHeight} from './ents.js';
@@ -8,7 +9,7 @@ import {WORLD_EXTENT} from './keep-sites.js';
 export const FIRE_LIMITS = Object.freeze({cells:256,surfaces:32,cellSize:.5});
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const key=(x,z)=>`${x},${z}`;
-const validVector=v=>Array.isArray(v)&&v.length===3&&v.every(n=>Number.isFinite(n)&&Math.abs(n)<=200);
+const validVector=v=>Array.isArray(v)&&v.length===3&&v.every(n=>Number.isFinite(n)&&Math.abs(n)<=posLimit());
 
 export function addFuel(state,point,radius=1,amount=.8,lit=false,tar=false) {
   const cells=state.fireCells, map=new Map(cells.map(c=>[key(c.x,c.z),c]));
@@ -16,7 +17,7 @@ export function addFuel(state,point,radius=1,amount=.8,lit=false,tar=false) {
   let changed=0;
   for(let ix=-n;ix<=n;ix++)for(let iz=-n;iz<=n;iz++){
     const x=x0+ix*.5,z=z0+iz*.5,d=Math.hypot(x-point[0],z-point[2]);
-    if(d>radius||Math.abs(x)>55||Math.abs(z)>55)continue;
+    if(d>radius||Math.abs(x)>thingLimit()||Math.abs(z)>thingLimit())continue;
     let cell=map.get(key(x,z));
     if(!cell){if(cells.length>=FIRE_LIMITS.cells)continue;cell={x,z,fuel:0,heat:0,burning:false,wetUntil:0,expiresTick:state.tick+1800};cells.push(cell);map.set(key(x,z),cell);}
     cell.fuel=clamp(cell.fuel+amount*(.5+.5*(1-d/radius)),0,1);cell.expiresTick=state.tick+1800;
@@ -222,12 +223,12 @@ export function restoreFire(saved,ids){
   if(!Array.isArray(cells)||cells.length>FIRE_LIMITS.cells||!Array.isArray(surfaces)||surfaces.length>FIRE_LIMITS.surfaces)throw Error('Invalid fire limits');
   const tick=(n,max)=>Number.isSafeInteger(n)&&n>=0&&n<=saved.tick+max;
   for(const c of cells){
-    if(!c||![c.x,c.z].every(n=>Number.isFinite(n)&&Math.abs(n)<=55&&Number.isInteger(n*2))||
+    if(!c||![c.x,c.z].every(n=>Number.isFinite(n)&&Math.abs(n)<=thingLimit()&&Number.isInteger(n*2))||
       ![c.fuel,c.heat].every(n=>Number.isFinite(n)&&n>=0&&n<=1)||typeof c.burning!=='boolean'||(c.tar!==undefined&&c.tar!==true)||!tick(c.wetUntil,300)||!tick(c.expiresTick,1800)||seen.has(key(c.x,c.z)))throw Error('Invalid fuel cell');
     seen.add(key(c.x,c.z));
   }
   for(const p of surfaces){
-    if(!p||typeof p.id!=='string'||!/^f\d+$/.test(p.id)||ids.has(p.id)||!validVector(p.position)||Math.abs(p.position[0])>WORLD_EXTENT||Math.abs(p.position[2])>WORLD_EXTENT||!validVector(p.normal)||Math.abs(Math.hypot(...p.normal)-1)>.02||!tick(p.expiresTick,240)||(p.emberTick!==undefined&&(!tick(p.emberTick,90)||p.emberTick>=p.expiresTick)))throw Error('Invalid fire surface');
+    if(!p||typeof p.id!=='string'||!/^f\d+$/.test(p.id)||ids.has(p.id)||!validVector(p.position)||Math.abs(p.position[0])>extentLimit()||Math.abs(p.position[2])>extentLimit()||!validVector(p.normal)||Math.abs(Math.hypot(...p.normal)-1)>.02||!tick(p.expiresTick,240)||(p.emberTick!==undefined&&(!tick(p.emberTick,90)||p.emberTick>=p.expiresTick)))throw Error('Invalid fire surface');
     ids.add(p.id);
   }
   for(const p of saved.players)if(p.heat!==undefined&&(!Number.isFinite(p.heat)||p.heat<0||p.heat>1)||p.overheatUntil!==undefined&&!tick(p.overheatUntil,180)||p.flameTick!==undefined&&(!Number.isSafeInteger(p.flameTick)||p.flameTick< -1000||p.flameTick>saved.tick)||p.flaskLit!==undefined&&typeof p.flaskLit!=='boolean')throw Error('Invalid fire equipment state');

@@ -76,6 +76,11 @@ export function heroPanelModel(view, held, ui = {}) {
   const stageIndex = STAGES.findIndex(([s]) => s === view.stage);
   const ids = HERO_ACTIONS.filter(a => view.actions.includes(a));
   const canDeliver = deliverable(view.stage, held).length > 0;
+  // A view may bring its own buttons (the Expedition Roguelite: kits, routes, upgrades, return or push on).
+  if (view.buttons) return {stage: view.stage, title: view.title, tone: view.tone || TONE[view.stage] || INK, timer: '', track: view.track || [],
+    rows: view.objectives.slice(0, 3).map(o => ({...o})), next: nextStep(view, held), alert: view.notice && !ui.hint ? {text: view.notice, color: DIM} : ui.hint ? {text: ui.hint, color: WARN} : null,
+    carryLabel: 'Run', carry: (view.carry || []).map(([icon, count]) => ({icon, count})),
+    buttons: layoutButtons(view.buttons.map(b => b.id), {}).map((b, i) => ({...b, label: view.buttons.at(i).label, enabled: view.buttons.at(i).enabled !== false, hover: ui.hover === b.id, pressed: ui.pressed === b.id, tone: null}))};
   const buttons = layoutButtons(ids, ui).map(b => ({...b, label: LABELS[b.id] || b.id,
     enabled: b.id !== 'deposit' || canDeliver, hover: ui.hover === b.id, pressed: ui.pressed === b.id,
     tone: b.id === 'confirm' ? DANGER : b.id === 'leave' || b.id === 'cancel' ? DIM : null}));
@@ -267,6 +272,7 @@ export function createVRAdventurePanel({parent, controllers, grips, sources, onA
       if(action.action==='forgeEncounter'){raidConfirmAt=t;return;}
       send(action.action,t,action.detail,id);return;
     }
+    if (id.startsWith('run:')) { send(id, t); return; }
     if (id === 'cancel') { confirmAt = 0; return; }
     if (id === 'leave') { confirmAt = t; return; }
     if (id === 'confirm') { if (confirmAt && t - confirmAt >= GATE.confirmMinMs) { confirmAt = 0; send('leave', t); } return; }

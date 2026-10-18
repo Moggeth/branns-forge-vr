@@ -1,7 +1,7 @@
 {
   "three": "0.186.1",
   "source": "55f466192cc84298755a424c5e040345006b2ee1455589b3b54126c2ea4123f4",
-  "atmosphere": "c545672816536754632b1dc244222268b8b82cdc5a93bbf8ba40b321fba7ceea",
+  "atmosphere": "6bb6f344a064b50061720e405ed5839bf1265ac04219d80a180eb31529474b32",
   "sigma": 0.04,
   "near": 0.1,
   "far": 100,
@@ -17,12 +17,12 @@
       "colorSpace": "srgb-linear",
       "minFilter": 1006,
       "magFilter": 1006,
-      "bakeMs": 434.5,
-      "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3080 Ti (0x00002208) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "bakeMs": 1228.4000000003725,
+      "gpu": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
       "file": "room-128.bfenv.gz",
-      "bytes": 120146,
-      "pixelSha256": "3c450013ea7f5a61764aa93c6bb1671266d59bb7e6e4164337eb70f499587c21",
-      "encodedSha256": "a553d791cabcb90182b47cb19e5c354cd6763f51d4a636f394edcd8ff16ac72a"
+      "bytes": 119702,
+      "pixelSha256": "939b4597f9e575809348035c12f1470988fcfe101baa686e39e943220ec46cbb",
+      "encodedSha256": "166aa1e099eaf012c7c04098880ffa6862285fd584af8ccb9461135eaab675e6"
     },
     {
       "size": 256,
@@ -34,12 +34,12 @@
       "colorSpace": "srgb-linear",
       "minFilter": 1006,
       "magFilter": 1006,
-      "bakeMs": 394.60000002384186,
-      "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3080 Ti (0x00002208) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "bakeMs": 3471.2000000001863,
+      "gpu": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
       "file": "room-256.bfenv.gz",
-      "bytes": 339214,
-      "pixelSha256": "618988bf92870cd877e6fbc89f7c4d546ae028664978c6c8d6c57fc11f207202",
-      "encodedSha256": "295d2c89a5430a7165747a6ae3294b56ce512d2e25e012482fd803658d6e6a76"
+      "bytes": 335136,
+      "pixelSha256": "e97a5a7639e17cc48f2bb05f0621c8387aadb7493fcbaa36817c6d417e746419",
+      "encodedSha256": "f36a45290342ec1b0de6be1a5eb200147b6d062a50ab6f9a21c68deafb0eb5be"
     }
   ]
 }

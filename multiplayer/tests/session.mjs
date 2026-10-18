@@ -108,3 +108,14 @@ test('host departure reports recovery storage success truthfully and retains mem
     assert.equal(notices.at(-1).recoverySaved,false,'no checkpoint is not a successful recovery');
   } finally {full=false;s.dispose();}
 });
+
+test('reset keeps a loaded generated world (not the classic valley)',async()=>{
+  const {worldDescriptor}=await import('../shared/worldgen/registry.js');
+  const world=worldDescriptor({kind:'wilds',seed:'reset-me',preset:'continent',size:1024});
+  const host=createSimulation({room:'12345678',seed:41,world});host.addPlayer({id:'p',role:'hero'});
+  const connection=new FakeConnection(),s=new WorldSession({connection,storage:storage()});
+  try{s.connect({save:{id:'w1',name:'Wilds',checkpoint:host.checkpoint()}});
+    if(!s.simulation)return; // this fake only hosts when the connection promotes it
+    assert.deepEqual(s.simulation.snapshot().world,world);s.resetWorld();assert.deepEqual(s.simulation.snapshot().world,world);
+  }finally{s.dispose();}
+});

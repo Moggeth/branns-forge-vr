@@ -4,6 +4,11 @@ import {specialCooldown} from '../shared/special-cooldowns.js';
 const RECOVERY = {
  "dragon_not_ready": "Slay Thee, Sun Birdy Above comes after 5 skeleton killing blows in a row. Keep going!",
  "dragon_riding": "You are up on your dragon. Your weapons wait on the ground until the ride ends.",
+ "mount_wild": "This tiger is still wild. Pick up an apple, then offer it from your hand.",
+ "mount_taken": "Someone else is already in that saddle.",
+ "already_riding": "You are already riding. Press it again to hop off first.",
+ "not_riding": "You are on your own two feet.",
+ "too_far": "Walk right up to it first.",
  "dragon_not_riding": "Your dragon has already flown home.",
  "dragon_cooldown": "The dragon is catching its breath. Watch the button fill, then try again.",
  "out_of_reach": "That target is beyond reach. Move closer and aim at it again.",

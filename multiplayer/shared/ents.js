@@ -5,6 +5,7 @@
 // Size comes from the tree: young trees wake as nimble saplings, mature trees as lumbering elders.
 // Anatomy is in units of the ent's height and is mirrored by client/ent-view.js (model faces -Z, its left is -X).
 
+import {thingLimit} from './world-extent.js';
 import {findTreeSpot} from './grove-growth.js';
 export const ENT = Object.freeze({
  wakeTicks: 72,        // 1.2 s pulling free of the ground before it may move or strike
@@ -145,7 +146,7 @@ export function stepEntRooting(state, trees, ctx, events) {
 const finite = n => typeof n === 'number' && Number.isFinite(n);
 const validId = id => typeof id === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(id);
 const validTree = t => t && typeof t === 'object' && !Array.isArray(t) && Object.keys(t).every(k => ['id', 'x', 'z', 'height', 'variant'].includes(k)) &&
- validId(t.id) && finite(t.x) && finite(t.z) && Math.abs(t.x) <= 55 && Math.abs(t.z) <= 55 && finite(t.height) && t.height >= 2 && t.height <= 12 && Number.isInteger(t.variant) && t.variant >= 0 && t.variant <= 2;
+ validId(t.id) && finite(t.x) && finite(t.z) && Math.abs(t.x) <= thingLimit() && Math.abs(t.z) <= thingLimit() && finite(t.height) && t.height >= 2 && t.height <= 12 && Number.isInteger(t.variant) && t.variant >= 0 && t.variant <= 2;
 export function restoreEntTrees(saved) {
  const awakened = saved.awakenedTrees ?? [], wild = saved.wildTrees ?? [];
  if (!Array.isArray(awakened) || awakened.length > ENT.records || !Array.isArray(wild) || wild.length > ENT.wild) throw Error('Invalid ent trees');

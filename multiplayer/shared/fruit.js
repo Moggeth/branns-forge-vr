@@ -10,6 +10,7 @@
 // A felled apple tree sheds the apples it still carried around its crown when it lands.
 // Drops are collectibles: take one, then each bite heals (BITE_HEAL) and three bites reach the core.
 // The apple grows back on its branch after REGROW_TICKS; the last GROW_TICKS of that wait are its visible swelling.
+import {posLimit} from './world-extent.js';
 import {heroMaxHp} from './hero-progress.js';
 import {worldTrees} from './world-content.js';
 import {treeScale,isFelled} from './trees.js';
@@ -38,7 +39,7 @@ export const FRUIT = Object.freeze({
 });
 const G = 9.8, BOUND = 54.5;
 const finite = Number.isFinite, clamp = (n, a, b) => Math.max(a, Math.min(b, n));
-const vec = (v, limit = 200) => Array.isArray(v) && v.length === 3 && v.every(n => finite(n) && Math.abs(n) <= limit);
+const vec = (v, limit = posLimit()) => Array.isArray(v) && v.length === 3 && v.every(n => finite(n) && Math.abs(n) <= limit);
 const len = v => Math.hypot(v[0], v[1], v[2]);
 const norm = v => { const l = len(v) || 1; return [v[0]/l, v[1]/l, v[2]/l]; };
 const cross = (a, b) => [a[1]*b[2] - a[2]*b[1], a[2]*b[0] - a[0]*b[2], a[0]*b[1] - a[1]*b[0]];
@@ -161,7 +162,7 @@ function shedFelled(state, ctx, events) {
   for (let slot = 0; slot < APPLE_SLOTS.length && n < FRUIT.shed; slot += 4) {
    if (gone.has(missingKey(tree.id, slot))) continue;
    const a = APPLE_SLOTS[slot], along = a[1]*s, side = a[0]*s*Math.cos(yaw) - a[2]*s*Math.sin(yaw);
-   const x = clamp(tree.x + dir[0]*along + dir[2]*side*.6, -BOUND, BOUND), z = clamp(tree.z + dir[2]*along - dir[0]*side*.6, -BOUND, BOUND);
+   const [x, z] = clampToWorld(tree.x + dir[0]*along + dir[2]*side*.6, tree.z + dir[2]*along - dir[0]*side*.6, BOUND);
    markMissing(state, tree, slot);
    const drop = spawnDrop(state, ctx, {stick: 'none', position: [x, ctx.terrainHeight(state, x, z) + .9, z], velocity: [dir[0]*1.5 + side*.4, 2.2, dir[2]*1.5], dir: [0, 1, 0], radius: a[3]*s, tree, slot});
    if (drop) { n++; events.push({kind: 'apple_pierce', id: drop.id, tree: tree.id, slot, stick: 'none', shed: true, position: [...drop.position], direction: [0, -1, 0]}); }
@@ -206,7 +207,7 @@ export function stepFruit(state, ctx, events) {
   const v = d.velocity, drag = Math.exp(-.35*dt);
   v[0] *= drag; v[2] *= drag; v[1] = v[1]*drag - G*dt;
   const [ax, az] = clampToWorld(d.position[0] + v[0]*dt, d.position[2] + v[2]*dt, BOUND);
-  d.position = [ax, clamp(d.position[1] + v[1]*dt, -150, 150), az];
+  d.position = [ax, clamp(d.position[1] + v[1]*dt, -posLimit(), posLimit()), az];
   const speed = len(v), s = STICKS[d.stick];
   if (d.half && speed > .5) { // a tumbling half: its face turns over as it falls (deterministic, from its spin sense)
    const a = 7*dt*(d.id.charCodeAt(d.id.length - 1) % 2 ? 1 : -1), c = Math.cos(a), sn = Math.sin(a), [x, y, z] = d.cut;

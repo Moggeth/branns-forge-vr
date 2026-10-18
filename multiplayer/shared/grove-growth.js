@@ -2,6 +2,7 @@
 // nearest open ground within reach: crowns never swallow each other, trunks stay off rocks, buildings, landmarks
 // and Heroes. A cast is refused only when not one tree fits. Pure and deterministic: the aimed preview and the
 // authority run the same plan on the same world, so the preview shows exactly the trees that will grow.
+import {thingLimit, godReach} from './world-extent.js';
 import {worldTrees} from './world-content.js';
 import {STARTING_SITES} from './starting-world.js';
 import {VARIANTS, TREE_PROFILES} from './trees.js';
@@ -71,7 +72,7 @@ function occupancy(state, heroes) {
     add,
     free(t) {
       const {x, z} = t;
-      if (Math.abs(x) > GROVE_EDGE || Math.abs(z) > GROVE_EDGE || Math.hypot(x, z) < FORGE_APRON) return false;
+      const edge = godReach(GROVE_EDGE); if (Math.abs(x) > edge || Math.abs(z) > edge || Math.hypot(x, z) < FORGE_APRON) return false;
       if (state.landmarks && STARTING_SITES.some(s => Math.hypot(x - s.x, z - s.z) < s.radius + c.landmark)) return false;
       if (deposits.some(d => Math.hypot(d.x - x, d.z - z) < c.deposit)) return false;
       if (structures.some(b => Math.hypot(b.position[0] - x, b.position[2] - z) < c.structure)) return false;
@@ -109,6 +110,6 @@ export const findTreeSpot = (state, tree, shift = 2.1, heroes = true) => nearest
 /** Save/restore check for a grove's grown trees: [[x, z, height, variant, appearTick?], ...]. */
 export function validGroveTrees(trees, tick) {
   return Array.isArray(trees) && trees.length >= 1 && trees.length <= GROWTH.wave.maxTrees && trees.every(t => Array.isArray(t) && (t.length === 4 || t.length === 5) &&
-    Number.isFinite(t[0]) && Number.isFinite(t[1]) && Math.abs(t[0]) <= 55 && Math.abs(t[1]) <= 55 && Number.isFinite(t[2]) && t[2] >= 3 && t[2] <= 9 &&
+    Number.isFinite(t[0]) && Number.isFinite(t[1]) && Math.abs(t[0]) <= thingLimit() && Math.abs(t[1]) <= thingLimit() && Number.isFinite(t[2]) && t[2] >= 3 && t[2] <= 9 &&
     [0, 1, 2].includes(t[3]) && (t.length === 4 || (Number.isSafeInteger(t[4]) && t[4] >= 0 && t[4] <= tick + 600)));
 }

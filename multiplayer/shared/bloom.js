@@ -1,3 +1,4 @@
+import {thingLimit} from './world-extent.js';
 import {heroMaxHp} from './hero-progress.js';
 // Bloom: how much life the world holds. Groves, fruit eaten and foes the Heroes fell make it rise;
 // each level unlocks more God spells. Pure and deterministic (authority state only, no clock or RNG).
@@ -40,7 +41,7 @@ export function restoreBloom(saved, ids) {
   if (!Array.isArray(springs) || springs.length > BLOOM.spring.cap) throw Error('Invalid Life Springs');
   for (const s of springs) {
     if (!s || typeof s !== 'object' || typeof s.id !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(s.id) || ids.has(s.id) ||
-        ![s.x, s.z].every(n => Number.isFinite(n) && Math.abs(n) <= 55) ||
+        ![s.x, s.z].every(n => Number.isFinite(n) && Math.abs(n) <= thingLimit()) ||
         !Number.isSafeInteger(s.expireTick) || s.expireTick <= saved.tick || s.expireTick > saved.tick + BLOOM.spring.ticks) throw Error('Invalid Life Spring');
     ids.add(s.id);
   }

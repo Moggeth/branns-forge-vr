@@ -6,6 +6,8 @@ import {entSpec,entWaking,entRooting} from './ents.js';
 import {STUMPLING,stepStumplingMotion} from './stumplings.js';
 import {clampToWorld} from './keep-sites.js';
 import {skeletonKindIndex} from './skeleton-kinds.js';
+import {BOSS,bossScale} from './run-boss.js';
+import {sameSpace} from './underways/space.js';
 export const ENEMY_STRIKE_TICK=18;
 // A skeleton whose shield splinters reels for this long (no steering, no new swing, a swing in progress misses).
 export const FLINCH_TICKS=45;
@@ -17,7 +19,7 @@ const wrap=a=>Math.atan2(Math.sin(a),Math.cos(a));
 // Pace personality per warband archetype (shared/skeleton-kinds.js order): Thornhood scurry, Old Bones dawdle.
 const SKELETON_PACE=[1,.96,1.08,.88,1.04,1];
 const AVOID_AHEAD=1.7,TURN_RATE=.15;
-const radius=e=>e.kind==='ent'?entSpec(e).radius:e.kind==='stumpling'?STUMPLING.radius:e.kind==='golem'?.5:.32;
+const radius=e=>e.kind==='ent'?entSpec(e).radius:e.kind==='stumpling'?STUMPLING.radius:e.kind==='golem'?.5*bossScale(e):.32;
 
 // Home-base Stormspires (b.home) belong to the base, so roaming foes never march across the map for them.
 export function stepEnemies(state,{ground,resolve,damageHero,damageStructure,damageEnemy,damageBase,events}){
@@ -37,13 +39,15 @@ export function stepEnemies(state,{ground,resolve,damageHero,damageStructure,dam
   // Tossed by a crystal wall front: a fixed parabola above the (rising) ground, no steering or strikes until it lands.
   if(e.launchTick!==undefined){const u=(state.tick-e.launchTick)/PICK_WALL.launchTicks;
    if(u<1){e.position[1]=ground(e.position[0],e.position[2])+4*PICK_WALL.launchPeak*u*(1-u);continue;}delete e.launchTick;}
-  const foes=battleBot(e)?[...targets.filter(h=>(h.side||'party')!==e.side),...battleBots.filter(h=>h.side!==e.side&&h.hp>0)]:targets;
+  // Bodies in the Underways and on the surface never chase each other across the gap (shared/underways/space.js).
+  const foes=(battleBot(e)?[...targets.filter(h=>(h.side||'party')!==e.side),...battleBots.filter(h=>h.side!==e.side&&h.hp>0)]:targets).filter(h=>sameSpace(h.position,e.position));
   let target=null,best=Infinity;for(const h of foes){const d=flat(e.position,h.position);if(d<best){best=d;target=h;}}
+  if(e.uw!==undefined&&best>16)target=null; // dungeon foes hold their room until a Hero comes close (they cannot path round corners from afar)
   let patrol=false;
   if(battleBot(e)&&(!target||best>BATTLE.aggroRange)){target=battleWaypoint(state,e,ground);best=flat(e.position,target.position);patrol=!!target.battleLane;}
   if(e.id.startsWith('camp_')&&best>14){const n=Number(e.id.replace(/\D/g,''))||0,a=state.tick/360+n;target={id:'patrol',position:[(n%2?-37:37)+Math.sin(a)*2,e.position[1],30+Math.cos(a)*2]};best=flat(e.position,target.position);patrol=true;}
   if(!target)continue;
-  const ent=e.kind==='ent'?entSpec(e):null,building=buildings.includes(target)||baseTargets.includes(target),reach=building?3.2:ent?ent.reach:1.8;
+  const ent=e.kind==='ent'?entSpec(e):null,building=buildings.includes(target)||baseTargets.includes(target),reach=building?3.2:ent?ent.reach:1.8*bossScale(e);
   let age=state.tick-e.attackTick;
   // Old saves can contain a wind-up without a locked target: let it recover harmlessly.
   const committed=age>=0&&age<34;
@@ -51,7 +55,7 @@ export function stepEnemies(state,{ground,resolve,damageHero,damageStructure,dam
   if(!committed&&!staggered){
    const dx=target.position[0]-e.position[0],dz=target.position[2]-e.position[2];
    const legs=e.missingParts.filter(p=>p.endsWith('Leg')).length;
-   const speed=(ent?ent.speed:e.kind==='golem'?1.25:2*SKELETON_PACE[skeletonKindIndex(e.id)])*(legs===2?.2:legs===1?.55:1)*(e.slowUntil>state.tick?.35:1);
+   const speed=(ent?ent.speed:e.kind==='golem'?1.25*(e.boss?BOSS.speed:1):2*SKELETON_PACE[skeletonKindIndex(e.id)])*(legs===2?.2:legs===1?.55:1)*(e.slowUntil>state.tick?.35:1);
    let vx=best>1.5?dx/Math.max(best,.001)*speed:0,vz=best>1.5?dz/Math.max(best,.001)*speed:0;
    const sx=vx/speed||0,sz=vz/speed||0,self=radius(e);let ax=0,az=0;
    const ci=Math.floor(e.position[0]/cell),cj=Math.floor(e.position[2]/cell);
@@ -101,8 +105,8 @@ export function stepEnemies(state,{ground,resolve,damageHero,damageStructure,dam
   if(age===ENEMY_STRIKE_TICK){
    const victim=[...foes,...baseTargets.filter(b=>b.side!==e.side)].find(p=>p.id===e.attackTarget);if(!victim)continue;
    const d=flat(e.position,victim.position),dot=(-Math.sin(e.yaw)*(victim.position[0]-e.position[0])-Math.cos(e.yaw)*(victim.position[2]-e.position[2]))/Math.max(d,.001);
-   if(d<((buildings.includes(victim)||baseTargets.includes(victim))?3.5:ent?ent.strike:2)&&dot>.65&&Math.abs(e.position[1]-victim.position[1])<1.8&&(e.hurtTick??-1000)<e.attackTick&&(e.flinchTick??-1000)<e.attackTick&&((buildings.includes(victim)||baseTargets.includes(victim))||!blocked(e.position,victim.position))){
-    const arms=e.missingParts.filter(p=>p.endsWith('Arm')).length;const amount=(ent?ent.damage:e.kind==='golem'?22:10)*(arms===2?.25:arms===1?.65:1);if(baseTargets.includes(victim))pendingHits.push(()=>damageBase?.(victim.id,amount,e.side));else if(battleBots.includes(victim))pendingHits.push(()=>damageEnemy?.(victim,amount,events,e.side));else if(buildings.includes(victim))damageStructure?.(victim.id,amount,events,e.side);else if(defenders.includes(victim))victim.hp=Math.max(0,victim.hp-amount);else{const start=events.length;damageHero(state,victim,amount,events,e.position);if(ent)for(let i=start;i<events.length;i++)if(events[i].kind==='hit')events[i].sourceMaterial='wood';}
+   if(d<((buildings.includes(victim)||baseTargets.includes(victim))?3.5:ent?ent.strike:2*bossScale(e))&&dot>.65&&Math.abs(e.position[1]-victim.position[1])<1.8&&(e.hurtTick??-1000)<e.attackTick&&(e.flinchTick??-1000)<e.attackTick&&((buildings.includes(victim)||baseTargets.includes(victim))||!blocked(e.position,victim.position))){
+    const arms=e.missingParts.filter(p=>p.endsWith('Arm')).length;const amount=(ent?ent.damage:e.kind==='golem'?22*(e.boss?BOSS.damage:1):10)*(arms===2?.25:arms===1?.65:1);if(baseTargets.includes(victim))pendingHits.push(()=>damageBase?.(victim.id,amount,e.side));else if(battleBots.includes(victim))pendingHits.push(()=>damageEnemy?.(victim,amount,events,e.side));else if(buildings.includes(victim))damageStructure?.(victim.id,amount,events,e.side);else if(defenders.includes(victim))victim.hp=Math.max(0,victim.hp-amount);else{const start=events.length;damageHero(state,victim,amount,events,e.position);if(ent)for(let i=start;i<events.length;i++)if(events[i].kind==='hit')events[i].sourceMaterial='wood';}
    }
   }
  }

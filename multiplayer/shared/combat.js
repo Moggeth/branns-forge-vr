@@ -1,4 +1,6 @@
+import {posLimit} from './world-extent.js';
 import {friendlyEnemyHit,damageBattleBase} from './battle-mode.js';
+import {BOSS,bossScale,BOSS_HP} from './run-boss.js';
 import {findHomeTarget,homeBattle} from './home-bases.js';
 import {terrainSpecial} from './weapon-specials.js';
 import {BLOOM,addBloom} from './bloom.js';
@@ -25,7 +27,7 @@ import {beyondWorld} from './keep-sites.js';
 export const TOOLS = Object.freeze(['axe','pick','hammer','crossbow','bow','limb','wyrmspout','flask','stormreel','staff']);
 export const PARTS = Object.freeze(['head','torso','leftArm','rightArm','leftLeg','rightLeg']);
 export const COMBAT_LIMITS = Object.freeze({projectiles:96, embeds:192, detachedParts:96});
-const vec = (v,limit=200) => Array.isArray(v)&&v.length===3&&v.every(n=>Number.isFinite(n)&&Math.abs(n)<=limit);
+const vec = (v,limit=posLimit()) => Array.isArray(v)&&v.length===3&&v.every(n=>Number.isFinite(n)&&Math.abs(n)<=limit);
 const quat = q => Array.isArray(q)&&q.length===4&&q.every(Number.isFinite)&&Math.abs(Math.hypot(...q)-1)<.02;
 const dist = (a,b) => Math.hypot(...a.map((n,i)=>n-b[i]));
 const unit = v => vec(v,1.01)&&Math.abs(Math.hypot(...v)-1)<.02;
@@ -75,8 +77,9 @@ function embedDepth(kind,part,measured,targetId){
 const fail=code=>({ok:false,code,events:[]}), ok=events=>({ok:true,events});
 export function enemyParts(kind='skeleton',size) {if(kind==='stumpling')return stumplingParts();return Object.fromEntries(PARTS.map(part=>[part,kind==='ent'?(ENT_SIZES[size]||ENT_SIZES.elder).parts[part]:kind==='golem'?120:part==='torso'?100:55]));}
 // Save/restore ceilings shared by every creature kind (ents carry their size class).
-export const enemyMaxHp=e=>e?.kind==='stumpling'?STUMPLING.hp:e?.kind==='ent'?entSpec(e).hp:e?.kind==='golem'?320:100;
-export const enemyPartMax=(e,part)=>e?.kind==='stumpling'?STUMPLING.part:e?.kind==='ent'?entSpec(e).parts[part]:e?.kind==='golem'?120:part==='torso'?100:55;
+export function makeBoss(e,id){e.boss=id;e.hp=enemyMaxHp(e);e.parts=Object.fromEntries(PARTS.map(p=>[p,enemyPartMax(e,p)]));e.armor=BOSS.armor;return e;}
+export const enemyMaxHp=e=>e?.kind==='stumpling'?STUMPLING.hp:e?.kind==='ent'?entSpec(e).hp:e?.kind==='golem'?(e.boss===true?BOSS_HP:320*(e.boss?BOSS.hp:1)):100;
+export const enemyPartMax=(e,part)=>e?.kind==='stumpling'?STUMPLING.part:e?.kind==='ent'?entSpec(e).parts[part]:e?.kind==='golem'?120*(e.boss&&e.boss!==true?BOSS.parts:1):part==='torso'?100:55;
 export function emptyScorch() {return Object.fromEntries(PARTS.map(part=>[part,0]));}
 export function applyEnemyScorch(enemy,part,amount){
   if(!enemy||!PARTS.includes(part)||!Number.isFinite(amount)||amount<=0)return false;
@@ -86,12 +89,12 @@ export function applyEnemyScorch(enemy,part,amount){
 }
 export function createEnemy(id,position,kind='skeleton') {return {id,position,kind,yaw:0,hp:kind==='golem'?320:100,parts:enemyParts(kind),missingParts:[],...(kind==='golem'?{armor:3}:{}),attackTick:-1000};}
 const centers={head:[0,1.75,0],torso:[0,1.15,0],leftArm:[.48,1.12,0],rightArm:[-.48,1.12,0],leftLeg:[.2,.48,0],rightLeg:[-.2,.48,0]};
-export function partPosition(enemy,part){if(enemy.kind==='ent')return entPartPosition(enemy,part);if(enemy.kind==='stumpling')return [enemy.position[0],enemy.position[1]+STUMPLING.height*.5,enemy.position[2]];const canonical=centers[part]||centers.torso,a=enemy.kind==='golem'?[-canonical[0],canonical[1],canonical[2]]:canonical,s=enemy.kind==='golem'?1.45:1,c=Math.cos(enemy.yaw),t=Math.sin(enemy.yaw);return [enemy.position[0]+(a[0]*c+a[2]*t)*s,enemy.position[1]+a[1]*s,enemy.position[2]+(-a[0]*t+a[2]*c)*s];}
+export function partPosition(enemy,part){if(enemy.kind==='ent')return entPartPosition(enemy,part);if(enemy.kind==='stumpling')return [enemy.position[0],enemy.position[1]+STUMPLING.height*.5,enemy.position[2]];const canonical=centers[part]||centers.torso,a=enemy.kind==='golem'?[-canonical[0],canonical[1],canonical[2]]:canonical,s=enemy.kind==='golem'?1.45*bossScale(enemy):1,c=Math.cos(enemy.yaw),t=Math.sin(enemy.yaw);return [enemy.position[0]+(a[0]*c+a[2]*t)*s,enemy.position[1]+a[1]*s,enemy.position[2]+(-a[0]*t+a[2]*c)*s];}
 export function validPartHit(enemy,part,point) {
   if(!PARTS.includes(part)||enemy.missingParts?.includes(part)||!vec(point))return false;
   if(enemy.kind==='ent')return dist(point,entPartPosition(enemy,part))<=entPartReach(enemy,part);
   if(enemy.kind==='stumpling')return dist(point,partPosition(enemy,part))<=.85; // one rigid body: roots and all
-  const s=enemy.kind==='golem'?1.45:1,center=partPosition(enemy,part);
+  const s=enemy.kind==='golem'?1.45*bossScale(enemy):1,center=partPosition(enemy,part);
   // The shipped 1.7m skeleton skull spans y=1.259..1.724. The historical
   // 1.75m fallback pivot rejected real jaw/face triangles. This is only the
   // authority sanity envelope: rendered triangles still determine every hit.
@@ -502,7 +505,7 @@ export function validateCombat(saved,ids){
   const held=new Set();
   for(const d of saved.detachedParts||[])if(!d||!unique(d.id)||typeof d.sourceId!=='string'||!['skeleton','golem'].includes(d.kind)||!PARTS.includes(d.part)||!vec(d.position)||!quat(d.quaternion)||d.localBounds!==undefined&&!bounds(d.localBounds)||!vec(d.velocity,100)||!vec(d.angularVelocity,30)||!tick(d.bornTick)||(d.miningHits!==undefined&&(d.kind!=='golem'||!Number.isInteger(d.miningHits)||d.miningHits<0||d.miningHits>1))||(d.heldBy!==null&&(!saved.players.some(p=>p.id===d.heldBy&&p.role==='hero')||held.has(d.heldBy)))||(d.throwerSide!==undefined&&!['party','rivals'].includes(d.throwerSide))||(d.throwerId!==undefined&&d.throwerId!==null&&typeof d.throwerId!=='string')||(d.hitIds!==undefined&&(!Array.isArray(d.hitIds)||d.hitIds.length>64||!d.hitIds.every(q=>typeof q==='string'&&q.length<=64))))throw Error('Invalid detached part');else if(d.heldBy)held.add(d.heldBy);
   for(const e of saved.embeds||[])if(!e||!unique(e.id)||!['arrow','bolt'].includes(e.kind)||(e.golden!==undefined&&(e.golden!==true||e.kind!=='bolt'))||!PARTS.includes(e.part)||!validContact(e)||(e.surface==='shield'&&(!['leftArm','rightArm'].includes(e.part)||(saved.enemies.find(q=>q.id===e.targetId)||saved.detachedParts?.find(q=>q.id===e.targetId))?.kind!=='skeleton'))||!(e.targetId==='world'||e.targetId==='terrain'||saved.enemies.some(q=>q.id===e.targetId)||saved.detachedParts?.some(q=>q.id===e.targetId)))throw Error('Invalid embed');
-  for(const e of saved.enemies)if(e.kind!==undefined&&!['skeleton','golem','ent','stumpling'].includes(e.kind)||e.armor!==undefined&&(!Number.isInteger(e.armor)||e.armor<0||e.armor>3)||e.parts!==undefined&&(!e.parts||!PARTS.every(p=>Number.isFinite(e.parts[p])&&e.parts[p]>=0&&e.parts[p]<=enemyPartMax(e,p)))||e.missingParts!==undefined&&(!Array.isArray(e.missingParts)||e.missingParts.length>6||new Set(e.missingParts).size!==e.missingParts.length||!e.missingParts.every(p=>PARTS.includes(p)&&e.parts?.[p]===0))||e.shield!==undefined&&(e.kind!=='skeleton'||!Number.isInteger(e.shield)||e.shield<1||e.shield>skeletonShield(e.id).hp||e.shieldBroken)||e.shieldBroken!==undefined&&(e.shieldBroken!==true||e.kind!=='skeleton')||e.flinchTick!==undefined&&(!Number.isSafeInteger(e.flinchTick)||e.flinchTick<0||e.flinchTick>saved.tick)||e.scorch!==undefined&&(!e.scorch||typeof e.scorch!=='object'||Object.keys(e.scorch).length!==PARTS.length||!PARTS.every(p=>Number.isFinite(e.scorch[p])&&e.scorch[p]>=0&&e.scorch[p]<=1)))throw Error('Invalid enemy anatomy');
+  for(const e of saved.enemies)if(e.kind!==undefined&&!['skeleton','golem','ent','stumpling'].includes(e.kind)||e.armor!==undefined&&(!Number.isInteger(e.armor)||e.armor<0||e.armor>(typeof e.boss==='string'?BOSS.armor:3))||e.parts!==undefined&&(!e.parts||!PARTS.every(p=>Number.isFinite(e.parts[p])&&e.parts[p]>=0&&e.parts[p]<=enemyPartMax(e,p)))||e.missingParts!==undefined&&(!Array.isArray(e.missingParts)||e.missingParts.length>6||new Set(e.missingParts).size!==e.missingParts.length||!e.missingParts.every(p=>PARTS.includes(p)&&e.parts?.[p]===0))||e.shield!==undefined&&(e.kind!=='skeleton'||!Number.isInteger(e.shield)||e.shield<1||e.shield>skeletonShield(e.id).hp||e.shieldBroken)||e.shieldBroken!==undefined&&(e.shieldBroken!==true||e.kind!=='skeleton')||e.flinchTick!==undefined&&(!Number.isSafeInteger(e.flinchTick)||e.flinchTick<0||e.flinchTick>saved.tick)||e.scorch!==undefined&&(!e.scorch||typeof e.scorch!=='object'||Object.keys(e.scorch).length!==PARTS.length||!PARTS.every(p=>Number.isFinite(e.scorch[p])&&e.scorch[p]>=0&&e.scorch[p]<=1)))throw Error('Invalid enemy anatomy');
 }
 
 // Only known fields survive a user-imported checkpoint. Validation above checks

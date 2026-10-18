@@ -12,6 +12,7 @@ import {baseTrees} from '../shared/world-content.js';
 import {createSimulation} from '../shared/simulation.js';
 import {baseHeight} from '../shared/terrain.js';
 import {townLifeLayout} from '../client/town-life.js';
+import {ARENA_UNDERWAYS} from '../shared/underways/sites.js';
 
 const LIST = process.argv.includes('--list');
 const items = [];
@@ -42,6 +43,7 @@ createSimulation({seed: 3}).adventureWorld().deposits.forEach(d => add('deposits
 const L = townLifeLayout();
 L.props.forEach((p, i) => add('town-life', `${p.kind}-${i}`, p.x, p.z, p.kind === 'bench' ? .7 : .45, {decor: true}));
 L.posts.forEach((p, i) => add('town-life', `post-${i}`, p.x, p.z, .25, {decor: true, cliff: true}));
+ARENA_UNDERWAYS.forEach(s => add('underways', `portal-${s.id}`, s.x, s.z, 3.2));
 L.folk.filter(f => !f.route).forEach((f, i) => add('town-life', `${f.role}-${i}`, f.x, f.z, .3, {decor: true, folk: true}));
 
 // Signed gap between two footprints (negative = overlap depth). Boxes are [yaw, halfU, halfV] about (x, z); landmark
