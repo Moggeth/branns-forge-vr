@@ -13,6 +13,7 @@ import {MILL, millAt} from '../shared/home-mill.js';
 import {STORES, WORKSHOP, backTownSpot} from '../shared/home-workshop.js';
 import {ORE_RECIPES} from '../shared/material-catalog.js';
 import {TAVERN, TAVERN_NAMES, taverns, tavernBar} from '../shared/taverns.js';
+import {ARMOURY_RULES, armouryStand, hasFlockwright} from '../shared/armoury.js';
 import {MOUNT, mountOf, mountNear} from '../shared/mounts.js';
 import {TREE_LIMITS, CUT_RANGE, treeScale, trunkRadius, isFelled, notchAt, rotateVector, logLength, logRadius} from '../shared/trees.js';
 
@@ -180,6 +181,9 @@ function homeCue(self, snapshot, keys, make) {
   const bar = taverns(snapshot).find(t => at(tavernBar(t), TAVERN.barReach));
   if (bar) return (self.heartyUntil ?? 0) > tick ? make('home', 'wait', bar.id, TAVERN_NAMES[bar.side], 'Still merry', '', wait(self.heartyUntil))
     : make('home', 'ready', bar.id, TAVERN_NAMES[bar.side], 'Hearty Ale', keys.collect, 'full health, then 20% tougher for 3 min');
+  // The Armoury's stand (shared/armoury.js): anyone can take a Flockwright down; it stays theirs on key 9.
+  if (at(armouryStand(), ARMOURY_RULES.reach)) return hasFlockwright(self) ? make('home', self.tool === 'flockwright' ? 'full' : 'ready', 'armoury', 'Armoury', self.tool === 'flockwright' ? 'In hand' : 'Flockwright', self.tool === 'flockwright' ? '' : keys.collect, 'the six-bird crossbow · key 9')
+    : make('home', 'ready', 'armoury', 'Armoury', 'Take a Flockwright', keys.collect, 'heavy bolts · the crew reloads it');
   if (!base || base.fallenUntil > tick) return null;
   if (at(counterAt(base.side), SHOP.reach)) return make('home', 'ready', 'quartermaster', 'Quartermaster', 'Shop', keys.collect, `${self.resources?.gold || 0} Gold · items for your hero`);
   const mill = base.mill, owed = mill?.queue?.find(q => q.id === self.id)?.gold || 0;

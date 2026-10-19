@@ -16,6 +16,7 @@ const RECOVERY = {
  "invalid_cast": "The spell target is not valid. Aim at ground inside the valley and try again.",
  "invalid_contact": "That strike did not reach a visible surface. Adjust your aim and strike again.",
  "outside_world": "The target is outside the playable valley. Aim inside the mountain boundary.",
+ "no_flockwright": "The Flockwright rests on its stand in the Armoury, just outside Dawnhold's gate. Walk up to the stand and press Use to take one.",
  "no_pack": "The Stormreel lives on its Stormspire. Walk up to the tower and take its pack.",
  "hands_full": "Your hands are occupied. Collect or put down the held item before picking up another.",
  "nothing_held": "You are not holding an item. Pick one up before trying to drop or throw it.",

@@ -6,6 +6,7 @@
 // focus only after it moves, cells rebuilt lazily after terrain/structure changes. One small texture (the daisy heads,
 // cut from Mitch's walk photo: assets/trees-canopy-20261004/photo_textures.py); no lights or shadow casters.
 import * as THREE from 'three';
+import {armouryPiece} from '../shared/home-bases.js';
 import {loadDeliveredTexture} from './texture-delivery.js';
 import {ORCHARD_LAYOUT, valueNoise, hash2, dryness, disturbanceAt} from './orchard-presentation.js';
 import {STARTING_SITES, STARTING_PATHS} from '../shared/starting-world.js';
@@ -41,6 +42,13 @@ function landmarkClearance(x, z) {
   return {path, inside};
 }
 
+// The Armoury's floor (shared/home-bases.js): no meadow through its flagstones.
+const ARMOURY_FLOOR = (() => { const a = armouryPiece(); return {x: a.x, z: a.z, c: Math.cos(a.yaw), s: Math.sin(a.yaw)}; })();
+function insideArmoury(x, z) {
+  const dx = x - ARMOURY_FLOOR.x, dz = z - ARMOURY_FLOOR.z, u = dx * ARMOURY_FLOOR.c - dz * ARMOURY_FLOOR.s, v = dx * ARMOURY_FLOOR.s + dz * ARMOURY_FLOOR.c;
+  return Math.abs(u) < 3.75 && Math.abs(v) < 3.05;
+}
+
 // Linear-space tints matched to the ground shader's tile average and its lush/dry grades.
 const LUSH = [.058, .148, .012], DRY = [.21, .158, .058];
 const FLOWERS = [
@@ -61,7 +69,7 @@ export function bakeCellStatic(ci, cj, cfg, landmarks) {
     if (Math.hypot(x, z) < 4.4) continue; // forge plaza stays bare
     const wear = meadowWear(x, z); if (wear > .6) continue; // bare foot-worn earth
     const lm = landmarks ? landmarkClearance(x, z) : {path: Infinity, inside: false};
-    if (lm.inside || lm.path < .15) continue;
+    if (lm.inside || lm.path < .15 || insideArmoury(x, z)) continue;
     const trodden = Math.max(smooth(.12, .5, wear), lm.path < 1 ? 1 - lm.path : 0);
     const clump = valueNoise(x * .21 + 13, z * .21 - 9), dense = .55 + .45 * clump;
     if (hash2(gi * 7 + 3, gj * 11 + 5) > dense * (1 - trodden * .92)) continue;

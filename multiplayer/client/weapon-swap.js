@@ -24,6 +24,10 @@ export const WEAPON_SWAP_STYLES = Object.freeze({
   crossbow: {lower: .26, raise: .32,
     stash: [K(0), K(.3, [.02, .02, 0], [0, 0, -.35]), K(1, [.25, -.46, .15], [-.4, .6, -1.5])],
     draw: [K(0, [.25, -.46, .15], [-.4, .6, -1.5]), K(.55, [-.02, .012, 0], [.05, -.1, .34]), K(.8, [0, 0, .01], [0, 0, -.06]), K(1)]},
+  // Flockwright: heavier, so it is slung lower and heaved up; the crew bobs on the settle.
+  flockwright: {lower: .28, raise: .36,
+    stash: [K(0), K(.3, [.02, .015, 0], [0, 0, -.3]), K(1, [.22, -.5, .15], [-.45, .55, -1.4])],
+    draw: [K(0, [.22, -.5, .15], [-.45, .55, -1.4]), K(.55, [-.015, .02, 0], [.08, -.08, .28]), K(.78, [0, -.012, .012], [-.05, 0, -.05]), K(1)]},
   // Emberwing: turned flat and slid onto the back. Its own sweep up from below is the draw (emberwing-motion.js).
   bow: {lower: .22, raise: 0,
     stash: [K(0), K(.3, [.01, .02, 0], [0, 0, .25]), K(1, [-.22, -.42, .2], [-.3, 0, 1.4])],

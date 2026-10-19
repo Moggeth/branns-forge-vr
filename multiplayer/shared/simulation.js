@@ -3,6 +3,7 @@ import {battleAction,createBattle,createHomeBattle,stepBattle,restoreBattle,batt
 import {homeBallistaAction,isHomeBallistaId} from './home-ballista.js';
 import {homeAction,isHomeAction} from './home-interact.js';
 import {isShopAction,shopAction,validTownFields,restoreTownFields} from './home-shop.js';
+import {isArmouryAction,armouryAction,hasFlockwright} from './armoury.js';
 import {isMillAction,millAction,stepMills} from './home-mill.js';
 import {aleArmor,resolveTaverns,stepTaverns,tavernAle,tavernSafe} from './taverns.js';
 import {itemBonus} from './hero-items.js';
@@ -288,6 +289,7 @@ function instantiate(state) {
         if(isShopAction(message.action))return shopAction(state,p,message);
         if(isMillAction(message.action))return millAction(state,p,message);
         if(message.action==='tavernAle')return tavernAle(state,p);
+        if(isArmouryAction(message.action))return armouryAction(state,p);
         if(typeof message.action==='string'&&message.action.startsWith('invention')&&isHomeBallistaId(message.structureId))return homeBallistaAction(state,p,message,{terrainHeight,damageHero,damageEnemy});
         if(typeof message.action==='string'&&message.action.startsWith('invention'))return inventionAction(state,p,message,inventionContext);
         if(typeof message.action==='string'&&message.action.startsWith('forge')&&p.side==='rivals')return fail('not_your_structure');
@@ -303,6 +305,8 @@ function instantiate(state) {
           if (!TOOLS.includes(message.tool) || (message.tool==='limb'&&!state.detachedParts.some(d=>d.heldBy===p.id))) return fail('invalid_action');
           // The Stormreel only comes off a Stormspire's hook; choosing another weapon plants it in the ground where you stand.
           if (message.tool==='stormreel') return wornTower(state,p)?ok():fail('no_pack');
+          // The Flockwright is taken down from the Armoury's stand first (shared/armoury.js).
+          if (message.tool==='flockwright'&&!hasFlockwright(p)) return fail('no_flockwright');
           if (p.tool==='stormreel') { const events=plantPack(state,p,[],(x,z)=>terrainHeight(state,x,z,false)); p.tool=message.tool; releaseHeld(state,p,[0,0,0]); return ok(events); }
           if(message.tool!=='limb')releaseHeld(state,p,[0,0,0]);
           if(message.tool!==p.tool)releaseSnack(state,p);
@@ -554,8 +558,8 @@ function instantiate(state) {
     projectileContact(message){const result=projectileContact(state,message,combatContext);recordSettlementDeaths(state,result.events);return result;},
     snapshot() {
       return copy({tick: state.tick, time: state.tick / HZ, seed: state.seed, room: state.room,
-        players: state.players.map(({id, name, role, side, roleTick, position,velocity, yaw, hp, mana, tool, resources, heldOre,rally,heat,overheatUntil,flaskLit, stats, castTick,attackTick,flameTick,specialTick,protectedUntil,siegebird,charge,swiftUntil,head, hands, xp, talents,items,draughts,draughtTick,drinkTick,heartyUntil,streak,dragonReady,dragon,runBoons}) =>
-          ({id, name, role, side, roleTick, position,velocity:velocity||[0,0,0], yaw, hp, maxHp:heroMaxHp({xp,items,runBoons}), xp:xp||0,...(runBoons?.length?{runBoons:[...runBoons]}:{}), talents:talents||{}, items:items||[], draughts:draughts||0,...(draughtTick!==undefined?{draughtTick}:{}),...(drinkTick!==undefined?{drinkTick}:{}),...(heartyUntil!==undefined?{heartyUntil}:{}), mana, tool, resources, stats,...(heldOre?{heldOre}:{}),...(rally?{rally}:{}),castTick,attackTick,flameTick:flameTick??-1000, heat:heat||0,overheatUntil:overheatUntil||0,flaskLit:!!flaskLit,...(specialTick!==undefined?{specialTick}:{}),...(protectedUntil!==undefined?{protectedUntil}:{}),...(siegebird?{siegebird:{...siegebird}}:{}),...(charge?{charge:{...charge}}:{}),...(swiftUntil!==undefined?{swiftUntil}:{}),...(streak?{streak}:{}),...(dragonReady?{dragonReady}:{}),...(dragon?{dragon}:{}), ...(head ? {head} : {}), ...(hands ? {hands} : {})})),
+        players: state.players.map(({id, name, role, side, roleTick, position,velocity, yaw, hp, mana, tool, resources, heldOre,rally,heat,overheatUntil,flaskLit, stats, castTick,attackTick,flameTick,specialTick,protectedUntil,siegebird,charge,swiftUntil,head, hands, xp, talents,items,draughts,draughtTick,drinkTick,heartyUntil,flockwright,streak,dragonReady,dragon,runBoons}) =>
+          ({id, name, role, side, roleTick, position,velocity:velocity||[0,0,0], yaw, hp, maxHp:heroMaxHp({xp,items,runBoons}), xp:xp||0,...(runBoons?.length?{runBoons:[...runBoons]}:{}), talents:talents||{}, items:items||[], draughts:draughts||0,...(draughtTick!==undefined?{draughtTick}:{}),...(drinkTick!==undefined?{drinkTick}:{}),...(heartyUntil!==undefined?{heartyUntil}:{}),...(flockwright?{flockwright:true}:{}), mana, tool, resources, stats,...(heldOre?{heldOre}:{}),...(rally?{rally}:{}),castTick,attackTick,flameTick:flameTick??-1000, heat:heat||0,overheatUntil:overheatUntil||0,flaskLit:!!flaskLit,...(specialTick!==undefined?{specialTick}:{}),...(protectedUntil!==undefined?{protectedUntil}:{}),...(siegebird?{siegebird:{...siegebird}}:{}),...(charge?{charge:{...charge}}:{}),...(swiftUntil!==undefined?{swiftUntil}:{}),...(streak?{streak}:{}),...(dragonReady?{dragonReady}:{}),...(dragon?{dragon}:{}), ...(head ? {head} : {}), ...(hands ? {hands} : {})})),
         enemies: state.enemies, projectiles: state.projectiles, embeds: state.embeds, detachedParts: state.detachedParts,
         edits: state.edits, ...(state.terrainBake?{terrainBake:state.terrainBake}:{}), groves: state.groves, pendingStarfalls: state.pendingStarfalls, bloom: state.bloom, springs: state.springs, ...(state.waygate ? {waygate: state.waygate} : {}), ...(state.geodes ? {geodes: state.geodes} : {}), ...(state.beacon ? {beacon: state.beacon} : {}), ...(state.weather?{weather:state.weather}:{}),...(state.underways?.runs.length||Object.keys(state.underways?.delves||{}).length?{underways:state.underways}:{}),
         harvestedTrees: state.harvestedTrees, ...(state.treeRoots?.length?{treeRoots:state.treeRoots}:{}), deposits: state.deposits, pickups: state.pickups, bridges: state.bridges,

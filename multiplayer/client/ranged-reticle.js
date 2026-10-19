@@ -1,7 +1,7 @@
 // Screen-space DOM reticle for flat first-person and touch. Zero WebGL draws.
 // Hidden whenever role !== 'hero', a menu is open, or renderer.xr.isPresenting
 // (VR keeps the physical weapon/guide only, so no doubled fixed-screen reticle).
-export const RETICLE_TOOLS = Object.freeze({crossbow: 'siegebird', bow: 'emberwing', wyrmspout: 'wyrmspout', flask: 'emberdew', stormreel: 'stormreel'});
+export const RETICLE_TOOLS = Object.freeze({crossbow: 'siegebird', flockwright: 'siegebird', bow: 'emberwing', wyrmspout: 'wyrmspout', flask: 'emberdew', stormreel: 'stormreel'});
 
 const SVG = {
   siegebird: '<path class="rr-s" d="M-11-7v-4h4M7-11h4v4M11 7v4H7M-7 11h-4V7"/><circle class="rr-f" r="1.3"/>',

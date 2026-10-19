@@ -19,7 +19,7 @@ export const HERO_LOD_DISTANCE = 16;
 // Remote equipment. Same canonical asset-pose contract as the local XR weapon (setWeaponGrip(visual, true, tool)),
 // re-expressed in the authored WeaponGrip socket frame. Bow is a left-hand weapon locally, so it is here too.
 // 'limb' (held bone) is presented by combat-view's detached part, so the grip stays empty.
-export const HERO_WEAPONS = Object.freeze({tools: ['axe', 'pick', 'hammer', 'crossbow', 'bow', 'wyrmspout', 'flask', 'stormreel', 'staff'], leftHand: ['bow'], none: ['limb'], melee: ['axe', 'pick', 'hammer', 'limb']});
+export const HERO_WEAPONS = Object.freeze({tools: ['axe', 'pick', 'hammer', 'crossbow', 'bow', 'wyrmspout', 'flask', 'stormreel', 'staff', 'flockwright'], leftHand: ['bow'], none: ['limb'], melee: ['axe', 'pick', 'hammer', 'limb']});
 // Bounded VR body: the neck carries part of the head turn; the torso lags but never more than torsoLag behind.
 export const HERO_HEADLOOK = Object.freeze({yaw: 1.2, pitchUp: .6, pitchDown: .8, roll: .35, neckShare: .4, torsoLag: .75, torsoRate: 4, movingTorsoRate: 10});
 export const HERO_CROUCH = Object.freeze({deadband: .04, maxDrop: .45, lean: .28, rate: 10});
@@ -78,7 +78,7 @@ export function seatPose(bones, pose = SEAT_POSE) {
   }
 }
 
-export function createHeroView({lodDistance = HERO_LOD_DISTANCE, resolveWeapon = null, onWarning = null, siegebird = null} = {}) {
+export function createHeroView({lodDistance = HERO_LOD_DISTANCE, resolveWeapon = null, onWarning = null, siegebird = null, flockwright = null} = {}) {
   let template = null, clips = null, eyeHeight = 1.645;
   const materials = new Map(), live = new Set(), warned = new Set();
 
@@ -164,6 +164,7 @@ export function createHeroView({lodDistance = HERO_LOD_DISTANCE, resolveWeapon =
     socket.add(visual); u.weapon = visual;
   }
   function disposeOwned(visual) {    // only per-visual allocations; template geometry/materials are shared
+    flockwright?.()?.forget(visual);
     const line = visual.userData.bowstring;
     if (line) { line.geometry.dispose(); line.material.dispose(); line.removeFromParent(); visual.userData.bowstring = null; }
     visual.removeFromParent();
@@ -174,8 +175,9 @@ export function createHeroView({lodDistance = HERO_LOD_DISTANCE, resolveWeapon =
     const u = group?.userData; if (!u?.hero || !ev) return null;
     if (ev.kind === 'embed') { u.embedAt = u.clock; return null; }
     if (ev.kind === 'gout_launch') { u.goutAt = u.clock; return 'recoil'; }        // same-frame hits are a projectile contact relayed by the host
-    if (ev.kind === 'shoot' && ['bow', 'crossbow'].includes(ev.weapon)) {
+    if (ev.kind === 'shoot' && ['bow', 'crossbow', 'flockwright'].includes(ev.weapon)) {
       u.recoil = 1;
+      if (ev.weapon === 'flockwright' && u.weapon && u.weaponTool === 'flockwright') flockwright?.()?.fired(u.weapon);
       if (ev.weapon === 'crossbow') {
         u.reloadAt = u.clock; u.reloadRate = ev.reload?.quick ? 1 / SIEGEBIRD_RELOAD.quick : 1; const flock = siegebird?.();
         if (flock && u.weapon && u.weaponTool === 'crossbow') { flock.fired(u.weapon, !!ev.golden);

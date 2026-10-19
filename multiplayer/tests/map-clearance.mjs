@@ -4,7 +4,7 @@
 // overlap, and nothing may stand on a cliff (more than `slope` of rise across its footprint).
 // `node tests/map-clearance.mjs --list` prints every overlap and steep placement instead of failing on the first.
 import assert from 'node:assert/strict';
-import {HOME_LAYOUT, HOME_SCALE, TOWN_SOLIDS, homePiece, homePoint, neutralTavern, pieceWorld} from '../shared/home-bases.js';
+import {HOME_LAYOUT, HOME_SCALE, TOWN_SOLIDS, armouryPiece, homePiece, homePoint, neutralTavern, pieceWorld} from '../shared/home-bases.js';
 import {BACK_TOWN, BACK_TOWN_LANTERNS, MAIN_ROAD, backTownPiece, backTownPoint, inKeepApproach, mainRoadDistance} from '../shared/keep-sites.js';
 import {BACK_TOWN_SOLIDS} from '../shared/home-workshop.js';
 import {STARTING_SITES} from '../shared/starting-world.js';
@@ -37,6 +37,8 @@ for (const side of ['party', 'rivals']) {
   BACK_TOWN_LANTERNS.forEach((at, i) => add(k, `back-lantern-${i}`, ...backTownPoint(side, at), .2));
 }
 solids('mug', 'tavern', neutralTavern(), TOWN_SOLIDS.neutralTavern);
+solids('armoury', 'armoury', armouryPiece(), TOWN_SOLIDS.armoury);
+{ const a = armouryPiece(); add('armoury', 'ground', a.x, a.z, 4.4, {cliff: true, decor: true}); } // the whole hall must stand on level ground
 for (const s of STARTING_SITES) s.footprints.forEach((f, i) => add(`site-${s.id}`, `${f.kind}-${i}`, f.x, f.z, Math.hypot(f.w, f.d) / 2, {box: [f.rotY, f.w / 2, f.d / 2], sign: 1}));
 baseTrees.forEach(([x, z], i) => add('trees', `tree-${i}`, x, z, .8));
 createSimulation({seed: 3}).adventureWorld().deposits.forEach(d => add('deposits', `${d.kind}-${d.id}`, d.x, d.z, 1.3, {cliff: true}));
