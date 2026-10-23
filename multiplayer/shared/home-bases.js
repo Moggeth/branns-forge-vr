@@ -3,6 +3,7 @@ import {restoreMill} from './home-mill.js';
 import {HOME_SITES} from './keep-sites.js';
 import {movedPlaced, movedTable} from './map-layout.js';
 import {posLimit} from './world-extent.js';
+import {resolveSquare, squareSolids} from './town-square.js';
 // Always-on home bases (battle v2): Dawnhold (party) in the south-west corner and
 // Grumblekeep (rivals) in the north-east. Each sits under a shield dome held up by
 // three pylons, with a heart forge, barracks, fountain, two crystal spires and two
@@ -331,6 +332,7 @@ export function resolveHomeStructures(state, position, radius = .3) {
   if (Math.abs(position[0] - n[0]) < 9 * TAVERN_SCALE && Math.abs(position[2] - n[1]) < 9 * TAVERN_SCALE) pushOut(position, neutralTavern(), TOWN_SOLIDS.neutralTavern, radius);
   const a = ARMOURY.at;
   if (Math.abs(position[0] - a[0]) < 7 + radius && Math.abs(position[2] - a[1]) < 7 + radius) pushOut(position, armouryPiece(), TOWN_SOLIDS.armoury, radius);
+  resolveSquare(state, position, radius); // the town square's stalls, stage and light poles (shared/town-square.js)
   return position;
 }
 
@@ -350,6 +352,7 @@ export function homeSolids(side) {
       else out.push({id, x: placed.x, z: placed.z, yaw: placed.yaw, at: sol.at, half: sol.half});
     }
   }
+  out.push(...squareSolids(side));
   return out;
 }
 

@@ -7,6 +7,7 @@
 // cut from Mitch's walk photo: assets/trees-canopy-20261004/photo_textures.py); no lights or shadow casters.
 import * as THREE from 'three';
 import {armouryPiece} from '../shared/home-bases.js';
+import {squareAt} from '../shared/town-square.js';
 import {loadDeliveredTexture} from './texture-delivery.js';
 import {ORCHARD_LAYOUT, valueNoise, hash2, dryness, disturbanceAt} from './orchard-presentation.js';
 import {STARTING_SITES, STARTING_PATHS} from '../shared/starting-world.js';
@@ -69,7 +70,7 @@ export function bakeCellStatic(ci, cj, cfg, landmarks) {
     if (Math.hypot(x, z) < 4.4) continue; // forge plaza stays bare
     const wear = meadowWear(x, z); if (wear > .6) continue; // bare foot-worn earth
     const lm = landmarks ? landmarkClearance(x, z) : {path: Infinity, inside: false};
-    if (lm.inside || lm.path < .15 || insideArmoury(x, z)) continue;
+    if (lm.inside || lm.path < .15 || insideArmoury(x, z) || squareAt(x, z)) continue; // no meadow through the town squares' cobbles
     const trodden = Math.max(smooth(.12, .5, wear), lm.path < 1 ? 1 - lm.path : 0);
     const clump = valueNoise(x * .21 + 13, z * .21 - 9), dense = .55 + .45 * clump;
     if (hash2(gi * 7 + 3, gj * 11 + 5) > dense * (1 - trodden * .92)) continue;

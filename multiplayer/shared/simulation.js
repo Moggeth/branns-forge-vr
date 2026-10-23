@@ -4,6 +4,7 @@ import {homeBallistaAction,isHomeBallistaId} from './home-ballista.js';
 import {homeAction,isHomeAction} from './home-interact.js';
 import {isShopAction,shopAction,validTownFields,restoreTownFields} from './home-shop.js';
 import {isArmouryAction,armouryAction,hasFlockwright} from './armoury.js';
+import {isSquareAction,squareAction} from './town-square.js';
 import {isMillAction,millAction,stepMills} from './home-mill.js';
 import {aleArmor,resolveTaverns,stepTaverns,tavernAle,tavernSafe} from './taverns.js';
 import {itemBonus} from './hero-items.js';
@@ -98,7 +99,7 @@ function pose(value) {
 
 
 function spawn(state, ignored = '') {
-  const team=state.players.find(p=>p.id===ignored)?.side||'party',base=battleActive(state)?state.battle.bases.find(b=>b.side===team):null,sign=team==='party'?1:-1,origin=homeBattle(state)?homePoint(team,[0,7]):base?[base.position[0]+sign*4,base.position[2]]:state.world?.kind==='underways'?wildsOrigin(state):[0,8];
+  const team=state.players.find(p=>p.id===ignored)?.side||'party',base=battleActive(state)?state.battle.bases.find(b=>b.side===team):null,sign=team==='party'?1:-1,origin=homeBattle(state)?homePoint(team,[0,9.2]):base?[base.position[0]+sign*4,base.position[2]]:state.world?.kind==='underways'?wildsOrigin(state):[0,8];
   let best = [origin[0], 0, origin[1]], clearance = -1;
   const trees=createTreeIndex();trees.update(state);const cuts=treeCutMap(state),forgeY=terrainHeight(state,0,0,false);
   for (let i = 0; i < 128; i++) {
@@ -290,6 +291,7 @@ function instantiate(state) {
         if(isMillAction(message.action))return millAction(state,p,message);
         if(message.action==='tavernAle')return tavernAle(state,p);
         if(isArmouryAction(message.action))return armouryAction(state,p);
+        if(isSquareAction(message.action))return squareAction(state,p,message);
         if(typeof message.action==='string'&&message.action.startsWith('invention')&&isHomeBallistaId(message.structureId))return homeBallistaAction(state,p,message,{terrainHeight,damageHero,damageEnemy});
         if(typeof message.action==='string'&&message.action.startsWith('invention'))return inventionAction(state,p,message,inventionContext);
         if(typeof message.action==='string'&&message.action.startsWith('forge')&&p.side==='rivals')return fail('not_your_structure');

@@ -134,7 +134,7 @@ assert.ok(s.checkpoint().enemies[0].hp>=80,'bolt only');
   for(let i=1;i<pts.length;i++)for(let j=1;j<40;j++)if(inside(pts[i-1][0]+(pts[i][0]-pts[i-1][0])*j/40,pts[i-1][1]+(pts[i][1]-pts[i-1][1])*j/40))return false;return true;};
  const walkTo=([lx,ly])=>{const [tx,tz]=homePoint('party',[lx,ly]);for(let i=0;i<3000;i++){const dx=tx-me.position[0],dz=tz-me.position[2],d=Math.hypot(dx,dz);if(d<.15)break;
   const pos=[me.position[0]+dx/d*Math.min(.1,d),0,me.position[2]+dz/d*Math.min(.1,d)];resolveHomeStructures(st,pos);leash(st,me,pos);me.position=pos;}};
- const route=[[8,15],[12,20],[16,14],[14,6],[10,2],[2,8],[-4,12]];
+ const route=[[8,15],[12,20],[16,14],[14,6],[10,2],[2,8],[2,13],[8,13]]; // past the town square's bard stage and welcome board, then round the tower
  for(const at of route){walkTo(at);assert.ok(clear(),`the cable runs clear of the keep at ${at} (${cableWraps(b,'red').map(w=>w.id)})`);}
  assert.ok(cableWraps(b,'red').some(w=>w.id.startsWith('home-party-'))&&cableWraps(b,'red').some(w=>w.id.startsWith('peg-home-stormspire-party')),'it bends round keep pieces and its own tower');
  for(const at of [...route].reverse())walkTo(at);walkTo([6.9,12.7]);assert.equal(cableWraps(b,'red').length,0,'walking back the way you came unwinds it');}
