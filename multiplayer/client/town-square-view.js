@@ -105,23 +105,19 @@ export function createTownSquareView({scene}) {
   let bulbs = null, halos = null, haloMat = null;
   const glowTex = glowTexture(); disposables.push(glowTex);
 
-  function standInStall(name) { // a plain shape until the kit loads, sized like the footprint
-    const g = new THREE.Group(), m = new THREE.MeshStandardMaterial({color: 0x9a7a55, roughness: .85, flatShading: true});
-    const dims = {trainer: [5, .1, 3.4], bakery: [3.2, 1, 1.6], stage: [3.2, .4, 3.2], board: [2, 2.5, .2]}[name];
-    const b = new THREE.Mesh(new THREE.BoxGeometry(...dims), m); b.position.y = dims[1] / 2; g.add(b); disposables.push(b.geometry, m); return g;
-  }
+  // Stalls, dummies, poles and their lights appear only with the authored kit (no stand-in shapes); without it the square
+  // is just cobbles round the heart.
   function makeStall(side, name) {
-    const pre = SIDES[side], node = kit?.getObjectByName(`${pre}_${name[0].toUpperCase()}${name.slice(1)}`);
-    const body = node ? node.clone(true) : standInStall(name);
+    const pre = SIDES[side], node = kit.getObjectByName(`${pre}_${name[0].toUpperCase()}${name.slice(1)}`);
+    const body = node.clone(true);
     body.position.set(0, 0, 0); body.rotation.set(0, 0, 0);
     const g = new THREE.Group(); g.name = `square-${side}-${name}`; g.add(body);
     const p = squarePiece(side, name); g.position.set(p.x, ground(p.x, p.z), p.z); g.rotation.y = p.yaw;
     if (name === 'trainer') {
-      const dummyNode = kit?.getObjectByName(`${pre}_Dummy`);
+      const dummyNode = kit.getObjectByName(`${pre}_Dummy`);
       DUMMY_AT.forEach((at, k) => {
-        const anchor = node?.getObjectByName(`${pre}_Trainer_Dummy${k}`);
-        const d = dummyNode ? dummyNode.clone(true) : new THREE.Mesh(new THREE.CylinderGeometry(.22, .22, 1.7, 8), new THREE.MeshStandardMaterial({color: 0xd8bb78}));
-        if (!dummyNode) d.position.y = .85;
+        const anchor = node.getObjectByName(`${pre}_Trainer_Dummy${k}`);
+        const d = dummyNode.clone(true);
         const pivot = new THREE.Group(); pivot.position.set(anchor ? anchor.position.x : at[0], 0, anchor ? anchor.position.z : at[1]); pivot.add(d); g.add(pivot);
         dummies.push({pivot, side, k, tilt: 0, vel: 0, axis: new THREE.Vector3(1, 0, 0), twist: 0, twistVel: 0});
       });
@@ -129,15 +125,14 @@ export function createTownSquareView({scene}) {
     return g;
   }
   function makePole(side) {
-    const node = kit?.getObjectByName(`${SIDES[side]}_LightPole`);
-    if (node) { const c = node.clone(true); c.position.set(0, 0, 0); c.rotation.set(0, 0, 0); return c; }
-    const m = new THREE.Mesh(new THREE.CylinderGeometry(.07, .07, POLE_TOP, 6), new THREE.MeshStandardMaterial({color: 0x7a5a3a}));
-    m.position.y = POLE_TOP / 2; disposables.push(m.geometry, m.material); const g = new THREE.Group(); g.add(m); return g;
+    const c = kit.getObjectByName(`${SIDES[side]}_LightPole`).clone(true); c.position.set(0, 0, 0); c.rotation.set(0, 0, 0); return c;
   }
 
   function build() {
     for (const g of Object.values(stalls)) { for (const c of [...g.children]) c.removeFromParent(); }
     dummies.length = 0;
+    for (const o of [cord, bulbs, halos]) if (o) o.visible = !!kit;
+    if (!kit) return;
     for (const side of Object.keys(SIDES)) {
       for (const name of SQUARE_PIECES) stalls[side].add(makeStall(side, name));
       for (const [x, z] of squarePoles(side)) { const p = makePole(side); p.position.set(x, ground(x, z), z); p.rotation.y = Math.atan2(x, z); stalls[side].add(p); }
@@ -185,11 +180,12 @@ export function createTownSquareView({scene}) {
     }
     halos = new THREE.Points(hg, haloMat); halos.name = 'square-halos'; halos.renderOrder = 22; halos.frustumCulled = false; halos.raycast = () => {}; root.add(halos);
   }
-  function place() { build(); buildGround(); buildLights(); placed = true; }
+  function place() { buildGround(); buildLights(); build(); placed = true; }
 
   /** The Blender kit: *_Trainer, *_Dummy, *_Bakery, *_Stage, *_Board, *_LightPole. */
   function installKit(gltf) {
-    const scene0 = gltf.scene; if (!scene0.getObjectByName('D_Trainer') || !scene0.getObjectByName('G_Stage')) return false;
+    const scene0 = gltf.scene, need = ['Trainer', 'Dummy', 'Bakery', 'Stage', 'Board', 'LightPole'].flatMap(n => [`D_${n}`, `G_${n}`]);
+    if (need.some(n => !scene0.getObjectByName(n))) return false;
     const seen = new Set();
     scene0.traverse(o => {
       if (!o.isMesh || seen.has(o.material)) return; seen.add(o.material);
@@ -225,7 +221,7 @@ export function createTownSquareView({scene}) {
     return hit;
   }
   let tune = null; // {side, until, song}
-  function event(ev) { if (ev.kind === 'square_tune' && enabled) tune = {side: ev.side, at: clock, until: clock + 12, song: ev.song | 0}; }
+  function event(ev) { if (ev.kind === 'square_tune' && enabled) tune = {side: ev.side, at: clock, until: clock + (+ev.length || 12), song: ev.song | 0}; }
   const tuning = side => tune && tune.side === side && clock < tune.until ? Math.min(1, (clock - tune.at) / .4, (tune.until - clock) / .6) : 0;
 
   const _q = new THREE.Quaternion();

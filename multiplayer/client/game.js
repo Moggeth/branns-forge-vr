@@ -140,7 +140,7 @@ import {createFlockwrightRigs, FLOCKWRIGHT_POSE} from './flockwright.js';
 import {FLOCKWRIGHT} from '../shared/combat.js';
 import {armouryStand, hasFlockwright, ARMOURY_RULES} from '../shared/armoury.js';
 import {SQUARE, squareSpot, squareSpawnYaw} from '../shared/town-square.js';
-import {createBardTune} from './bard-tune.js';
+import {createBardTune,BARD_SONGS,songLength} from './bard-tune.js';
 import {createSiegebirdWind, SIEGEBIRD_WIND} from './siegebird-wind.js';
 import {specialCooldown} from '../shared/special-cooldowns.js';
 import {createTalentFx,playTalentSound} from './talent-fx.js';
@@ -355,7 +355,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   yield;
   const startingWorld=createStartingWorld({THREE,scene,height:(x,z)=>heightAt(x,z,snapshot.edits)});startingWorld.group.visible=false;let startingEdits='';
   const homeSound=createLandmarkAudio({audio:()=>audioContext,listener:()=>listenerPose()});
-  const bardTune=createBardTune({audio:()=>audioContext,listener:()=>listenerPose()}); // the town square bard (client/bard-tune.js)
+  let bardUntil=0;const bardTune=createBardTune({audio:()=>audioContext,listener:()=>listenerPose()}); // the town square bard (client/bard-tune.js)
   const waygateView=createWaygateView({scene,startingWorld,height:(x,z)=>heightAt(x,z,snapshot.edits),audio:()=>audioContext,listener:()=>listenerPose(),report:message=>{if(!disposed)onNotice(message);}});
   const geodeView=createGeodeView({startingWorld,audio:()=>audioContext,listener:()=>listenerPose()});
   const beaconView=createBeaconView({scene,startingWorld,height:(x,z)=>heightAt(x,z,snapshot.edits),night:()=>skyCycle.night(),audio:()=>audioContext,listener:()=>listenerPose(),report:message=>{if(!disposed)onNotice(message);}});
@@ -1212,7 +1212,11 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     if(event.kind==='waygate_travel'&&event.id===playerId&&!manned){localPosition.fromArray(event.position);correction.set(0,0,0);verticalSpeed=0;grounded=true;yaw=event.yaw;pitch=0;heldSway.snap();}
     waygateView.handleEvent(event,playerId);geodeView.handleEvent(event);beaconView.handleEvent(event,playerId);dragonRide.event(event,playerId);
     feedback.handleEvent(event);
+    if(event.kind==='snack_take'&&event.bakery&&event.by===playerId)report('Fresh from the cart: a crisp red apple. Three bites, three helpings of health.');
     if(appleSnack.event(event,playerId))return;
+    // One tune at a time: a request while the bard is mid-song is let go on every client alike (same event stream).
+    if(event.kind==='square_tune'){const now=performance.now()/1000;if(now<bardUntil){if(event.by===playerId)report('The bard is mid-song. Catch the next one!');return;}
+      event={...event,length:songLength(BARD_SONGS[event.song%BARD_SONGS.length])};bardUntil=now+event.length;}
     combat.handleEvent(event.hero&&event.id===playerId?{...event,damage:0}:event); // no number floating in your own face
     wyrmStream.handleEvent(event,{localId:playerId,resolveTarget:(id,part)=>{const a=actors.get(`e:${id}`);return a?.visual?partAnchor(a.visual,part):null;}});wyrmFeel.event(event,playerId,listenerPose());
     golemFx.handleEvent(event);
@@ -1229,7 +1233,6 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     if(event.kind==='shop_buy'){homeSound.chord(event.position,[12,16,19,24],.07,55,1.2);}
     if(event.kind==='shop_sell')homeSound.chord(event.position,[19,16],.05,60,.8);
     if(event.kind==='square_tune'){bardTune.play(event.position,event.song);if(event.by===playerId)report(['The bard grins and strikes up "The Sunny Anvil".','The bard winks: "Goblin in the Butter" it is.','"Brann Lost His Hammer": the whole square knows the words.','The bard plays "Apples for the Golem". Somebody claps along.'][event.song%4]);}
-    if(event.kind==='snack_take'&&event.bakery&&event.by===playerId)report('Fresh from the cart: a crisp red apple. Three bites, three helpings of health.');
     if(event.kind==='armoury_take'){homeSound.chord(event.position,[0,7,12,16],.05,70,1.2);if(event.id===playerId){flockTaken=true;if(tool!=='flockwright')equip('flockwright');report(event.first?'You lift a Flockwright off the stand. Six goggled birds hop aboard. It lives on key 9 now.':'The crew is already with you: Flockwright in hand.');}}
     if(event.kind==='tavern_ale'){homeSound.chord(event.position,[0,4,7,12],.06,80,1.4);if(event.id===playerId)report('A Hearty Ale! Fully mended, and blows land 20% softer for three minutes.');}
     if(event.kind==='draught_drunk'){homeSound.chord(event.position,[7,11,14],.06,50,1);if(event.id===playerId)report(`Glug. Healing Draught down; ${event.draughts} left. Refill at your keep's well.`);}

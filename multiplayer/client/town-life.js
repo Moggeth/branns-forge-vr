@@ -373,7 +373,7 @@ export function createTownLife({scene}) {
     glassMat.emissiveIntensity = (1.1 + night * 1.6) * flick;
   }
 
-  function event(ev) { if (ev?.kind === 'square_tune' && (ev.side === 'party' || ev.side === 'rivals')) tunes[ev.side] = performance.now() / 1000 + 12; }
+  function event(ev) { if (ev?.kind === 'square_tune' && (ev.side === 'party' || ev.side === 'rivals')) tunes[ev.side] = performance.now() / 1000 + (+ev.length || 12); }
   return {sync, update, setNight, event, object: root,
     stats: () => ({enabled, placed, folk: folk.length, variants: batches.length, props: L.props.length, posts: L.posts.length, glows: L.glows.length, night: +night.toFixed(2), draws: root.children.length}),
     dispose() { root.removeFromParent(); for (const d of disposables) d.dispose?.(); }};

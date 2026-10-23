@@ -36,7 +36,8 @@ export function createBardTune({audio = () => null, listener = () => null} = {})
     g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(accent ? .5 : .3, t + .005); g.gain.exponentialRampToValueAtTime(.0001, t + .22);
     o.connect(g).connect(bus); o.start(t); o.stop(t + .25); o.onended = () => { o.disconnect(); g.disconnect(); };
   }
-  /** Plays song `index` from `position`; a new request while one plays is ignored. Returns the length in seconds. */
+  /** Plays song `index` from `position`. The caller (client/game.js) lets one tune finish before the next; a request
+   *  that still overlaps one playing here is ignored. Returns the length in seconds. */
   function play(position, index = 0) {
     const ctx = ready(), song = BARD_SONGS[((index | 0) % BARD_SONGS.length + BARD_SONGS.length) % BARD_SONGS.length], length = songLength(song);
     if (!ctx || (playing && ctx.currentTime < playing)) return length;
