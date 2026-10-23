@@ -66,13 +66,7 @@ export function buildKitBase(kit, data, ctx) {
   const worldAt = local => { const [x, z] = homePoint(side, local); return new THREE.Vector3(x, ctx.height(x, z), z); };
   const tag = (obj, id) => obj.traverse(n => { if (n.isMesh) n.userData.targetId = id; });
 
-  // Plaza: a big disc of the side's stone, tiled.
-  const stone = kit.mats.get(side === 'rivals' ? 'Basalt' : 'Stone');
-  const disc = new THREE.CylinderGeometry(9.5, 9.7, .14, side === 'rivals' ? 6 : 8, 1);
-  const uv = disc.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 7, uv.getY(i) * 7);
-  // RGBA like the kit's own colours: a 3-wide colour would drop out of the merged Stone mesh and turn it black.
-  disc.setAttribute('color', new THREE.BufferAttribute(new Float32Array(disc.attributes.position.count * 4).map((_, i) => i % 4 === 3 ? 1 : .82), 4));
-  const plaza = new THREE.Mesh(disc, stone); place(plaza, [0, 0], Math.PI / 8, staticRoot, 1); plaza.position.y += .03; // the ring plaza stays inside the buildings
+  // The ring's floor is the town square's cobbles now (client/town-square-view.js), so no stone plaza disc here.
 
   // Heart forge: static plinth and forge; the crystal and its two rings hover over it.
   const heartMain = place(clone('Heart'), [0, 0], 0, staticRoot); tag(heartMain, data.id);
@@ -126,7 +120,7 @@ export function buildKitBase(kit, data, ctx) {
   const baked = new THREE.Group(); baked.name = `home-${side}-static`;
   const merged = mergeMeshes(statics, baked);
   for (const m of merged) m.userData.targetId = undefined;
-  group.remove(staticRoot); group.add(baked); disc.dispose();
+  group.remove(staticRoot); group.add(baked);
   // The heart's plinth stays hittable through a hidden proxy (the merged mesh is shared decor).
   const proxy = new THREE.Mesh(new THREE.CylinderGeometry(3.3, 3.3, 5.5, 8), new THREE.MeshBasicMaterial({visible: false}));
   place(proxy, [0, 0]); proxy.position.y += 2.75 * K; proxy.userData.targetId = data.id;

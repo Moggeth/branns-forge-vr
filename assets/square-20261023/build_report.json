@@ -1,0 +1,189 @@
+{
+ "bytes": 1387252,
+ "nodes": [
+  "D_Trainer_Coach",
+  "D_Trainer_Dummy0",
+  "D_Trainer_Dummy1",
+  "D_Trainer",
+  "D_Dummy",
+  "D_Bakery_Baker",
+  "D_Bakery_Counter",
+  "D_Bakery_Oven",
+  "D_Bakery",
+  "D_Stage_Bard",
+  "D_Stage_Hat",
+  "D_Stage",
+  "D_Board_Face",
+  "D_Board",
+  "D_LightPole_Top",
+  "D_LightPole",
+  "G_Trainer_Coach",
+  "G_Trainer_Dummy0",
+  "G_Trainer_Dummy1",
+  "G_Trainer",
+  "G_Dummy",
+  "G_Bakery_Baker",
+  "G_Bakery_Counter",
+  "G_Bakery_Oven",
+  "G_Bakery",
+  "G_Stage_Bard",
+  "G_Stage_Hat",
+  "G_Stage",
+  "G_Board_Face",
+  "G_Board",
+  "G_LightPole_Top",
+  "G_LightPole"
+ ],
+ "materials": [
+  "Plaster",
+  "Wood",
+  "Brass",
+  "Cloth",
+  "Iron",
+  "Crystal",
+  "Slate",
+  "Glass",
+  "Stone",
+  "Ember",
+  "Ooze",
+  "GlassOoze",
+  "Basalt",
+  "Bone"
+ ],
+ "images": 47,
+ "triangles": {
+  "D_Trainer": 3131,
+  "D_Dummy": 808,
+  "D_Bakery": 4477,
+  "D_Stage": 2207,
+  "D_Board": 1327,
+  "D_LightPole": 578,
+  "G_Trainer": 3252,
+  "G_Dummy": 820,
+  "G_Bakery": 4393,
+  "G_Stage": 2321,
+  "G_Board": 1314,
+  "G_LightPole": 578
+ },
+ "total_triangles": 25206,
+ "anchors": {
+  "D_Trainer_Coach": [
+   0.2,
+   0,
+   -0.45
+  ],
+  "D_Trainer_Dummy0": [
+   -1.25,
+   0,
+   0.35
+  ],
+  "D_Trainer_Dummy1": [
+   1.25,
+   0,
+   0.45
+  ],
+  "D_Bakery_Baker": [
+   0.4,
+   0,
+   -1.15
+  ],
+  "D_Bakery_Counter": [
+   0.4,
+   1,
+   0.85
+  ],
+  "D_Bakery_Oven": [
+   -2,
+   0.55,
+   0.15
+  ],
+  "D_Stage_Bard": [
+   0,
+   0.4,
+   -0.25
+  ],
+  "D_Stage_Hat": [
+   0.95,
+   0,
+   1.75
+  ],
+  "D_Board_Face": [
+   0,
+   1.45,
+   0.12
+  ],
+  "D_LightPole_Top": [
+   0,
+   4.25,
+   0
+  ],
+  "G_Trainer_Coach": [
+   0.2,
+   0,
+   -0.45
+  ],
+  "G_Trainer_Dummy0": [
+   -1.25,
+   0,
+   0.35
+  ],
+  "G_Trainer_Dummy1": [
+   1.25,
+   0,
+   0.45
+  ],
+  "G_Bakery_Baker": [
+   0.4,
+   0,
+   -1.15
+  ],
+  "G_Bakery_Counter": [
+   0.4,
+   1,
+   0.85
+  ],
+  "G_Bakery_Oven": [
+   -2,
+   0.55,
+   0.15
+  ],
+  "G_Stage_Bard": [
+   0,
+   0.4,
+   -0.25
+  ],
+  "G_Stage_Hat": [
+   0.95,
+   0,
+   1.75
+  ],
+  "G_Board_Face": [
+   0,
+   1.45,
+   0.12
+  ],
+  "G_LightPole_Top": [
+   0,
+   4.25,
+   0
+  ]
+ },
+ "texture_luminance": {
+  "Stone": 0.511,
+  "Wood": 0.301,
+  "Basalt": 0.207,
+  "Plaster": 0.867,
+  "Slate": 0.302,
+  "Cloth": 0.82,
+  "Bone": 0.745,
+  "Iron": 0.202,
+  "Brass": 0.507,
+  "Crystal": 0.492,
+  "Amethyst": 0.402,
+  "Ember": 0.296,
+  "Ooze": 0.322,
+  "Glass": 0.479,
+  "GlassOoze": 0.422
+ },
+ "seconds": 7.5
+}

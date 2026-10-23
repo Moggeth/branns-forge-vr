@@ -16,6 +16,7 @@ const neutralTavern = () => ({...HOME.neutralTavern(), s: tavernScale()});
 const tavernPiece = side => ({...homePiece(side, 'tavern'), s: tavernScale()});
 import {BACK_TOWN_LANTERNS, MAIN_ROAD, backTownPiece, backTownPoint} from '../shared/keep-sites.js';
 import {terrainHeight} from '../shared/terrain.js';
+import {SQUARE_PIECES, squarePiece} from '../shared/town-square.js';
 
 const TAU = Math.PI * 2;
 const SIDE_KEYS = ['party', 'rivals'];
@@ -46,6 +47,13 @@ const FOLK = {
   folk: {robe: 0x4f9a54, apron: 0xf0dfae, skin: 0xf3cfa8, hat: 'bun', hair: 0x8a5a2e, extra: 'kerchief', hatColor: 0xf2c64a},
   goblin: {robe: 0x6f3d93, apron: 0x6a4630, skin: 0x93c650, hat: 'pointy', hatColor: 0x43275a, extra: 'ears', goblin: true},
   goblin2: {robe: 0x433a40, apron: 0x9c6a34, skin: 0x7fb043, hat: 'topknot', hair: 0x2a2026, extra: 'ears', goblin: true},
+  // The town square's stall keepers (shared/town-square.js): a floury baker, a drill coach with a whistle, a bard.
+  baker: {robe: 0xf3ead8, apron: 0xd96a4a, skin: 0xf2c09a, hat: 'chef', hatColor: 0xffffff, extra: 'mustache', hair: 0x8a5a2e},
+  coach: {robe: 0x2f63c4, apron: 0x6a4630, skin: 0xd99a72, hat: 'helm', hatColor: 0xb8b8c2, extra: 'beard', hair: 0xe8d6b0},
+  bard: {robe: 0x8d3fb0, apron: 0xf2c64a, skin: 0xf3cfa8, hat: 'feather', hatColor: 0x2e7d6a, extra: 'kerchief', hair: 0x6a4127},
+  gobbaker: {robe: 0x5c7a3a, apron: 0x6f3d93, skin: 0x93c650, hat: 'chef', hatColor: 0xe8e4d8, extra: 'ears', goblin: true},
+  gobbard: {robe: 0x6f3d93, apron: 0x8fd04a, skin: 0x7fb043, hat: 'feather', hatColor: 0x8fd04a, extra: 'ears', goblin: true},
+  kid: {robe: 0xf2a33a, apron: 0xfaf4e6, skin: 0xe2a77e, hat: 'bun', hair: 0x3b2618, extra: 'kerchief', hatColor: 0x4f9a54},
 };
 const SHOULDER = [.2, .7, 0], FOLK_SCALE = 1.18; // chunky, but tall enough to see over a counter
 function folkBody(v) {
@@ -76,11 +84,17 @@ function folkBody(v) {
   if (v.hat === 'bandana') P.push(part(SPH, v.hatColor, [0, hy + .06, -.01], [.215, .17, .21]), part(SPH_LO, v.hatColor, [0, hy + .04, -.22], [.05, .05, .05]));
   if (v.hat === 'bun') P.push(part(SPH, v.hair, [0, hy + .05, -.03], [.215, .18, .2]), part(SPH_LO, v.hair, [0, hy + .2, -.1], [.08, .08, .08]));
   if (v.hat === 'pointy') P.push(part(CONE, v.hatColor, [.02, hy + .3, -.02], [.2, .38, .2], [-.12, 0, -.15]), part(CYL, v.hatColor, [0, hy + .12, 0], [.25, .03, .25]));
+  if (v.hat === 'chef') P.push(part(CYL, v.hatColor, [0, hy + .2, -.01], [.17, .2, .17]), part(SPH, v.hatColor, [0, hy + .33, -.01], [.23, .12, .23]));
+  if (v.hat === 'helm') P.push(part(SPH, v.hatColor, [0, hy + .06, -.01], [.225, .19, .22]), part(CYL, v.hatColor, [0, hy + .02, -.01], [.25, .03, .25]), part(CONE, 0xd94a3a, [0, hy + .3, -.02], [.05, .14, .05]));
+  if (v.hat === 'feather') P.push(part(CYL, v.hatColor, [0, hy + .14, 0], [.2, .1, .2]), part(CYL, v.hatColor, [0, hy + .1, .02], [.27, .02, .27]), part(CONE, 0xf2c64a, [-.16, hy + .32, -.05], [.03, .38, .015], [-.4, 0, .5]));
   if (v.hat === 'topknot') P.push(part(SPH_LO, v.hair, [0, hy + .2, -.02], [.06, .1, .06]), part(TORUS, 0xd2a64a, [0, hy + .14, -.02], [.05, .05, .05], [Math.PI / 2, 0, 0]));
   return merge(P);
 }
 // The right arm, pivoting at the shoulder, hanging down -Y.
 const folkArm = v => merge([part(CYL_LO, v.robe, [0, -.15, 0], [.062, .3, .062]), part(SPH_LO, v.skin, [0, -.33, 0], [.068, .068, .068])]);
+// The bard's lute, held across the body: a pear-shaped bowl, a neck and a bent-back peg box.
+const luteGeo = () => merge([part(SPH, 0xb5763c, [0, 0, 0], [.17, .22, .06]), part(CYL_LO, 0x2b211b, [0, .02, .055], [.045, .005, .045], [Math.PI / 2, 0, 0]),
+  part(BOX, 0x6a4628, [0, .34, 0], [.045, .32, .03]), part(BOX, 0x5e4229, [0, .52, -.03], [.06, .1, .03], [-.6, 0, 0])]);
 const mugGeo = () => merge([part(CYL_LO, 0x9a6a3e, [0, .07, 0], [.06, .14, .06]), part(CYL_LO, 0xfff4dc, [0, .15, 0], [.062, .03, .062]), part(TORUS, 0x6a4628, [.07, .07, 0], [.035, .035, .035])]);
 
 // ---------------------------------------------------------------- props
@@ -124,6 +138,9 @@ const KEEP_FOLK = {
   tavern: [[.8, -2.35, 0, 'wipe', 'barkeep', 'goblin2', .4], [1.05, -.95, Math.PI, 'drink', 'folk', 'goblin', .1], [-2.2, 1.55, Math.PI, 'drink', 'smith', 'goblin2', .1]],
   workshop: [[-.05, .5, .25, 'hammer', 'smith', 'goblin2', 0]],
   well: [[0, 1.3, Math.PI, 'crank', 'folk', 'goblin', 0]],
+  bakery: [[.4, -1.15, 0, 'wave', 'baker', 'gobbaker', 0]],
+  trainer: [[.2, -.45, .35, 'coach', 'coach', 'goblin2', 0]],
+  stage: [[0, -.25, 0, 'strum', 'bard', 'gobbard', .4]],
 };
 const MUG_FOLK = [[-1, -3.25, 0, 'wipe', 'barkeep', .4], [.7, -1.85, Math.PI, 'drink', 'goblin'], [-1.9, -1.85, Math.PI, 'drink', 'folk'], [-3, 2.55, Math.PI, 'drink', 'smith'], [3, 2.55, Math.PI, 'chat', 'goblin2'], [3.4, 2.45, -2.3, 'chat', 'keeper']];
 // Props per site: [kind, local x, local z, local yaw].
@@ -144,7 +161,7 @@ const MUG_PROPS = [['barrel', -6.3, -3, 0], ['barrel', -6.25, -2.25, .7], ['barr
 export function townLifeLayout() {
   const folk = [], props = [], posts = [], glows = [], bunting = [];
   const place = (placed, [lx, lz], ly = 0) => { const k = placed.s ?? 1, [x, z] = pieceWorld(placed, [lx * k, lz * k]); return {x, z, y: ly * k}; };
-  const sitePiece = (side, name) => name === 'workshop' || name === 'stores' || name.startsWith('cottage') || name === 'well' ? backTownPiece(side, name) : name === 'tavern' ? tavernPiece(side) : homePiece(side, name);
+  const sitePiece = (side, name) => SQUARE_PIECES.includes(name) ? squarePiece(side, name) : name === 'workshop' || name === 'stores' || name.startsWith('cottage') || name === 'well' ? backTownPiece(side, name) : name === 'tavern' ? tavernPiece(side) : homePiece(side, name);
   for (const side of SIDE_KEYS) {
     const evil = side === 'rivals';
     for (const [name, list] of Object.entries(KEEP_FOLK)) {
@@ -156,9 +173,11 @@ export function townLifeLayout() {
       for (const [kind, lx, lz, yaw, stack] of list) props.push({kind, ...place(placed, [lx, lz], stack ? .6 : 0), yaw: placed.yaw + yaw, side});
     }
     // Strollers: one round the keep's square, one round the back town's yard.
-    const ring = Array.from({length: 24}, (_, i) => homePoint(side, [Math.sin(i / 24 * TAU) * 7.6, Math.cos(i / 24 * TAU) * 7.6]));
+    const ring = Array.from({length: 24}, (_, i) => homePoint(side, [Math.sin(i / 24 * TAU) * 6.2, Math.cos(i / 24 * TAU) * 6.2]));
     const yard = [[56, 55.5], [61.5, 55], [62, 60], [57.5, 61.5]].map(p => backTownPoint(side, p));
     folk.push({role: 'walk', variant: evil ? 'goblin2' : 'folk', side, route: ring, speed: .9, x: ring[0][0], z: ring[0][1], y: 0, yaw: 0});
+    folk.push({role: 'walk', variant: evil ? 'goblin' : 'keeper', side, route: ring, speed: .75, x: ring[0][0], z: ring[0][1], y: 0, yaw: 0, offset: 19});
+    folk.push({role: 'walk', variant: evil ? 'goblin2' : 'kid', side, route: [...ring].reverse(), speed: 1.4, x: ring[0][0], z: ring[0][1], y: 0, yaw: 0, offset: 9, small: true});
     folk.push({role: 'walk', variant: evil ? 'goblin' : 'keeper', side, route: yard, speed: .7, x: yard[0][0], z: yard[0][1], y: 0, yaw: 0, offset: 7});
     // Lantern posts: flanking the gate road, the square and the mouth of the pass.
     for (const [lx, ly, face] of [[2.3, 13, -1], [-2.3, 13, 1], [2.1, -10.5, -1], [-2.1, -10.5, 1]]) {
@@ -230,6 +249,12 @@ export function createTownLife({scene}) {
   });
   const holders = folk.filter(f => f.role === 'drink');
   const mugs = instanced(mugGeo(), flat, holders.length, 'townsfolk-mugs', true);
+  const strummers = folk.filter(f => f.role === 'strum');
+  const lutes = instanced(luteGeo(), flat, strummers.length, 'townsfolk-lutes', true);
+  // The square bard's tunes (shared/town-square.js square_tune): everyone on that side bobs along while it plays.
+  const tunes = {party: -1, rivals: -1};
+  let tClock = 0;
+  const tuneLevel = side => { const end = tunes[side] ?? -1; return end > tClock ? Math.min(1, (end - tClock) / .6, (tClock - (end - 12)) / .4) : 0; };
 
   // Props: one batch per kind.
   const propBatches = Object.keys(PROPS).map(kind => ({kind, list: L.props.filter(p => p.kind === kind), mesh: null}));
@@ -305,6 +330,8 @@ export function createTownLife({scene}) {
     else if (f.role === 'hammer') { const u = (k % 1.15) / 1.15; ax = u < .72 ? -1 - 1.7 * smooth(u / .72) : -2.7 + 1.7 * smooth(Math.min(1, (u - .72) / .1)); bob = u > .8 && u < .9 ? -.03 : 0; lean = .08; }
     else if (f.role === 'drink') { const u = (k % 6) / 6; const up = u < .25 ? smooth(Math.min(1, Math.min(u, .25 - u) / .06)) : 0; ax = -.6 - up * 1.75; az = .12 + up * .25; lean = -up * .12; }
     else if (f.role === 'crank') { ax = -1.25 + Math.sin(k * 2.6) * .32; az = .25 + Math.cos(k * 2.6) * .25; lean = .1; }
+    else if (f.role === 'strum') { const fast = tuneLevel(f.side); ax = -1.1 + Math.sin(k * (fast ? 14 : 3)) * (fast ? .22 : .08); az = .55; lean = -.04; }
+    else if (f.role === 'coach') { const u = (k % 7) / 7; const up = u < .35 ? smooth(Math.min(1, Math.min(u, .35 - u) / .07)) : 0; ax = -.2 - up * 1.4; az = .1 + up * .1; lean = up * .05; }
     else if (f.role === 'chat') { ax = -.55 + Math.sin(k * 2.1) * Math.sin(k * .7) * .55; az = .2 + Math.max(0, Math.sin(k * 1.7)) * .4; }
     return {ax, az, bob, lean};
   }
@@ -322,21 +349,23 @@ export function createTownLife({scene}) {
     if (!enabled || !placed) return;
     haloMat.uniforms.scale.value = viewportHeight / 2;
     const t = performance.now() / 1000; dt = Math.min(.1, dt || 0);
-    let h = 0;
+    let h = 0, l = 0; tClock = t;
     for (const f of folk) {
       let ax, az, bob = 0, lean = 0, roll = 0;
       if (f.route) { walk(f, dt); const s = Math.sin((f.dist / .55) * Math.PI); ax = s * .5; az = .1; bob = Math.abs(s) * .045; roll = s * .05; }
       else ({ax, az, bob, lean} = pose(f, t));
-      const yaw = f.route ? f.curYaw : f.yaw, breathe = 1 + Math.sin((t + f.phase) * 2.1) * .018;
-      bodyM.compose(V.set(f.x, f.groundY + f.y + bob, f.z), Q.setFromEuler(E.set(lean, yaw, roll + Math.sin((t + f.phase) * 1.1) * .025, 'YXZ')), S.set(FOLK_SCALE, breathe * FOLK_SCALE, FOLK_SCALE));
+      const dance = tuneLevel(f.side); if (dance) { bob += Math.abs(Math.sin((t + f.phase * .1) * 6.5)) * .07 * dance; roll += Math.sin(t * 3.25 + f.phase) * .09 * dance; }
+      const yaw = f.route ? f.curYaw : f.yaw, breathe = 1 + Math.sin((t + f.phase) * 2.1) * .018, sc = f.small ? FOLK_SCALE * .72 : FOLK_SCALE;
+      bodyM.compose(V.set(f.x, f.groundY + f.y + bob, f.z), Q.setFromEuler(E.set(lean, yaw, roll + Math.sin((t + f.phase) * 1.1) * .025, 'YXZ')), S.set(sc, breathe * sc, sc));
       f.batch.body.setMatrixAt(f.batch.i, bodyM);
-      SH.set(...SHOULDER).multiplyScalar(FOLK_SCALE); SH.y *= breathe; SH.applyMatrix4(M.compose(V.set(0, 0, 0), Q, S.set(1, 1, 1)));
-      armM.compose(V.set(f.x + SH.x, f.groundY + f.y + bob + SH.y, f.z + SH.z), Q.multiply(ARM_Q.setFromEuler(E.set(ax, 0, az, 'XYZ'))), S.setScalar(FOLK_SCALE));
+      SH.set(...SHOULDER).multiplyScalar(sc); SH.y *= breathe; SH.applyMatrix4(M.compose(V.set(0, 0, 0), Q, S.set(1, 1, 1)));
+      armM.compose(V.set(f.x + SH.x, f.groundY + f.y + bob + SH.y, f.z + SH.z), Q.multiply(ARM_Q.setFromEuler(E.set(ax, 0, az, 'XYZ'))), S.setScalar(sc));
       f.batch.arm.setMatrixAt(f.batch.i, armM);
+      if (f.role === 'strum') { M.compose(V.set(0, .52, .2).applyMatrix4(bodyM), Q.setFromEuler(E.set(lean, yaw, roll - .9, 'YXZ')), S.setScalar(sc)); lutes.setMatrixAt(l++, M); }
       if (f.role === 'drink') { HAND.set(-.02, -.36, .06).applyMatrix4(armM); M.compose(HAND, Q.setFromAxisAngle(UP, yaw), S.set(1, 1, 1)); mugs.setMatrixAt(h++, M); }
     }
     for (const b of batches) { b.body.instanceMatrix.needsUpdate = true; b.arm.instanceMatrix.needsUpdate = true; }
-    mugs.instanceMatrix.needsUpdate = true;
+    mugs.instanceMatrix.needsUpdate = true; lutes.instanceMatrix.needsUpdate = true;
     // Lamps glow a little by day and properly at dusk and night, with a gentle flame flicker.
     const flick = 1 + Math.sin(t * 7.3) * .05 + Math.sin(t * 13.1) * .03;
     haloMat.uniforms.strength.value = (.18 + night * .62) * flick;
@@ -344,7 +373,8 @@ export function createTownLife({scene}) {
     glassMat.emissiveIntensity = (1.1 + night * 1.6) * flick;
   }
 
-  return {sync, update, setNight, object: root,
+  function event(ev) { if (ev?.kind === 'square_tune' && (ev.side === 'party' || ev.side === 'rivals')) tunes[ev.side] = performance.now() / 1000 + (+ev.length || 12); }
+  return {sync, update, setNight, event, object: root,
     stats: () => ({enabled, placed, folk: folk.length, variants: batches.length, props: L.props.length, posts: L.posts.length, glows: L.glows.length, night: +night.toFixed(2), draws: root.children.length}),
     dispose() { root.removeFromParent(); for (const d of disposables) d.dispose?.(); }};
 }

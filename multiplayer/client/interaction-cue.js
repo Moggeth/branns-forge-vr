@@ -14,6 +14,7 @@ import {STORES, WORKSHOP, backTownSpot} from '../shared/home-workshop.js';
 import {ORE_RECIPES} from '../shared/material-catalog.js';
 import {TAVERN, TAVERN_NAMES, taverns, tavernBar} from '../shared/taverns.js';
 import {ARMOURY_RULES, armouryStand, hasFlockwright} from '../shared/armoury.js';
+import {SQUARE, squareSpot} from '../shared/town-square.js';
 import {MOUNT, mountOf, mountNear} from '../shared/mounts.js';
 import {TREE_LIMITS, CUT_RANGE, treeScale, trunkRadius, isFelled, notchAt, rotateVector, logLength, logRadius} from '../shared/trees.js';
 
@@ -184,6 +185,13 @@ function homeCue(self, snapshot, keys, make) {
   // The Armoury's stand (shared/armoury.js): anyone can take a Flockwright down; it stays theirs on key 9.
   if (at(armouryStand(), ARMOURY_RULES.reach)) return hasFlockwright(self) ? make('home', self.tool === 'flockwright' ? 'full' : 'ready', 'armoury', 'Armoury', self.tool === 'flockwright' ? 'In hand' : 'Flockwright', self.tool === 'flockwright' ? '' : keys.collect, 'the six-bird crossbow · key 9')
     : make('home', 'ready', 'armoury', 'Armoury', 'Take a Flockwright', keys.collect, 'heavy bolts · the crew reloads it');
+  // The town square's stalls (shared/town-square.js), in either keep.
+  for (const side of ['party', 'rivals']) {
+    if (at(squareSpot(side, 'trainer'), SQUARE.reach)) return make('home', 'ready', 'square-trainer', 'Training ring', 'Talents', keys.collect, 'spend talent points · whack a dummy');
+    if (at(squareSpot(side, 'board'), SQUARE.reach)) return make('home', 'ready', 'square-board', 'Welcome board', 'Town news', keys.collect, "what's new in the valley");
+    if (at(squareSpot(side, 'bakery'), SQUARE.reach)) return make('home', 'ready', 'square-bakery', 'Bakery cart', 'Fresh apple', keys.collect, 'free · three bites of health');
+    if (at(squareSpot(side, 'stage'), SQUARE.reach)) return make('home', 'ready', 'square-stage', "Bard's stage", 'Request a tune', keys.collect, 'the whole square hears it');
+  }
   if (!base || base.fallenUntil > tick) return null;
   if (at(counterAt(base.side), SHOP.reach)) return make('home', 'ready', 'quartermaster', 'Quartermaster', 'Shop', keys.collect, `${self.resources?.gold || 0} Gold · items for your hero`);
   const mill = base.mill, owed = mill?.queue?.find(q => q.id === self.id)?.gold || 0;

@@ -303,6 +303,15 @@ export function takeGroundApple(state, ctx, p, q) {
  state.pickups.splice(state.pickups.indexOf(q), 1);
  return {ok: true, events: [{kind: 'snack_take', id: d.id, by: p.id, stick: 'none', ground: q.id, position: [...d.position]}]};
 }
+/** A fresh apple handed over a counter (the town square's bakery cart, shared/town-square.js): straight into the hand,
+ *  eaten in three bites like a ground apple. */
+export function handApple(state, ctx, p, at) {
+ if (p?.role !== 'hero') return {ok: false, code: 'role_required', events: []};
+ if (heldDrop(state, p) || handsFull(state, p)) return {ok: false, code: 'hands_full', events: []};
+ const d = spawnDrop(state, ctx, {stick: 'none', position: [at[0], at[1], at[2]], velocity: [0, 0, 0], dir: [0, 1, 0], radius: .08}); if (!d) return {ok: false, code: 'busy', events: []};
+ d.heldBy = p.id; d.mode = 'held'; d.biteTick = state.tick - FRUIT.biteTicks + 20;
+ return {ok: true, events: [{kind: 'snack_take', id: d.id, by: p.id, stick: 'none', bakery: true, position: [...d.position]}]};
+}
 /** Put the held snack down (tool change, death, role change, leaving): it falls from the hand. */
 export function releaseSnack(state, p, toss = false) {
  const d = state.fruit?.drops?.find(q => q.heldBy === p.id); if (!d) return false;
