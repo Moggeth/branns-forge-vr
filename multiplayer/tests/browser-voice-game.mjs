@@ -14,7 +14,7 @@ try {
   });
   for(const page of pages){await page.goto(BASE+'/?acceptanceProbe');await page.waitForFunction(()=>window.brannHarness);await page.keyboard.press('Escape');}
   const [hero,god]=pages;
-  await hero.fill('#name','Voice Hero');await hero.click('#create');await hero.waitForFunction(()=>brannHarness.state().phase==='game',null,{timeout:60000});
+  await hero.fill('#name','Voice Hero');await hero.click('#friends');await hero.waitForFunction(()=>brannHarness.state().phase==='game',null,{timeout:60000});
   const room=await hero.evaluate(()=>brannHarness.snapshot().room);
   await god.fill('#name','Voice God');await god.check('input[name="role"][value="god"]',{force:true});await god.evaluate(r=>{document.getElementById('joinBlock').hidden=false;document.getElementById('room').value=r;},room);await god.locator('#join').tap();
   for(const page of pages)await page.waitForFunction(()=>brannHarness.snapshot()?.players.length===2,null,{timeout:60000});

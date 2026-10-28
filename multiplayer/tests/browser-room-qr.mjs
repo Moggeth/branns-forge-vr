@@ -10,7 +10,7 @@ try {
   await a.page.goto(BASE+'/?acceptanceProbe');
   await a.page.waitForFunction(()=>window.brannHarness);
   if(await a.page.locator('.pn-close').isVisible())await a.page.locator('.pn-close').click();
-  await a.page.fill('#name','QR QA');await a.page.click('#create');
+  await a.page.fill('#name','QR QA');await a.page.click('#friends');
   await a.page.waitForFunction(()=>window.brannHarness.state().connected,null,{timeout:30000});
   await a.page.click('#showInviteQr');
   await a.page.locator('#inviteQrImage').waitFor({state:'visible'});

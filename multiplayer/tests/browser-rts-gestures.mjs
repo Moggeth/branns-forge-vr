@@ -16,7 +16,7 @@ try {
  await page.goto(`${process.env.ACCEPT_BASE || 'http://127.0.0.1:5188'}/?acceptanceProbe`);
  await page.fill('#name','GestureReview');
  await page.check('input[name="role"][value="god"]',{force:true});
- await page.click('#create');
+ await page.click('#friends');
  await page.waitForFunction(()=>window.brannHarness?.snapshot()?.players.some(p=>p.id===window.brannHarness.state().playerId&&p.role==='god'));
  await pause(800);
  await page.locator('#quickCast').check();await page.locator('#quickCast').blur();

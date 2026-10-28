@@ -1,5 +1,6 @@
-// World creation menu: pick which world a new room starts in. Brann's Valley (the classic arena) stays the default;
-// the generated worlds are labelled experimental. Only a small descriptor leaves this menu ({kind, seed, preset});
+// World creation menu: pick which world a new room starts in. The Great Wilds is the single-player home and comes
+// first; Brann's Valley is the classic hand-built map. Worlds start as your own solo world unless "Open to friends"
+// is ticked, which lights a public room instead. Only a small descriptor leaves this menu ({kind, seed, preset});
 // every player regenerates the same land from it.
 import {PRESETS, PRESET_IDS} from '../shared/worldgen/presets.js';
 import {friendlySeed, cleanSeed} from '../shared/worldgen/random.js';
@@ -7,15 +8,15 @@ import {worldDescriptor} from '../shared/worldgen/registry.js';
 import './world-menu.css';
 
 const MODES = [
-  {id: 'arena', title: "Brann's Valley", tag: 'Classic', blurb: 'The hand-built valley: the forge, Dawnhold and Grumblekeep, and the battle for the pylons.'},
-  {id: 'wilds', title: 'The Great Wilds', tag: 'Experimental', blurb: 'A seeded land kilometres wide. Rivers run to the sea, forests climb the hills, and danger grows the further you roam from the village.'},
+  {id: 'wilds', title: 'The Great Wilds', tag: 'Recommended', blurb: 'A seeded land kilometres wide. Rivers run to the sea, forests climb the hills, and danger grows the further you roam from the village.'},
+  {id: 'arena', title: "Brann's Valley", tag: 'Classic', blurb: 'The hand-built valley: the forge, Dawnhold and Grumblekeep. The keeps are at peace unless you start the keep war.'},
   {id: 'expedition', title: 'Expedition Roguelite', tag: 'Experimental', blurb: 'Short seeded runs out of the forge camp. Pick a route, take boons, and decide when to push on or head home.'},
   {id: 'underways', title: 'The Underways', tag: 'Experimental', blurb: 'Caves beneath the Wilds: delve a procedural dungeon to its finale and bring the treasure home.'},
 ];
 
 /**
  * createWorldMenu({parent, onStart, available})
- *   onStart({kind:'arena'} | {kind, world}) starts a new room in that world.
+ *   onStart({kind:'arena', friends} | {kind, world, friends}) starts a new world; friends:false means solo.
  *   available(kind) -> true | string  (a string explains why a mode is not ready yet)
  */
 export function createWorldMenu({parent = document.body, onStart = () => {}, available = () => true, mountLauncher = null} = {}) {
@@ -47,6 +48,7 @@ export function createWorldMenu({parent = document.body, onStart = () => {}, ava
       <div class="wm-detail" data-for="expedition" hidden><div class="wm-launcher"></div></div>
       <footer class="wm-foot">
         <p class="wm-foot-note"></p>
+        <label class="wm-friends" title="Off: your own world on this device. On: a public world friends can join."><input type="checkbox" class="wm-friends-box"> Open to friends</label>
         <button type="button" class="btn btn-quiet wm-cancel">Back</button>
         <button type="button" class="btn btn-primary wm-go">Start this world</button>
       </footer>
@@ -97,7 +99,8 @@ export function createWorldMenu({parent = document.body, onStart = () => {}, ava
   go.addEventListener('click', () => {
     if (available(mode) !== true) return;
     close();
-    onStart(mode === 'arena' ? {kind: 'arena'} : {kind: mode, world: descriptor(mode)});
+    const friends = $('.wm-friends-box').checked;
+    onStart(mode === 'arena' ? {kind: 'arena', friends} : {kind: mode, world: descriptor(mode), friends});
   });
   function open(initial = mode) { root.hidden = false; select(initial); requestAnimationFrame(() => root.querySelector(`.wm-mode[data-mode="${mode}"]`)?.focus()); }
   function close() { root.hidden = true; }

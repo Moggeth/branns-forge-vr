@@ -53,7 +53,7 @@ export async function enterWorld(page, {role = 'hero', name = 'Acceptance', quer
   await page.waitForFunction(() => window.brannHarness, null, {timeout: 20000});
   await page.fill('#name', name);
   await page.check(`input[name="role"][value="${role}"]`, {force: true});
-  await page.click('#create');
+  await page.click('#friends');
   await page.waitForFunction(r => { const p = window.brannHarness; const s = p.snapshot(); return s && s.players.some(x => x.id === p.state().playerId && x.role === r); }, role, {timeout: 30000});
   await sleep(800);
 }
@@ -78,6 +78,6 @@ export async function stubUnavailableRooms(page) {
   await page.routeWebSocket(url => url.pathname.startsWith('/peer'), socket => { setTimeout(() => socket.close(), 100); });
 }
 export async function enterSoloFromPlay(page) {
-  await page.locator('#create').click();
+  await page.locator('#friends').click();
   await page.locator('#statusSolo').click({timeout: 30000});
 }

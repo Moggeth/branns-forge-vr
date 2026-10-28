@@ -7,6 +7,7 @@
 export const SIDE_NAME = Object.freeze({party: 'Dawn', rivals: 'Dusk'});
 const HOME_NAME = Object.freeze({party: 'Dawnhold', rivals: 'Grumblekeep'});
 const HOME_OBJECTIVE = 'Dawnhold and Grumblekeep fight from opposite corners. Pick a side, push with your troops, break the enemy’s three shield pylons, then smash its heart.';
+const HOME_PEACE = 'The keeps are at peace. Grumblekeep still guards its walls if you go raiding, and the barracks bell sends a squad with you. Turn the keep war on for squads marching the lane every minute.';
 const BOT_CAP = 16;
 const SIDE_NAMES_LEGACY = SIDE_NAME;
 const otherSide = side => (side === 'rivals' ? 'party' : 'rivals');
@@ -29,7 +30,7 @@ export function normalizeBattle(m = {}) {
     wave: Math.max(0, Math.floor(num(m?.wave))),
     nextWaveSeconds: Number.isFinite(Number(m?.nextWaveSeconds)) ? Math.max(0, Math.ceil(Number(m.nextWaveSeconds))) : null,
     bots: {party: Math.max(0, Math.floor(num(m?.bots?.party))), rivals: Math.max(0, Math.floor(num(m?.bots?.rivals)))},
-    bases, winner: m?.winner === 'party' || m?.winner === 'rivals' ? m.winner : null, home: m?.home === true,
+    bases, winner: m?.winner === 'party' || m?.winner === 'rivals' ? m.winner : null, home: m?.home === true, war: m?.war === true,
   };
 }
 
@@ -130,6 +131,8 @@ export function createBattlePanel({mount, onAction, doc = mount?.ownerDocument |
   const ACTIONS = {
     start: {label: 'Enable battle mode', confirm: 'Turn on Battle mode for everyone? Dawn and Dusk wave bots begin spawning. Expeditions can’t start while a battle runs.', yes: 'Enable', no: 'Not now', danger: false},
     stop: {label: 'Disable battle mode', confirm: 'End the battle for everyone? The battle stops for everyone and the world returns to adventure.', yes: 'End battle', no: 'Keep fighting', danger: true},
+    war_on: {label: 'Start the keep war', confirm: 'Start the keep war for everyone? Both keeps send squads down the lane every minute until you stop it.', yes: 'To war', no: 'Not now', danger: false},
+    war_off: {label: 'Make peace', confirm: 'Call the squads home? The keeps stay standing and the lane goes quiet.', yes: 'Make peace', no: 'Keep fighting', danger: true},
     reset: {label: 'Play again', confirm: 'Start a fresh battle? Both sanctuaries return to full health and waves restart.', yes: 'Restart', no: 'Cancel', danger: false},
   };
 
@@ -150,14 +153,14 @@ export function createBattlePanel({mount, onAction, doc = mount?.ownerDocument |
   }
 
   function paint() {
-    const v = view, running = v.status === 'running', victory = v.status === 'victory', active = running || victory;
+    const v = view, running = v.status === 'running' && (!v.home || v.war), victory = v.status === 'victory', active = running || victory;
     const SIDE_NAME = v.home ? HOME_NAME : SIDE_NAMES_LEGACY;
-    setText(h, v.home ? 'Home bases' : 'Battle mode'); setText(objective, v.home ? HOME_OBJECTIVE : OBJECTIVE);
+    setText(h, v.home ? 'Keep war' : 'Battle mode'); setText(objective, v.home ? (v.war ? HOME_OBJECTIVE : HOME_PEACE) : OBJECTIVE);
     show(beta, !v.home); show(betaNote, !v.home);
     for (const side of ['party', 'rivals']) { setText(sideBtns[side], SIDE_NAME[side]); setText(sideRows[side].row.firstChild, SIDE_NAME[side]); }
     root.dataset.status = v.status;
     root.dataset.confirming = String(!!pending);
-    setText(pill, running ? 'Running' : victory ? 'Battle over' : 'Off');
+    setText(pill, v.home ? (v.war ? 'At war' : 'Peace') : running ? 'Running' : victory ? 'Battle over' : 'Off');
 
     // stats
     show(stats, active);
@@ -180,10 +183,10 @@ export function createBattlePanel({mount, onAction, doc = mount?.ownerDocument |
       }
     }
     // Announce only state transitions, not every countdown tick.
-    if (v.status !== lastStatus || v.winner !== lastWinner || v.selfSide !== lastSide) {
+    if ((v.home ? `${v.status}:${v.war}` : v.status) !== lastStatus || v.winner !== lastWinner || v.selfSide !== lastSide) {
       setText(live, victory ? (v.winner ? `${SIDE_NAME[v.winner]} wins the battle.` : 'The battle has ended.')
-        : running ? `Battle mode is on. You fight for ${SIDE_NAME[v.selfSide]}.` : lastStatus ? 'Battle mode is off.' : '');
-      lastStatus = v.status; lastWinner = v.winner; lastSide = v.selfSide;
+        : running ? `${v.home ? 'The keep war is on' : 'Battle mode is on'}. You fight for ${SIDE_NAME[v.selfSide]}.` : lastStatus ? (v.home ? 'The keeps are at peace.' : 'Battle mode is off.') : '');
+      lastStatus = v.home ? `${v.status}:${v.war}` : v.status; lastWinner = v.winner; lastSide = v.selfSide;
     }
 
     // side chooser
@@ -202,23 +205,25 @@ export function createBattlePanel({mount, onAction, doc = mount?.ownerDocument |
     show(sideReason, !!sideMsg);
 
     // host controls
-    show(hostBox, v.isHost && !v.home);
-    show(guestNote, !v.isHost && !v.home);
+    show(hostBox, v.isHost);
+    show(guestNote, !v.isHost);
+    setText(guestNote, v.home ? 'The host decides whether the keeps are at war. You can choose your side.' : 'The host controls Battle mode. You can choose your side.');
     show(hostRow, !pending);
     show(confirmBox, !!pending);
     if (v.isHost) {
-      primaryAction = v.status === 'off' ? 'start' : victory ? 'reset' : 'stop';
-      secondaryAction = victory ? 'stop' : null;
+      primaryAction = v.home ? (v.war ? 'war_off' : 'war_on') : v.status === 'off' ? 'start' : victory ? 'reset' : 'stop';
+      secondaryAction = victory && !v.home ? 'stop' : null;
       setText(primary, ACTIONS[primaryAction].label);
-      primary.classList.toggle('btn-primary', primaryAction !== 'stop');
-      primary.classList.toggle('btn-danger-quiet', primaryAction === 'stop');
+      primary.classList.toggle('btn-primary', primaryAction !== 'stop' && primaryAction !== 'war_off');
+      primary.classList.toggle('btn-danger-quiet', primaryAction === 'stop' || primaryAction === 'war_off');
       show(secondary, !!secondaryAction);
       if (secondaryAction) setText(secondary, 'Return to adventure');
       const reason = !v.battleCompatible ? 'Someone is using an older game version. Have everyone refresh before enabling Battle mode.'
         : !v.connected ? 'Reconnecting… battle controls return when the connection does.'
+        : v.home ? (v.war ? '' : 'Peace is the default. The war is optional and you can stop it any time.')
         : v.status === 'off' && v.expeditionActive ? 'An expedition is running. Finish or end it from the quest bar, then enable Battle mode.'
           : v.status === 'off' ? 'Adventure stays the default. Expeditions can’t run during a battle.' : '';
-      const blocked = !v.connected || (!v.battleCompatible && primaryAction!=='stop') || (v.status === 'off' && v.expeditionActive);
+      const blocked = !v.connected || (!v.home && ((!v.battleCompatible && primaryAction!=='stop') || (v.status === 'off' && v.expeditionActive)));
       setAttr(primary, 'aria-disabled', String(blocked));
       setAttr(secondary, 'aria-disabled', String(!v.connected));
       if (blocked) setAttr(primary, 'aria-describedby', hostReason.id); else primary.removeAttribute('aria-describedby');
@@ -236,7 +241,7 @@ export function createBattlePanel({mount, onAction, doc = mount?.ownerDocument |
     [confirmYes, 'click', () => {
       const action = pending;
       if (!action) return;
-      if(!view.isHost||!view.connected||(action!=='stop'&&!view.battleCompatible)||(action==='start'&&view.expeditionActive)){cancel();return;}
+      if(!view.isHost||!view.connected||(!view.home&&((action!=='stop'&&!view.battleCompatible)||(action==='start'&&view.expeditionActive)))){cancel();return;}
       pending = null; paint(); primary.focus();
       onAction?.({action});
     }],
@@ -252,7 +257,7 @@ export function createBattlePanel({mount, onAction, doc = mount?.ownerDocument |
   function update(model) {
     const next = normalizeBattle(model);
     // A status/host/connection change invalidates whatever the host was about to confirm.
-    if (pending && (next.status !== view.status || !next.isHost || !next.connected || (pending!=='stop'&&!next.battleCompatible) || (pending==='start'&&next.expeditionActive))) {
+    if (pending && (next.status !== view.status || next.war !== view.war || !next.isHost || !next.connected || (!next.home && ((pending!=='stop'&&!next.battleCompatible) || (pending==='start'&&next.expeditionActive))))) {
       const hadFocus = root.contains(doc.activeElement);
       pending = null; view = next; paint();
       if (hadFocus && next.isHost) primary.focus();

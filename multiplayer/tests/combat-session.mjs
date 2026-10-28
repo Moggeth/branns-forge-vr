@@ -9,5 +9,7 @@ session.publish();assert.equal(connection.messages.find(m=>m.kind==='snapshot').
 const shot=session.simulation.snapshot().projectiles[0],hit={projectileId:shot.id,targetId:'world',part:'torso',point:shot.position,normal:[0,1,0],localPoint:shot.position,localQuaternion:[0,0,0,1]};
 const events=[];session.addEventListener('event',({detail})=>events.push(detail));assert.equal(session.projectileContact(hit).ok,true);assert.equal(events[0].kind,'embed');assert.ok(connection.messages.some(m=>m.kind==='event'&&m.event.kind==='embed'));
 session.publish();assert.equal(connection.messages.find(m=>m.kind==='snapshot').snapshot.embeds.length,1);
+// Only the host can start or stop the keep war; a guest's toggle is refused before it reaches the simulation.
+connection.messages=[];session.applyCommand('guest',{type:'battle',action:'war_on',seq:9});assert.equal(session.simulation.snapshot().battle.war,false);assert.equal(connection.messages.find(m=>m.to==='guest')?.code,'host_required');
 connection.hostId='other';assert.equal(session.projectileContact(hit).code,'host_required');session.dispose();
 console.log('combat-session: host geometry authority and broadcast pass');
