@@ -14,9 +14,10 @@ const flat = (a,b) => Math.hypot(a[0]-b[0],a[2]-b[2]);
 const int = (n,a,b) => Number.isSafeInteger(n)&&n>=a&&n<=b;
 const fail = code => ({ok:false,code,events:[]});
 export const createBattle = () => ({v:1,status:'off',run:0,wave:0,nextWaveTick:0,winner:null,bases:[]});
-// Every new world starts with the always-on home bases (shared/home-bases.js).
-export function createHomeBattle(state,height,run=1) {
-  return {v:2,status:'running',run,wave:0,nextWaveTick:state.tick+HOME.firstWaveTicks,winner:null,sieges:0,
+// Every new world starts with the home bases standing (shared/home-bases.js). The keep war (squads marching the lane
+// every minute) is opt-in: war:false keeps both keeps peaceful until a host turns it on from the menu.
+export function createHomeBattle(state,height,run=1,{war=false}={}) {
+  return {v:2,status:'running',run,wave:0,nextWaveTick:state.tick+HOME.firstWaveTicks,winner:null,sieges:0,war:!!war,
     bases:BATTLE_SIDES.map(side=>createHomeBase(side,(x,z)=>height(state,x,z)))};
 }
 /** The old host-started lane battle; it suppresses fires and other world hazards while it runs. */
@@ -43,9 +44,10 @@ function cleanup(state) {
 }
 
 export function battleAction(state,player,message,ctx) {
-  if(!['start','stop','reset','attack_base'].includes(message.action))return fail('invalid_battle_action');
+  if(!['start','stop','reset','attack_base','war_on','war_off'].includes(message.action))return fail('invalid_battle_action');
   if(message.action==='attack_base')return attackBattleBase(state,player,message.targetId,ctx);
-  if(state.battle.v===2)return fail('always_on');
+  if(state.battle.v===2)return keepWarAction(state,player,message.action);
+  if(message.action==='war_on'||message.action==='war_off')return fail('invalid_battle_action');
   if(message.action==='stop'){
     cleanup(state);state.battle={...createBattle(),run:state.battle.run};
     return {ok:true,events:[{kind:'battle_stop',by:player.id}]};
@@ -58,6 +60,17 @@ export function battleAction(state,player,message,ctx) {
     bases:BATTLE_SIDES.map((side,i)=>({id:`battle-base-${side}`,side,position:[sites[i][0],ctx.terrainHeight(state,...sites[i]),sites[i][1]],hp:BATTLE.baseHp,maxHp:BATTLE.baseHp}))};
   return {ok:true,events:[{kind:'battle_start',run:state.battle.run,by:player.id}]};
 }
+
+/** Keep war on/off (home bases only). Turning it off sends the marching squads home; the keeps stay standing. */
+function keepWarAction(state,player,action) {
+  const b=state.battle,on=action==='war_on';
+  if(action!=='war_on'&&action!=='war_off')return fail('always_on');
+  if(b.war===on)return fail(on?'war_on':'war_off');
+  b.war=on;
+  if(on)b.nextWaveTick=state.tick+HOME.firstWaveTicks;else cleanup(state);
+  return {ok:true,events:[{kind:on?'keep_war_on':'keep_war_off',by:player.id,nextWaveTick:b.nextWaveTick}]};
+}
+export const keepWar = state => homeBattle(state) && state.battle.war === true;
 
 export function damageBattleBase(state,id,amount,side,events) {
   if(state.battle?.v===2)return damageHome(state,id,amount,side,events);
@@ -131,7 +144,9 @@ function stepHomeBattle(state,ctx,events) {
   stepHomeBases(state,ctx,events);
   // An Expedition Roguelite run directs its own encounters, so the keeps stand but send no squads (shared/expedition-run.js).
   if(!state.players.length||state.run||state.tick<state.battle.nextWaveTick)return;
-  const b=state.battle;b.wave++;b.nextWaveTick=state.tick+HOME.waveTicks;
+  const b=state.battle;
+  if(!b.war){b.nextWaveTick=state.tick+HOME.waveTicks;return;} // peaceful keeps: no squads until the war is turned on
+  b.wave++;b.nextWaveTick=state.tick+HOME.waveTicks;
   let spawned=0;
   for(const base of b.bases)if(!baseFallen(state,base))spawned+=spawnSquad(state,ctx,base,String(b.wave));
   events.push({kind:'battle_wave',wave:b.wave,count:spawned,nextWaveTick:b.nextWaveTick});
@@ -180,5 +195,7 @@ function restoreHomeBattle(saved,bots) {
   for(const side of BATTLE_SIDES)if(bots.filter(e=>e.side===side).length>BATTLE.perSideCap)bad();
   for(const e of bots)if(e.battleRun!==b.run||!['skeleton','golem'].includes(e.kind)||!BATTLE_SIDES.includes(e.side)||!int(e.battleWaypoint,0,lane.length-1)||!new RegExp(`^battle${b.run}_([1-9][0-9]*|b[0-9]+)_${e.side}_[0-9]+$`).test(e.id)||Number(e.id.split('_')[1])>b.wave||Number(e.id.split('_')[1].slice(1))>saved.tick)bad(); // b<tick>: rung out early by a barracks bell
   for(const e of saved.enemies)if(!battleBot(e)&&(e.side!==undefined||e.battleWaypoint!==undefined||/^battle\d+_/.test(e.id)))bad();
-  return {v:2,status:'running',run:b.run,wave:b.wave,nextWaveTick:b.nextWaveTick,winner:b.winner,sieges:b.sieges,bases:restoreHomeBases(b.bases,saved.tick)};
+  if(b.war!==undefined&&typeof b.war!=='boolean')bad();
+  // Saves from before the keep war became opt-in have no flag: they come back peaceful.
+  return {v:2,status:'running',run:b.run,wave:b.wave,nextWaveTick:b.nextWaveTick,winner:b.winner,sieges:b.sieges,war:b.war===true,bases:restoreHomeBases(b.bases,saved.tick)};
 }

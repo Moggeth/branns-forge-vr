@@ -31,7 +31,7 @@ try {
  assert.equal(await page.evaluate(()=>!!document.querySelector('#world').brannDiagnostics),false,'orientation works before renderer import');
  await page.waitForFunction(()=>window.brannHarness);
  const close=page.getByRole('button',{name:'Close patch notes',exact:true});if(await close.isVisible())await close.click();
- await page.locator('#create').click();
+ await page.locator('#friends').click();
  await page.locator('#statusCancel').click();
  releaseGame();
  await page.waitForFunction(()=>document.querySelector('#world').brannDiagnostics?.()?.startup.phase==='shadows',null,{timeout:120000});

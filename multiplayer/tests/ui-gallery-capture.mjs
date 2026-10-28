@@ -13,7 +13,7 @@ await Promise.all(devices.map(async d=>{
  try{
   await page.goto(BASE+'/?acceptanceProbe&sky=noon');await page.waitForFunction(()=>window.brannHarness,null,{timeout:60000});await sleep(4000);
   await closeNotes(page);await sleep(400);await shot(page,d.id+'-01-welcome');
-  await js(page,()=>{document.querySelector('#name').value='Mitch';const r=document.querySelector('input[name="role"][value="hero"]');r.checked=true;r.dispatchEvent(new Event('change',{bubbles:true}));document.querySelector('#create').click();});
+  await js(page,()=>{document.querySelector('#name').value='Mitch';const r=document.querySelector('input[name="role"][value="hero"]');r.checked=true;r.dispatchEvent(new Event('change',{bubbles:true}));document.querySelector('#friends').click();});
   await page.waitForFunction(()=>{const s=document.querySelector('#statusSolo');if(s&&s.offsetParent)s.click();return window.brannHarness.state().phase==='game';},null,{timeout:90000,polling:500});
   await sleep(4000);await closeNotes(page);await sleep(800);
   await shot(page,d.id+'-02-hero-hud');

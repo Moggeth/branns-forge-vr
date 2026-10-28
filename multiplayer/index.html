@@ -107,7 +107,7 @@
     <header class="masthead">
       <svg class="crest" aria-hidden="true"><use href="#i-anvil"/></svg>
       <h1>Brann’s Forge</h1>
-      <p class="lede">Walk the land. Shape the world.<br>One shared adventure for up to 32 players.</p>
+      <p class="lede">Walk the land. Shape the world.<br>Your own adventure, or bring friends along.</p>
     </header>
 
     <!-- New: shown by lobby-ui.js bindConnectivity() when navigator.onLine is false -->
@@ -200,8 +200,9 @@
       <div class="actions">
         <section class="create-block">
           <button id="create" class="btn btn-primary btn-large" type="button">Play</button>
-          <p class="hint">Joins the busiest world near you, or starts one if they’re all full.</p>
+          <p id="playHint" class="hint">Your own world. Picks up right where you left off.</p>
           <button id="newWorld" class="btn btn-secondary new-world-btn" type="button">New world…</button>
+          <button id="friends" class="btn btn-quiet friends-btn" type="button">Play with friends</button>
           <button id="runLaunch" hidden class="btn btn-quiet rx-launch-entry" type="button">Expedition Roguelite <span class="rx-exp">Experimental</span></button>
           <!-- Kept for scripts; the welcome screen is just role + Play + guides now. -->
           <button id="solo" class="btn btn-quiet" type="button" hidden>Play solo · no room service needed</button>

@@ -11,7 +11,7 @@ async function ready(page,name){await page.goto(BASE+'/?acceptanceProbe');await 
 async function battleMenu(page,touch=false){if(touch)await page.locator('[data-touch-action="menu"]').tap();else await page.locator('#menuButton').click();if(await page.locator('[data-mc-tab="battle"]').isVisible())await page.locator('[data-mc-tab="battle"]').click();}
 async function fits(page,selector,id){const r=await page.locator(selector).evaluate(e=>({height:e.clientHeight,scroll:e.scrollHeight,width:e.clientWidth,scrollWidth:e.scrollWidth,bottom:e.getBoundingClientRect().bottom,viewport:innerHeight}));assert.ok(r.scroll<=r.height+2&&r.scrollWidth<=r.width+2&&r.bottom<=r.viewport+2,`${id}: ${JSON.stringify(r)}`);record(id,'pass',r);}
 try{
- await ready(desktop.page,'Dawn host');await desktop.page.locator('#create').click();await desktop.page.waitForFunction(()=>brannHarness.snapshot()?.players.length===1);
+ await ready(desktop.page,'Dawn host');await desktop.page.locator('#friends').click();await desktop.page.waitForFunction(()=>brannHarness.snapshot()?.players.length===1);
  const room=await desktop.page.evaluate(()=>brannHarness.snapshot().room);
  await ready(mobile.page,'Dusk guest');await fits(mobile.page,'#lobby > .card','phone-lobby');await mobile.page.locator('#browseWorlds').tap();
  const row=mobile.page.locator(`.bf-pr-row[data-code="${room}"]`);await row.waitFor();assert.match(await row.innerText(),/Dawn host/);await row.locator('.bf-pr-toggle').tap();assert.match(await row.locator('.bf-pr-people').innerText(),/Dawn host/);await shot(mobile.page,'public-worlds-phone');

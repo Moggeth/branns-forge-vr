@@ -7,7 +7,7 @@ try {
   await a.page.route('**/peer/rooms*',route=>route.fulfill({json:{rooms:[],region:'',nextCursor:null}}));
   await a.page.goto(BASE+'/?acceptanceProbe');await a.page.waitForFunction(()=>window.brannHarness);
   if(await a.page.locator('.pn-close').isVisible())await a.page.locator('.pn-close').click();
-  await a.page.fill('#name','Recovery QA Host');await a.page.locator('#create').tap();
+  await a.page.fill('#name','Recovery QA Host');await a.page.locator('#friends').tap();
   await a.page.waitForFunction(()=>window.brannHarness.state().connected&&window.brannHarness.snapshot(),null,{timeout:30000});
   const room=await a.page.evaluate(()=>window.brannHarness.snapshot().room);
   await b.page.goto(BASE+'/?acceptanceProbe');await b.page.waitForFunction(()=>window.brannHarness);
