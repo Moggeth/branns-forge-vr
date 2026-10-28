@@ -211,7 +211,7 @@ export class WorldSession extends EventTarget {
   }
   get battleCompatible() { return this.connection.local === true || this.connection.maxPeers >= MAX_PLAYERS; }
   applyCommand(id, message) {
-    if (message?.type === 'battle' && ['start','stop','reset'].includes(message.action) && id !== this.connection.hostId) {
+    if (message?.type === 'battle' && ['start','stop','reset','war_on','war_off'].includes(message.action) && id !== this.connection.hostId) {
       const detail={code:'host_required',message:'Only the world host can change battle mode. Ask the host to start or reset the battle.'};
       if (id===this.identity?.peerId) this.emit('error',detail);
       else this.connection.send(id,{kind:'command_error',epoch:this.connection.epoch,...detail});
