@@ -9,6 +9,8 @@
 //            haft rings in your hands.
 //   cleave   a blade through a body: a brief catch, then it carries on through the follow-through.
 //   thud     into the dirt, or a hammer into anything soft: a heavy stop, a little sink, pulled back.
+//   pry      the pick's spike into an ore deposit (2026-10-29): it bites and holds a beat longer (the hit-stop), then
+//            levers out with a twist that pops the chunk free before the head is pulled back.
 //   miss     nothing there: the authored swing plays through untouched.
 //
 // Camera space: +X right, +Y up, -Z forward. The swing clock below warps the authored swing (weapon-motion.js) instead
@@ -25,6 +27,7 @@ export const STRIKE_REACTIONS = Object.freeze({
   bite:    Object.freeze({hold: .085, back: .06, out: .08,  home: .08, sink: .016, shiver: .018, ring: 0,    twist: .2,  punch: [-.009, .006, .008]}),
   rebound: Object.freeze({hold: .04,  back: .13, out: .07,  home: .13, sink: .004, shiver: .03,  ring: .028, twist: 0,   punch: [.013, .004, -.01]}),
   cleave:  Object.freeze({hold: .05,  back: 0,   out: 0,    home: 0,   sink: .01,  shiver: .012, ring: 0,    twist: 0,   punch: [-.006, .008, .006]}),
+  pry:     Object.freeze({hold: .095, back: .07, out: .095, home: .085, sink: .024, shiver: .028, ring: 0,  twist: -.3, punch: [-.017, .007, .012]}),
   thud:    Object.freeze({hold: .07,  back: .05, out: .08,  home: .11, sink: .012, shiver: .02,  ring: 0,    twist: .06, punch: [-.011, .002, .004]}),
 });
 
@@ -39,8 +42,9 @@ export const STRIKE_ENERGY = Object.freeze({axe: 1.15, pick: 1.1, hammer: 1.8, l
 // Steel meeting stone or metal throws sparks; bone or wood on stone never does.
 export const STEEL_TOOLS = Object.freeze(['axe', 'pick', 'hammer']);
 
-export function strikeReaction(tool, material) {
+export function strikeReaction(tool, material, {deposit = false} = {}) {
   if (!material) return null;
+  if (deposit && tool === 'pick' && (material === 'stone' || material === 'crystal')) return 'pry';
   return (TABLE[tool] || TABLE.axe)[material] || 'thud';
 }
 

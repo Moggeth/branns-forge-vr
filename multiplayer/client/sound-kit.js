@@ -97,6 +97,36 @@ export function createSoundKit({context, level = () => ({gain: 1, pan: 0}), clai
       noise(o, t, {type: 'lowpass', f0: 1100, f1: 260, peak: .09 * w, release: .14});
       noise(o, t + .03, {f0: 2600, f1: 1400, q: 1.1, peak: .025, release: .18});
     }},
+    // Mining (2026-10-29). A pick into ore: the steel's crisp tick and the mineral's own ping (iron rings, crystal and
+    // mithril chime like glass, gold clinks, plain stone stays dry), then, as the spike levers the chunk free, a geode crack
+    // and the pop of the chunk, pebbles skittering. The crack climbs in pitch as the rock weakens, so you hear it giving.
+    ore_crack: {trim: 1.8, seconds: .9, range: 30, play(o, t, {weakness = 0, kind = 'stone', delay = .09} = {}) {
+      const w = clamp(weakness, 0, 1), ping = {iron: 1650, copper: 1450, gold: 2350, mithril: 1950, crystal: 1500, meteor: 1250, star: 1250}[kind];
+      noise(o, t, {type: 'highpass', f0: 4200, peak: .08, attack: .001, release: .035});
+      thump(o, t, 210, 90, .1, .07);
+      if (kind === 'crystal' || kind === 'mithril') bell(o, t + .004, ping, .028, .55);
+      else if (ping) { tone(o, t, {type: 'triangle', f0: ping, f1: ping * .99, peak: .03, attack: .001, release: .22}); tone(o, t, {f0: ping * 2.4, peak: .01, attack: .001, release: .12}); }
+      const at = t + delay;
+      noise(o, at, {f0: 1500 + 1300 * w, f1: 700 + 600 * w, q: 2.5, attack: .002, peak: .1 + .05 * w, release: .09});
+      noise(o, at + .012, {type: 'highpass', f0: 2600 + 1400 * w, peak: .05, attack: .001, release: .05});
+      thump(o, at + .01, 150 + 40 * w, 60, .12 + .06 * w, .12);
+      rattle(o, at + .06, 2 + Math.round(3 * w), {spread: .05, f: 2400, peak: .035});
+      if (w > .5) tone(o, at + .02, {type: 'sawtooth', f0: 180 + 160 * w, f1: 120, peak: .006 + .006 * w, attack: .01, release: .14});
+    }},
+    // The rock gives way: a split, a deep whump through the ground, rubble raining down and settling, then the ore's
+    // reward ring (a rising chime for ore and crystal, a coin clink for gold; plain stone just lands with a hearty clonk).
+    ore_burst: {seconds: 2.2, range: 55, duck: [.2, .7], play(o, t, {kind = 'stone'} = {}) {
+      noise(o, t, {type: 'highpass', f0: 3000, f1: 1200, peak: .2, release: .16});
+      thump(o, t, 85, 30, .34, .55);
+      noise(o, t + .01, {type: 'lowpass', f0: 1300, f1: 150, peak: .17, release: .7});
+      rattle(o, t + .08, 10, {spread: .045, f: 1700, peak: .07});
+      rattle(o, t + .55, 6, {spread: .09, f: 1200, peak: .045});
+      thump(o, t + .5, 160, 70, .08, .12); thump(o, t + .72, 140, 65, .06, .1);
+      if (kind === 'gold') { for (let i = 0; i < 4; i++) bell(o, t + .18 + i * .06, 2100 + i * 260, .028, .4); return; }
+      const base = {iron: 659, copper: 587, mithril: 880, crystal: 784, meteor: 523, star: 523}[kind];
+      if (base) [0, 4, 7, 12].forEach((n, i) => bell(o, t + .16 + i * .07, semis(base, n), .03, .9));
+      else tone(o, t + .02, {type: 'triangle', f0: 240, f1: 150, peak: .06, attack: .002, release: .2});
+    }},
     // Your Hero knocked out: a dull thump, the world pulls away (a falling, muffled chord). Then the respawn chime.
     hero_down: {seconds: 2, range: 30, duck: [.45, 1.6], play(o, t) { thump(o, t, 110, 38, .3, .5); noise(o, t, {type: 'lowpass', f0: 900, f1: 120, peak: .14, release: .9}); [7, 3, 0].forEach((n, i) => tone(o, t + .15 + i * .18, {type: 'triangle', f0: semis(392, n), f1: semis(392, n) * .97, peak: .035, release: .7})); }},
     respawn: {seconds: 1.6, range: 30, play(o, t) { noise(o, t, {type: 'highpass', f0: 2500, f1: 6000, attack: .35, peak: .05, release: .6}); [0, 7, 12, 16].forEach((n, i) => bell(o, t + .2 + i * .09, semis(523, n), .03, 1)); }},

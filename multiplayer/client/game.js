@@ -95,7 +95,7 @@ import {setVoiceZoneResolver} from './voice-zones.js';
 const tavernRules = Object.values(import.meta.glob('../shared/taverns.js', {eager: true}))[0] || {};
 import {createCrystalWallAudio} from './crystal-wall-audio.js';
 import {createGolemPresentation} from './golem-presentation.js';
-import {createImpactPresentation} from './impact-presentation.js';
+import {createImpactPresentation,ORE_KINDS} from './impact-presentation.js';
 import {createRewardMoments} from './reward-moments.js';
 import {swingPose, SWING_PROFILES, idleOffset} from './weapon-motion.js';
 import {createStrikeClock,createViewPunch,createImpactLedger,createSwingTrail,strikeMaterial,strikeReaction,STRIKE_REACTIONS,STRIKE_ENERGY,STEEL_TOOLS,SHOT_PUNCH,TRAIL} from './strike-feel.js';
@@ -426,7 +426,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   listen(globalThis.document||{addEventListener(){},removeEventListener(){}},'click',e=>{const b=e.target?.closest?.('button,[role="button"],.hotbar-slot,summary');if(!b||b.disabled)return;unlockAudio();soundKit?.play(b.matches?.('[aria-expanded="true"],summary')?'open':'click',null,null,{gap:.04});},{capture:true});
   function report(message) { if (!disposed) onStatus(message); }
   yield;
-  const content = createWorldContent({scene,templates,instantiate,height:heightAt,camera});
+  const content = createWorldContent({scene,templates,instantiate,height:heightAt,camera,emit:e=>{try{return impacts.emit(e);}catch{return null;}}});
   // Stonewhisper wall: hold Special (Q / right mouse / touch Special / VR trigger) to see the exact footprint, release to raise it.
   const wallPreview=createWallPreview({THREE,scene,height:(x,z)=>heightAt(x,z)});let wallAim=null,wallAudio=null;
   const pickWallMotion=createPickWallMotion({reducedMotion:reducedWeaponMotion});
@@ -1263,7 +1263,11 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     const kind=event.kind;if(!['hit','wood_hit','stone_hit','tree_fell','ore_break','pickup','build','death','headshot','shoot','detach','shockwave','embed','hammer_slam','pick_burst','axe_cleave'].includes(kind))return;
     const material=event.material||(kind==='wood_hit'?'wood':kind==='stone_hit'||kind==='ore_break'?'stone':event.id==='shrine'?'metal':'bone');
     const isImpact=['hit','headshot','wood_hit','stone_hit'].includes(kind)||(kind==='embed'&&event.impact);
-    if(isImpact&&!predictedImpact){let seed=event.tick??snapshot.tick??0;for(const char of String(event.id||''))seed=(Math.imul(seed,31)+char.charCodeAt(0))|0;impacts.emit({material,position:event.position,normal:event.normal||[0,1,0],energy:event.energy||1,seed});}
+    // Someone else's pick in a deposit: the same rock-and-ore spray and the rock rocks, without our hands' reaction.
+    const struck=kind==='stone_hit'?snapshot.deposits?.find(d=>d.id===event.id):null;
+    if(isImpact&&!predictedImpact){let seed=event.tick??snapshot.tick??0;for(const char of String(event.id||''))seed=(Math.imul(seed,31)+char.charCodeAt(0))|0;impacts.emit({material:struck&&ORE_KINDS.includes(struck.kind)?'ore:'+struck.kind:material,position:event.position,normal:event.normal||[0,1,0],energy:event.energy||1,seed,steel:struck?true:undefined});if(struck)content.depositStruck(struck.id,{normal:event.normal});}
+    // A deposit giving way: a crack and a whump with the ore's own ring; close by, the ground kicks back at you.
+    if(kind==='ore_break'&&Array.isArray(event.position)){const ear=listenerPose().position,near=Math.hypot(event.position[0]-ear[0],event.position[2]-ear[2]);soundKit?.play('ore_burst',event.position,listenerPose(),{kind:snapshot.deposits?.find(d=>d.id===event.id)?.kind||event.material});if(near<4&&role==='hero')viewPunch.kick([-.02,.006,.014],1-near/5);}
     if(kind==='pickup'&&soundKit&&!woodSound&&!rewardSound){const c=pickupCue(event);kitSound=soundKit.play(c.name,event.position,listenerPose(),c.opts);}
     const now=performance.now();if(audioContext&&!kitSound&&!['death','detach','shoot','build','pickup','shockwave'].includes(kind)&&!woodSound&&!materialSound&&!rewardSound&&!(kind==='embed'&&!event.impact)&&!(kind==='shoot'&&event.weapon==='crossbow'&&event.by===playerId)&&now-lastSound>45){lastSound=now;const osc=audioContext.createOscillator(),gain=audioContext.createGain();osc.type=kind==='stone_hit'?'triangle':'sine';const metallic=material==='stone'||material==='metal';osc.frequency.setValueAtTime(metallic?1500:kind==='hammer_slam'?70:kind==='shoot'?280:kind==='pickup'?660:150,audioContext.currentTime);osc.frequency.exponentialRampToValueAtTime(metallic?650:80,audioContext.currentTime+.13);gain.gain.setValueAtTime(.055,audioContext.currentTime);gain.gain.exponentialRampToValueAtTime(.001,audioContext.currentTime+.18);osc.connect(gain).connect(audioContext.destination);osc.start();osc.stop(audioContext.currentTime+.19);}
   }
@@ -1476,16 +1480,20 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     let material=hit?strikeMaterial(hit.targetId,snapshot,{trees:worldTrees(snapshot),structureMaterial}):null,point=hit?.point,normal=hit?.normal;
     if(hit&&!material)material='stone';           // an unbreakable prop: the blow glances off it
     if(!hit){const aim=weaponAim(),to=aim.origin.map((v,i)=>v+aim.direction[i]*1.95),earth=terrainRay.segment(aim.origin,to);if(earth){material='earth';point=earth.point;normal=earth.normal;}}
-    const kind=strikeReaction(tool,material)||'miss';strikeClock.contact(now/1000,kind);
+    const deposit=hit?snapshot.deposits?.find(d=>d.id===hit.targetId):null;
+    const kind=strikeReaction(tool,material,{deposit:!!deposit})||'miss';strikeClock.contact(now/1000,kind);
     if(kind==='miss'||!point)return;
-    const reaction=STRIKE_REACTIONS[kind],weight=tool==='hammer'?1.45:tool==='limb'?.8:1;
+    // Mining: each blow lands harder as the rock weakens, and the one that breaks it hardest of all.
+    const weakness=kind==='pry'?Math.min(1,(deposit.hits+1)/Math.max(1,deposit.maxHits)):0,breaking=kind==='pry'&&weakness>=1;
+    const reaction=STRIKE_REACTIONS[kind],weight=(tool==='hammer'?1.45:tool==='limb'?.8:1)*(1+weakness*.45+(breaking?.5:0));
     viewPunch.kick(reaction.punch,weight);
     // The blade travels right to left across the view and down: chips leave the cut that way.
     camera.getWorldDirection(strikeDirection);strikeRight.set(-strikeDirection.z,0,strikeDirection.x).normalize();
     const travel=strikeRight.clone().multiplyScalar(-1).addScaledVector(strikeDirection,.35).normalize().toArray();
-    const steel=STEEL_TOOLS.includes(tool),visual=material==='flesh'?'bone':material;
+    const steel=STEEL_TOOLS.includes(tool),visual=kind==='pry'?'ore:'+(ORE_KINDS.includes(deposit.kind)?deposit.kind:'stone'):material==='flesh'?'bone':material;
     let seed=Math.round(now)|0;for(const c of String(hit?.targetId||'earth'))seed=(Math.imul(seed,31)+c.charCodeAt(0))|0;
-    impacts.emit({material:visual,position:point,normal,energy:STRIKE_ENERGY[tool]??1,seed,direction:travel,steel,kind});
+    impacts.emit({material:visual,position:point,normal,energy:(STRIKE_ENERGY[tool]??1)*(1+weakness*.35),seed,direction:travel,steel,kind});
+    if(kind==='pry'){content.depositStruck(hit.targetId,{normal});soundKit?.play('ore_crack',point,listenerPose(),{weakness,kind:deposit.kind,delay:reaction.hold});}
     impactLedger.record(point,material,now/1000);
     const ear=listenerPose(),id=hit?.targetId;
     if(material==='wood')woodAudio?.play({kind:'wood_hit',position:point,id,material:'wood',normal},ear);
@@ -1494,7 +1502,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     else materialAudio?.play({kind:'hit',position:point,id,material:material==='crystal'?'stone':material,normal,energy:STRIKE_ENERGY[tool]??1,sourceMaterial:steel?'weapon':'bone'},ear,snapshot.tick);
     if(kind==='rebound'&&steel)soundKit?.play('strike_ring',null,null,{tool});
     if(kind==='bite'&&material==='wood')soundKit?.play('strike_wrench',null,null,{delay:reaction.hold});
-    if(touchEnabled)try{navigator.vibrate?.(kind==='bite'?[22]:kind==='rebound'?[12,24,8]:kind==='thud'?[28]:[14]);}catch{}
+    if(touchEnabled)try{navigator.vibrate?.(kind==='pry'?(breaking?[34,50,70]:[18,Math.round(reaction.hold*1000),24]):kind==='bite'?[22]:kind==='rebound'?[12,24,8]:kind==='thud'?[28]:[14]);}catch{}
   }
   function clearInput() {
     dragonRide.clearInput();
