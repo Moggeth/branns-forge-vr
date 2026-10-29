@@ -3,9 +3,8 @@
 //
 //   shudder   the struck rock rocks back on its bed away from the blow and squashes a touch, then settles (a damped
 //             spring, so it reads at any frame rate and never steps at snapshot rate).
-//   glow      minerals that carry their own light (crystal, mithril, star ore) glow a little brighter from their opened
-//             faces the deeper the pick has gone. (A strike-heat ember on every rock was tried and read as a flat red patch
-//             on the crater surfaces, so plain rock stays unlit; fracture.heat() remains for a future textured interior.)
+//   (A strike-heat ember and a mineral glow on the opened faces were tried and dropped: on the crater surfaces they read
+//   as a flat patch and hid the geode's own crystal interior. fracture.heat()/glow() stay, additive, for a later pass.)
 //   burst     the last blow: every shell still on the rock is thrown outward, tumbles, bounces on the ground and sinks
 //             away, under a heavy spray of rubble, ore flecks, sparks and a dust cloud from the impact artist.
 //
@@ -21,8 +20,6 @@ export const MINING_FEEL = Object.freeze({
   burstCap: 48,     // flying shells at once across every breaking rock
   burstLife: [1.2, 1.8],
 });
-// Inner light of minerals that glow on their own (mechanical coherence: crystal and star ore carry light; iron does not).
-export const MINERAL_GLOW = Object.freeze({crystal: 0x9a6be8, mithril: 0x6fe0f0, meteor: 0xff8a12, star: 0xff8a12});
 
 const UP = new T.Vector3(0, 1, 0);
 
@@ -49,8 +46,6 @@ export function createMiningFeel({scene, height = () => 0, emit = () => null, re
     entry.axis.crossVectors(UP, n.normalize().negate()).normalize();
     const w = Math.min(1, Math.max(0, weakness));
     entry.t = 0; entry.amp = MINING_FEEL.tilt * (.7 + .6 * w) * motion; entry.squash = MINING_FEEL.squash * (.8 + .5 * w) * motion;
-    const glow = MINERAL_GLOW[kind];
-    if (glow) fracture?.glow?.(glow, .25 + .75 * w);
   }
 
   // Last shell gone: free the split geometry and whatever the owner kept alive for it (its own tinted materials).

@@ -53,10 +53,11 @@ export function attachFracture(T,root,id,{chunks=CHUNKS,ground=null}={}){
     const floor=ground?ground(c.position.x,c.position.z)+f.radius:-Infinity;
     if(c.position.y<floor){c.position.y=floor;if(f.v.y<-1.2){f.v.y*=-.3;f.v.x*=.55;f.v.z*=.55;f.spin.multiplyScalar(.5);}else f.rest=true;}}
    const k=Math.min(1,Math.max(0,(f.life-f.t)/.35));c.scale.setScalar(f.s0*k*k*(3-2*k));if(f.t>f.life){c.removeFromParent();chips.splice(i,1);}}
-  if(heatLevel>0||glowLevel>0){heatLevel=Math.max(0,heatLevel-dt*3.2);const h=heatLevel*heatLevel;interior.emissive.copy(glowColor).multiplyScalar(glowLevel).lerp(heatColor,Math.min(1,h/(h+glowLevel+1e-4)));interior.emissiveIntensity=Math.max(glowLevel*.1,h*.16);}}
- const heatColor=new T.Color(),glowColor=new T.Color();let heatLevel=0,glowLevel=0;
+  if(heatLevel>0||glowLevel>0){heatLevel=Math.max(0,heatLevel-dt*3.2);const h=heatLevel*heatLevel;// Added on top of the interior's own crystal light, never in place of it.
+   const k=1/Math.max(1e-4,baseIntensity);interior.emissive.copy(baseEmissive).addScaledVector(glowColor,glowLevel*.1*k).addScaledVector(heatColor,h*.16*k);interior.emissiveIntensity=baseIntensity;}}
+ const heatColor=new T.Color(),glowColor=new T.Color(),baseEmissive=interior.emissive.clone(),baseIntensity=interior.emissiveIntensity;let heatLevel=0,glowLevel=0;
  function heat(amount=1,hex=0xff9a3c){heatColor.setHex(hex);heatLevel=Math.min(1.2,Math.max(heatLevel,amount));}
- function glow(hex,level){glowColor.setHex(hex);glowLevel=Math.max(0,Math.min(1,level));if(!glowLevel&&heatLevel<=0){interior.emissive.setRGB(0,0,0);interior.emissiveIntensity=0;}}
+ function glow(hex,level){glowColor.setHex(hex);glowLevel=Math.max(0,Math.min(1,level));if(!glowLevel&&heatLevel<=0){interior.emissive.copy(baseEmissive);interior.emissiveIntensity=baseIntensity;}}
  /** Hand every shell still on the rock to the caller (the break burst), detached from the tagged hierarchy. */
  function release(){const out=[];for(let k=0;k<cells.length;k++)if(!removed.has(k))for(const s of cells[k].shells){s.updateWorldMatrix(true,false);delete s.userData.targetId;s.raycast=()=>{};out.push({mesh:s,centroid:part.cells[k].centroid.clone().add(part.centre).applyMatrix4(host.matrixWorld),out:part.cells[k].centroid.clone().normalize().applyQuaternion(host.getWorldQuaternion(new T.Quaternion()))});}return out;}
  function dispose(){if(disposed)return;disposed=true;interior.dispose();for(const c of chips)c.removeFromParent();chips.length=0;releasePartition(part,key);}
