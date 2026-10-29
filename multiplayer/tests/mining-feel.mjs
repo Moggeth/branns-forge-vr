@@ -64,8 +64,8 @@ const scene = new T.Scene();
   const shells = [];
   for (let i = 0; i < MINING_FEEL.burstCap + 6; i++) { const m = new T.Mesh(new T.BoxGeometry(.2, .2, .2)); root.add(m); shells.push(m); }
   root.updateMatrixWorld(true);
-  let disposed = 0, done = 0;
-  const fracture = {release: () => shells.map((mesh, i) => ({mesh, centroid: new T.Vector3(3, .6, -1), out: new T.Vector3(Math.cos(i), .3, Math.sin(i)).normalize()})), dispose: () => disposed++};
+  let disposed = 0, done = 0, updates = 0;
+  const fracture = {update: () => updates++, release: () => shells.map((mesh, i) => ({mesh, centroid: new T.Vector3(3, .6, -1), out: new T.Vector3(Math.cos(i), .3, Math.sin(i)).normalize()})), dispose: () => disposed++};
   feel.burst({root, fracture, kind: 'gold', position: [3, .2, -1], done: () => done++});
   assert.equal(root.parent, null, 'the rock itself is gone at once');
   assert.ok(emitted.length >= 1 && emitted.every(e => e.burst && e.material === 'ore:gold'), 'a rubble burst in the mineral\'s colours');
@@ -75,6 +75,8 @@ const scene = new T.Scene();
   for (let i = 0; i < 60 * 3; i++) { feel.update(1 / 60); for (const c of scene.children) if (c.isGroup && c.children[0]?.isMesh && c !== root) minAbove = Math.min(minAbove, c.position.y - ground(c.position.x, c.position.z)); }
   assert.ok(minAbove > -.3, `shells rest on the ground (${minAbove.toFixed(3)})`);
   assert.equal(feel.stats().flying, 0); assert.equal(disposed, 1, 'fracture freed once'); assert.equal(done, 1);
+  assert.ok(updates > 60, 'chips from the earlier blows keep flying during the burst');
+  const after = updates; feel.update(1 / 60); assert.equal(updates, after, 'and stop once it is freed');
   assert.equal(scene.children.filter(c => c.isGroup).length, groupsBefore, 'no pivots left behind');
   feel.dispose();
 }

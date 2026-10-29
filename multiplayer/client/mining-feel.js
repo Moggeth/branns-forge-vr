@@ -31,6 +31,7 @@ export function createMiningFeel({scene, height = () => 0, emit = () => null, re
   const motion = reducedMotion ? .35 : 1;
   const shudders = new Map(); // root -> {t, amp, squash, axis, q0, s0}
   const debris = [];
+  const owners = new Set(); // breaking rocks whose fracture chips (from earlier blows) and shells are still in the air
   const stats = {strikes: 0, bursts: 0, flying: 0};
   const axis = new T.Vector3(), q = new T.Quaternion();
 
@@ -55,7 +56,7 @@ export function createMiningFeel({scene, height = () => 0, emit = () => null, re
   }
 
   // Last shell gone: free the split geometry and whatever the owner kept alive for it (its own tinted materials).
-  function finish(owner) { if (owner.finished) return; owner.finished = true; owner.fracture?.dispose?.(); owner.done?.(); }
+  function finish(owner) { if (owner.finished) return; owner.finished = true; owners.delete(owner); owner.fracture?.dispose?.(); owner.done?.(); }
 
   function settle(root, entry) {
     root.quaternion.copy(entry.q0); root.scale.copy(entry.s0); shudders.delete(root);
@@ -77,6 +78,7 @@ export function createMiningFeel({scene, height = () => 0, emit = () => null, re
     const shells = fracture?.release?.() || [];
     light?.dispose?.();
     const owner = {fracture, root, pending: 0, done};
+    owners.add(owner);
     const room = Math.max(0, MINING_FEEL.burstCap - debris.length);
     let seed = 0; for (const c of String(foot.map(v => v.toFixed(2)))) seed = (Math.imul(seed, 31) + c.charCodeAt(0)) | 0;
     const rnd = () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -113,6 +115,8 @@ export function createMiningFeel({scene, height = () => 0, emit = () => null, re
       const sq = e.squash * Math.exp(-e.t * MINING_FEEL.damping * 1.6) * wave;
       root.scale.set(e.s0.x * (1 + sq * .5), e.s0.y * (1 - sq), e.s0.z * (1 + sq * .5));
     }
+    // Chips the previous blows popped are still the fracture's own: keep them flying until the rock is fully gone.
+    for (const o of owners) o.fracture?.update?.(dt);
     for (let i = debris.length - 1; i >= 0; i--) {
       const d = debris[i], p = d.pivot;
       d.t += dt;
@@ -142,10 +146,9 @@ export function createMiningFeel({scene, height = () => 0, emit = () => null, re
 
   function dispose() {
     for (const [root, e] of shudders) settle(root, e);
-    const owners = new Set();
-    for (const d of debris) { d.pivot.removeFromParent(); owners.add(d.owner); }
+    for (const d of debris) d.pivot.removeFromParent();
     debris.length = 0;
-    for (const o of owners) finish(o);
+    for (const o of [...owners]) finish(o);
   }
 
   return {strike, burst, update, dispose, stats: () => ({...stats, shuddering: shudders.size})};
