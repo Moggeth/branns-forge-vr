@@ -1,82 +1,182 @@
-/* World creation menu (client/world-menu.js). Warm forge card over the lobby; one column on phones. */
+/* World creation menu (client/world-menu.js). A forge panel over the title vista: painted cards for each kind of
+   world, the chosen world's details in a scrolling body, and a footer that never scrolls away. Full screen on phones. */
 .wm-backdrop {
-  position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 16px;
-  background: radial-gradient(80% 60% at 50% 40%, rgba(14, 28, 22, .55), rgba(10, 8, 6, .82));
-  backdrop-filter: blur(3px);
+  position: fixed; inset: 0; z-index: 60; display: grid; place-items: center;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  background: radial-gradient(80% 70% at 50% 45%, rgba(20, 30, 40, .35), rgba(12, 10, 8, .72));
+  animation: wm-fade .2s ease both;
 }
 .wm-dialog {
-  width: min(920px, 100%); max-height: calc(100dvh - 32px); overflow: auto;
-  background: linear-gradient(180deg, rgba(34, 28, 21, .98), rgba(20, 17, 14, .98));
-  border: 1px solid var(--line, rgba(201, 164, 92, .28)); border-radius: 20px;
-  box-shadow: 0 24px 70px rgba(0, 0, 0, .55), inset 0 1px 0 rgba(255, 220, 160, .08);
-  padding: 20px 22px 16px; color: var(--text, #efe5d1);
+  position: relative; display: flex; flex-direction: column; width: min(960px, 100%); max-height: 100%; overflow: hidden;
+  background: linear-gradient(180deg, rgba(56, 40, 26, .98), rgba(24, 19, 14, .98) 30%);
+  border: 1px solid rgba(236, 196, 120, .55); border-radius: 22px;
+  box-shadow: 0 0 0 4px rgba(26, 18, 12, .35), 0 24px 70px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 230, 180, .2);
+  color: var(--text, #efe5d1); animation: wm-rise .3s cubic-bezier(.2, .8, .2, 1) both;
 }
-.wm-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
-.wm-kicker { margin: 0; font: 600 12px/1.2 var(--sans); letter-spacing: .14em; text-transform: uppercase; color: var(--brass, #c9a45c); }
-.wm-title { margin: 4px 0 0; font: 600 26px/1.15 var(--serif); color: var(--parchment, #f2e6cd); }
-.wm-close { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: rgba(255, 255, 255, .04); color: var(--muted, #b9aa8e); font-size: 24px; line-height: 1; cursor: pointer; }
-.wm-close:hover { color: var(--parchment); background: rgba(255, 255, 255, .08); }
-.wm-modes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.wm-head { flex: none; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 20px 22px 12px; }
+.wm-kicker { margin: 0; font: 700 12px/1.2 var(--sans); letter-spacing: .16em; text-transform: uppercase; color: var(--brass, #c9a45c); }
+.wm-title { margin: 4px 0 0; font: 600 28px/1.15 var(--serif); color: var(--parchment, #f2e6cd); }
+.wm-close { flex: none; width: 44px; height: 44px; border-radius: 50%; border: 1px solid rgba(236, 196, 120, .35); background: rgba(255, 255, 255, .04); color: var(--muted, #b9aa8e); font-size: 24px; line-height: 1; cursor: pointer; }
+.wm-close:hover { color: var(--parchment); background: rgba(255, 255, 255, .1); }
+
+/* Four painted cards. */
+.wm-modes { flex: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; padding: 0 22px; }
 .wm-mode {
-  display: flex; flex-direction: column; gap: 6px; text-align: left; cursor: pointer; min-height: 132px;
-  padding: 12px 12px 14px; border-radius: 14px; border: 1px solid rgba(201, 164, 92, .2);
-  background: linear-gradient(180deg, rgba(255, 240, 210, .05), rgba(255, 240, 210, .015)); color: inherit; font: inherit;
-  transition: border-color .15s ease, transform .15s ease, background .15s ease;
+  position: relative; display: flex; flex-direction: column; gap: 6px; text-align: left; cursor: pointer; min-width: 0;
+  padding: 0 0 12px; overflow: hidden; border-radius: 16px; border: 1px solid rgba(236, 196, 120, .22);
+  background: rgba(255, 240, 210, .04); color: inherit; font: inherit;
+  transition: border-color .15s ease, transform .15s ease, box-shadow .15s ease, background .15s ease;
 }
-.wm-mode:hover { border-color: rgba(236, 210, 154, .5); transform: translateY(-1px); }
+.wm-art { display: block; width: 100%; height: 84px; flex: none; border-bottom: 1px solid rgba(236, 196, 120, .25); transition: filter .25s ease; }
+.wm-mode:not([aria-checked="true"]) .wm-art { filter: saturate(.55) brightness(.75); }
+.wm-mode:hover { border-color: rgba(236, 210, 154, .6); transform: translateY(-2px); }
+.wm-mode:hover .wm-art { filter: none; }
 .wm-mode[aria-checked="true"] {
-  border-color: var(--brass-hi, #ecd29a);
-  background: linear-gradient(180deg, rgba(232, 105, 43, .2), rgba(201, 164, 92, .07));
-  box-shadow: 0 0 0 1px rgba(236, 210, 154, .35), 0 8px 24px rgba(232, 105, 43, .16);
+  border-color: #ffd28a; background: linear-gradient(180deg, rgba(232, 105, 43, .2), rgba(201, 164, 92, .06));
+  box-shadow: 0 0 0 2px rgba(255, 196, 120, .55), 0 12px 28px -8px rgba(232, 105, 43, .55);
 }
-.wm-mode:focus-visible, .wm-dice:focus-visible, .wm-close:focus-visible { outline: none; box-shadow: 0 0 0 3px #14110e, 0 0 0 5px var(--ember-hi, #ffb067); }
-.wm-mode-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; flex-wrap: wrap; }
+.wm-mode[aria-checked="true"]::after {
+  content: "✓"; position: absolute; top: 8px; left: 8px; width: 24px; height: 24px; display: grid; place-items: center;
+  border-radius: 50%; background: rgba(20, 14, 10, .78); color: #ffd28a; font-weight: 800; font-size: .85rem;
+}
+.wm-mode:focus-visible, .wm-dice:focus-visible, .wm-close:focus-visible, .wm-friends:has(input:focus-visible) { outline: none; box-shadow: 0 0 0 3px #14110e, 0 0 0 5px var(--ember-hi, #ffb067); }
+.wm-mode-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; flex-wrap: wrap; padding: 0 12px; }
 .wm-mode-title { font: 600 17px/1.2 var(--serif); color: var(--parchment); }
 .wm-tag { font: 700 10px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; padding: 4px 7px; border-radius: 99px; background: rgba(127, 182, 232, .16); color: #a9d6ff; }
-.wm-tag[data-tag="recommended"] { background: rgba(232, 105, 43, .2); color: var(--ember-hi, #ffb067); }
+.wm-tag[data-tag="recommended"] { background: rgba(255, 176, 103, .22); color: #ffc48a; }
 .wm-tag[data-tag="classic"] { background: rgba(181, 211, 107, .16); color: #cfe79a; }
-.wm-mode-blurb { font-size: 13px; line-height: 1.42; color: var(--muted); }
-.wm-detail { display: grid; grid-template-columns: 1fr 240px; gap: 16px; margin-top: 14px; padding: 14px; border-radius: 14px; background: rgba(0, 0, 0, .22); border: 1px solid rgba(201, 164, 92, .14); }
-.wm-detail[data-for="expedition"] { display: block; }
+.wm-mode-blurb { padding: 0 12px; font-size: 13px; line-height: 1.42; color: var(--muted); }
+.wm-mode-note { padding: 0 12px; font-size: 12px; color: #ffc48a; }
+.wm-art-puff { transform-box: fill-box; transform-origin: center; animation: wm-puff 3.2s ease-out infinite; opacity: 0; }
+.wm-art-puff-2 { animation-delay: -1.6s; }
+.wm-art-flame { transform-box: fill-box; transform-origin: 50% 100%; animation: wm-flame .7s ease-in-out infinite alternate; }
+.wm-art-flag { transform-box: fill-box; transform-origin: 0 50%; animation: wm-flag 2s ease-in-out infinite; }
+.wm-art-glow { animation: wm-glow 3s ease-in-out infinite; }
+.wm-art-sway { transform-box: fill-box; transform-origin: 50% 100%; animation: wm-sway 4s ease-in-out infinite; }
+
+/* The chosen world's details. */
+.wm-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 14px 22px 4px; }
+.wm-chosen { display: none; margin: 0 0 10px; font-size: 14px; line-height: 1.45; color: var(--parchment); }
+.wm-detail { display: grid; grid-template-columns: minmax(0, 1fr) 248px; gap: 18px; padding: 16px; border-radius: 16px; background: rgba(0, 0, 0, .24); border: 1px solid rgba(236, 196, 120, .16); }
 .wm-detail[hidden] { display: none !important; }
+.wm-steps-detail { display: block; }
 .wm-form { display: flex; flex-direction: column; gap: 8px; }
-.wm-field { display: flex; flex-direction: column; gap: 5px; font: 600 12px/1.2 var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--brass); }
+.wm-field { display: flex; flex-direction: column; gap: 6px; font: 700 12px/1.2 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--brass); }
 .wm-field select, .wm-seed {
   font: 500 16px/1.2 var(--sans); color: var(--parchment); text-transform: none; letter-spacing: 0;
-  background: rgba(255, 255, 255, .05); border: 1px solid rgba(201, 164, 92, .3); border-radius: 10px; padding: 10px 12px; min-height: 44px;
+  background: rgba(8, 7, 6, .5); border: 1px solid rgba(236, 196, 120, .32); border-radius: 12px; padding: 10px 12px; min-height: 46px;
 }
+.wm-field select:focus, .wm-seed:focus { outline: none; border-color: var(--brass-hi); box-shadow: 0 0 0 3px rgba(236, 210, 154, .2); }
 .wm-field select option { color: #14110e; }
 .wm-seed-row { display: flex; gap: 8px; }
 .wm-seed { flex: 1; min-width: 0; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
-.wm-dice { width: 48px; min-height: 44px; border-radius: 10px; border: 1px solid rgba(201, 164, 92, .3); background: rgba(232, 105, 43, .16); color: var(--ember-hi); font-size: 24px; cursor: pointer; }
-.wm-dice:hover { background: rgba(232, 105, 43, .28); }
+.wm-dice { width: 50px; min-height: 46px; border-radius: 12px; border: 1px solid rgba(255, 196, 120, .5); background: linear-gradient(180deg, rgba(255, 176, 103, .28), rgba(232, 105, 43, .16)); color: #ffd28a; font-size: 26px; line-height: 1; cursor: pointer; transition: transform .2s ease; }
+.wm-dice:hover { background: rgba(232, 105, 43, .34); }
+.wm-dice:active { transform: rotate(90deg) scale(.95); }
 .wm-preset-blurb, .wm-help { margin: 0; font-size: 13px; line-height: 1.45; color: var(--muted); }
-.wm-map { margin: 0; display: flex; flex-direction: column; gap: 6px; }
-.wm-map canvas { width: 100%; aspect-ratio: 1; border-radius: 12px; border: 1px solid rgba(201, 164, 92, .3); background: #1f4a5c; image-rendering: auto; transition: opacity .25s ease, filter .25s ease; }
-.wm-map canvas.wm-busy { opacity: .45; filter: blur(1px); }
-.wm-facts { font-size: 12px; line-height: 1.4; color: var(--muted); }
-.wm-foot { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
-.wm-foot-note { flex: 1; margin: 0; font-size: 13px; color: var(--muted); }
-.wm-friends { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; font-size: 14px; color: var(--muted); cursor: pointer; white-space: nowrap; }
-.wm-friends input { width: 20px; height: 20px; accent-color: var(--ember, #e8692b); }
-.wm-go[disabled] { opacity: .5; cursor: not-allowed; }
-.wm-launcher:empty::before { content: 'Run options appear here.'; color: var(--muted); font-size: 13px; }
-@media (max-width: 760px) {
-  .wm-modes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .wm-detail { grid-template-columns: 1fr; }
-  .wm-map { max-width: 260px; }
-  .wm-title { font-size: 21px; }
-  .wm-foot { flex-wrap: wrap; }
-  .wm-foot-note { flex-basis: 100%; }
-  .wm-friends { margin-right: auto; }
+
+/* The map preview, framed like a chart on the forge wall. */
+.wm-map { margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.wm-map-frame {
+  position: relative; display: block; padding: 6px; border-radius: 14px;
+  background: linear-gradient(135deg, #e9d3a3, #b98d4e); box-shadow: 0 8px 20px rgba(0, 0, 0, .4), inset 0 1px 0 rgba(255, 245, 220, .7);
 }
-@media (max-height: 520px) and (orientation: landscape) {
-  .wm-dialog { padding: 12px 14px; }
-  .wm-mode { min-height: 0; }
+.wm-map canvas { display: block; width: 100%; aspect-ratio: 1; border-radius: 9px; background: #2a6a86; image-rendering: auto; box-shadow: inset 0 0 0 1px rgba(60, 36, 12, .5); transition: opacity .25s ease, filter .25s ease; }
+.wm-map canvas.wm-busy { opacity: .55; filter: blur(1px) saturate(.6); }
+.wm-map-frame:has(canvas.wm-busy)::after {
+  content: ""; position: absolute; inset: 6px; border-radius: 9px; pointer-events: none;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 245, 220, .35) 50%, transparent 70%) 0 0 / 250% 100%; animation: wm-shimmer 1.3s linear infinite;
+}
+.wm-compass {
+  position: absolute; right: 12px; top: 12px; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%;
+  font: 700 11px/1 var(--serif); color: #3a2408; background: rgba(246, 230, 196, .88); box-shadow: 0 0 0 2px rgba(110, 70, 26, .6);
+}
+.wm-facts { font-size: 12.5px; line-height: 1.45; color: var(--parchment); opacity: .85; }
+
+/* Numbered steps for the valley and for runs. */
+.wm-steps { list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; }
+.wm-steps li { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; line-height: 1.45; color: var(--muted); }
+.wm-steps b { color: var(--parchment); font-weight: 600; }
+.wm-step-n { flex: none; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; font: 700 14px/1 var(--serif); color: #3a1804; background: linear-gradient(180deg, #ffd58c, #e8692b); box-shadow: 0 0 0 2px rgba(120, 50, 12, .5); }
+.wm-launcher:empty { display: none; }
+
+/* Footer: solo / friends switch, Back, Start. Never scrolls away. */
+.wm-foot { flex: none; display: flex; align-items: center; gap: 12px; padding: 12px 22px 18px; border-top: 1px solid rgba(236, 196, 120, .14); background: rgba(14, 11, 8, .35); }
+.wm-foot-note { flex: 1; margin: 0; font-size: 13px; color: var(--muted); }
+.wm-foot-note:empty { flex: 1; }
+.wm-friends { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 6px; border-radius: 12px; cursor: pointer; color: var(--parchment); }
+.wm-friends input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.wm-switch { position: relative; flex: none; width: 44px; height: 26px; border-radius: 99px; background: rgba(255, 240, 210, .12); box-shadow: inset 0 0 0 1px rgba(236, 196, 120, .4); transition: background .2s ease; }
+.wm-switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #d8c8a8; box-shadow: 0 2px 4px rgba(0, 0, 0, .4); transition: transform .2s ease, background .2s ease; }
+.wm-friends input:checked + .wm-switch { background: linear-gradient(180deg, #ffb067, #e8692b); }
+.wm-friends input:checked + .wm-switch::after { transform: translateX(18px); background: #fff6e4; }
+.wm-friends-text { display: grid; line-height: 1.2; font-size: 14px; font-weight: 600; white-space: nowrap; }
+.wm-friends-sub { font-size: 11.5px; font-weight: 500; color: var(--muted); }
+.wm-go { min-width: 190px; min-height: 50px; font-family: var(--serif); font-size: 1.08rem; letter-spacing: .02em; }
+.wm-go[disabled] { opacity: .5; cursor: not-allowed; }
+
+@keyframes wm-fade { from { opacity: 0; } }
+@keyframes wm-rise { from { opacity: 0; transform: translateY(12px) scale(.985); } }
+@keyframes wm-puff { 0% { opacity: 0; transform: translate(0, 0) scale(.6); } 20% { opacity: .9; } 100% { opacity: 0; transform: translate(4px, -16px) scale(2); } }
+@keyframes wm-flame { from { transform: scale(.9, .85); } to { transform: scale(1.05, 1.1); } }
+@keyframes wm-flag { 0%, 100% { transform: skewY(0); } 50% { transform: skewY(-8deg) scaleX(.9); } }
+@keyframes wm-glow { 0%, 100% { opacity: .18; } 50% { opacity: .38; } }
+@keyframes wm-sway { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
+@keyframes wm-shimmer { from { background-position: 150% 0; } to { background-position: -100% 0; } }
+
+/* Narrow screens: two-by-two cards, details in one column. */
+@media (max-width: 760px) {
+  .wm-modes { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 0 14px; }
+  .wm-head { padding: 16px 14px 10px; }
+  .wm-title { font-size: 22px; }
+  .wm-art { height: 58px; }
+  .wm-mode { padding-bottom: 8px; gap: 4px; }
   .wm-mode-blurb { display: none; }
-  .wm-detail { grid-template-columns: 1fr 170px; }
+  .wm-mode-title { font-size: 15px; }
+  .wm-body { padding: 12px 14px 4px; }
+  .wm-chosen { display: block; }
+  .wm-detail { grid-template-columns: 1fr; padding: 12px; }
+  .wm-map { max-width: 280px; width: 100%; justify-self: center; }
+  .wm-steps { grid-template-columns: 1fr; gap: 10px; }
+  .wm-foot { flex-wrap: wrap; padding: 10px 14px 14px; gap: 8px; }
+  .wm-foot-note { flex-basis: 100%; order: -1; }
+  .wm-foot-note:empty { display: none; }
+  .wm-friends { margin-right: auto; }
+  .wm-go { min-width: 0; flex: 1 1 auto; }
+}
+/* Phones: the menu is the whole screen, and Back is the way out (the corner belongs to the full screen button). */
+@media (max-width: 760px), (max-height: 560px) {
+  .wm-backdrop { padding: 0; }
+  .wm-dialog { width: 100%; height: 100%; max-height: none; border-radius: 0; border: 0; box-shadow: none; background: linear-gradient(180deg, #382a1c, #18130e 30%);
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  .wm-close { display: none; }
+  .wm-head { padding-right: 70px; }
+}
+/* Phones turned sideways: one row of compact cards, details beside the map. */
+@media (orientation: landscape) and (max-height: 560px) {
+  .wm-head { padding: 10px 70px 6px 16px; }
+  .wm-kicker { display: none; }
+  .wm-title { margin: 0; font-size: 19px; }
+  .wm-modes { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 0 16px; }
+  .wm-mode { flex-direction: row; align-items: center; gap: 8px; padding: 4px 8px 4px 4px; border-radius: 12px; }
+  .wm-mode[aria-checked="true"]::after { display: none; }
+  .wm-mode-blurb, .wm-mode-note { display: none; }
+  .wm-chosen { display: block; }
+  .wm-art { width: 48px; height: 36px; border: 0; border-radius: 8px; }
+  .wm-mode-top { padding: 0; display: grid; gap: 3px; }
+  .wm-mode-title { font-size: 13px; line-height: 1.15; }
+  .wm-tag { font-size: 8.5px; padding: 3px 5px; justify-self: start; }
+  .wm-body { padding: 8px 16px 2px; }
+  .wm-chosen { font-size: 12.5px; margin-bottom: 6px; }
+  .wm-detail { grid-template-columns: minmax(0, 1fr) 150px; padding: 10px; gap: 12px; }
+  .wm-map { max-width: none; }
+  .wm-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .wm-steps li { font-size: 12px; }
+  .wm-foot { flex-wrap: nowrap; padding: 6px 16px 8px; }
+  .wm-foot-note:not(:empty) { flex-basis: auto; order: 0; font-size: 12px; }
+  .wm-go, .wm-cancel { min-height: 44px; }
+  .wm-friends-sub { display: none; }
 }
 
-/* Lobby entry point under Play. */
-#lobby .create-block .new-world-btn { margin-top: 10px; min-width: 200px; }
-#lobby .create-block .friends-btn { display: block; margin: 6px auto 0; min-width: 200px; }
+/* Lobby entry point under Play (layout lives in client/title-screen.css). */
+#lobby .create-block .new-world-btn { margin-top: 0; }

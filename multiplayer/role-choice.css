@@ -102,38 +102,4 @@
 @keyframes rs-mote { 0% { transform: translateY(-10px); opacity: 0; } 30% { opacity: 1; } 100% { transform: translateY(16px); opacity: 0; } }
 @keyframes rs-swap { 0%, 70%, 100% { transform: rotate(0); } 85% { transform: rotate(180deg); } }
 
-/* ------------------------------------------------------------ desktop: a little more room for the scenes */
-@media (min-width: 720px) {
-  #lobby .role-card-scene .role-body { padding-bottom: 12px; }
-  #lobby .role-card-scene .role-icon { display: none; }
-}
-
-/* ------------------------------------------------------------ phones (portrait): scene over name and one line */
-@media (max-width: 760px), (max-height: 560px) {
-  #lobby .role-grid-scenes { gap: 10px; }
-  #lobby .role-card-scene .role-body {
-    display: flex !important; flex-direction: column !important; align-items: center !important; text-align: center !important;
-    min-height: 0 !important; padding: 0 0 8px !important; gap: 1px !important;
-  }
-  #lobby .role-card-scene .role-scene { height: 74px; margin-bottom: 5px; }
-  #lobby .role-card-scene .role-name { font-size: 1.15rem !important; }
-  #lobby .role-card-scene .role-desc { font-size: .74rem; -webkit-line-clamp: 2; padding: 0 6px; }
-  #lobby .role-card-scene .role-detail { display: none; }
-  #lobby .role-swap { width: 32px; height: 32px; margin: -16px 0 0 -16px; top: 37px; }
-  #lobby .role-swap svg { width: 18px; height: 18px; }
-  #lobby .role-switch-note { margin-top: 6px; font-size: .74rem; }
-  #lobby .role-switch-note span { display: none; }
-  #lobby .role-switch-note::after { content: "Hotbar button or F9."; }
-}
-
-/* ------------------------------------------------------------ landscape phones: scene becomes a thumbnail */
-@media (orientation: landscape) and (max-height: 560px) {
-  #lobby .role-card-scene .role-body {
-    display: grid !important; grid-template-columns: 64px minmax(0, 1fr); grid-template-rows: auto auto;
-    column-gap: 8px; row-gap: 0 !important; align-items: center !important; text-align: left !important; padding: 4px 8px 4px 4px !important;
-  }
-  #lobby .role-card-scene .role-scene { grid-row: 1 / 3; width: 64px; height: 42px; margin: 0; border: 0; border-radius: 9px; }
-  #lobby .role-card-scene .role-desc { -webkit-line-clamp: 2; padding: 0; font-size: .72rem; line-height: 1.2; }
-  #lobby .role-swap { top: 50%; }
-  #lobby .role-switch-note { margin-top: 4px; }
-}
+/* Sizes and phone layouts for these cards live in client/title-screen.css. */

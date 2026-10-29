@@ -63,10 +63,14 @@ import {insideTavern} from './shared/taverns.js';
 import './client/hero-progress.css';
 import './client/quartermaster.css';
 import './client/ui-polish.css';
+import './client/title-screen.css';
+import './client/game-menu.css';
+import {startLoadingTips} from './client/loading-tips.js';
 
 // ---------------------------------------------------------------- helpers
 const $ = id => document.getElementById(id);
 const body = document.body;
+startLoadingTips();
 const canvas = $('world');
 // Header controls wrap as room state and viewport width change.
 const hudHeader = document.querySelector('.hud-top');
@@ -226,9 +230,9 @@ function play() {
   start({create: true, solo: true, world: worldDescriptor({kind: 'wilds', seed: friendlySeed(Math.floor(Math.random() * 1e6)), preset: 'continent'})});
 }
 function refreshPlayHint() {
-  if (ROOM_PATTERN.test(invited)) { setText($('playHint'), 'Joins your friend’s world.'); return; }
+  if (ROOM_PATTERN.test(invited)) { setText($('playHint'), 'Join your friend’s world'); return; }
   const save = latestSoloSave();
-  setText($('playHint'), save ? `Back to ${save.name || 'your world'}, right where you left off.` : 'Your own world in the Great Wilds. It saves as you play.');
+  setText($('playHint'), save ? `Continue ${save.name || 'your world'}` : 'Start your own Great Wilds world');
 }
 refreshPlayHint();
 

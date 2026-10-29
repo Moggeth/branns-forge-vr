@@ -88,26 +88,120 @@
 
 <canvas id="world" aria-label="The world of Brann’s Forge"></canvas>
 
-<div class="atmosphere" aria-hidden="true">
-  <div class="glow"></div>
-  <svg class="treeline" viewBox="0 0 1200 220" preserveAspectRatio="none">
-    <path d="M0 220 V150 L30 120 L45 140 L70 90 L95 135 L120 105 L140 130 L170 70 L200 128 L225 100 L250 140 L280 95 L305 130 L330 60 L360 125 L390 100 L410 140 L440 85 L470 130 L500 110 L525 145 L560 75 L590 130 L615 105 L640 140 L670 92 L700 132 L730 65 L760 128 L790 98 L815 140 L845 88 L875 130 L900 108 L930 145 L960 70 L990 128 L1020 102 L1045 140 L1075 85 L1105 132 L1130 100 L1160 138 L1200 95 V220 Z" fill="currentColor"/>
+<div class="atmosphere title-vista" aria-hidden="true">
+  <svg class="tv-scene" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMax slice" focusable="false">
+    <defs>
+      <linearGradient id="tvSky" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#3f93d6"/><stop offset=".38" stop-color="#7cc4ec"/><stop offset=".6" stop-color="#cfe9ee"/><stop offset=".72" stop-color="#ffe3ad"/><stop offset="1" stop-color="#ffc98f"/>
+      </linearGradient>
+      <radialGradient id="tvSunGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1010 520) scale(520 380)">
+        <stop offset="0" stop-color="#fff6d6" stop-opacity=".95"/><stop offset=".25" stop-color="#ffe3a0" stop-opacity=".6"/><stop offset="1" stop-color="#ffd38a" stop-opacity="0"/>
+      </radialGradient>
+      <linearGradient id="tvHaze" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff4dc" stop-opacity="0"/><stop offset=".55" stop-color="#fff1d6" stop-opacity=".55"/><stop offset="1" stop-color="#fff1d6" stop-opacity="0"/></linearGradient>
+      <linearGradient id="tvRiver" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d8f3ff"/><stop offset="1" stop-color="#5fc0ea"/></linearGradient>
+      <linearGradient id="tvHillA" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9fd36f"/><stop offset="1" stop-color="#78b955"/></linearGradient>
+      <linearGradient id="tvHillB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7cc25a"/><stop offset="1" stop-color="#4f9a42"/></linearGradient>
+      <linearGradient id="tvHillC" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5aa548"/><stop offset="1" stop-color="#2f7438"/></linearGradient>
+      <linearGradient id="tvNear" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3d8a3c"/><stop offset="1" stop-color="#1f4f2c"/></linearGradient>
+      <radialGradient id="tvWindow"><stop offset="0" stop-color="#fff0b8"/><stop offset=".5" stop-color="#ffb347"/><stop offset="1" stop-color="#ff8a2a" stop-opacity="0"/></radialGradient>
+      <radialGradient id="tvCrystal"><stop offset="0" stop-color="#e9fbff" stop-opacity=".9"/><stop offset=".45" stop-color="#7fd3ff" stop-opacity=".45"/><stop offset="1" stop-color="#4aa8ff" stop-opacity="0"/></radialGradient>
+      <g id="tvTree"><rect x="-4" y="-6" width="8" height="24" rx="3" fill="#6b4426"/><circle r="22" cy="-22" fill="#4f9a40"/><circle r="15" cx="-14" cy="-10" fill="#5fae48"/><circle r="15" cx="14" cy="-12" fill="#43893a"/><circle r="9" cx="-6" cy="-32" fill="#74c257" opacity=".8"/></g>
+      <g id="tvPine"><rect x="-3" y="-4" width="6" height="16" rx="2" fill="#5a3a22"/><path d="M0-62 22-8H-22Z" fill="#2f7a45"/><path d="M0-62 22-8H0Z" fill="#24653a"/><path d="M0-62-12-30H6Z" fill="#43995a" opacity=".7"/></g>
+      <g id="tvCloud"><ellipse cx="0" cy="0" rx="90" ry="30"/><ellipse cx="-44" cy="-14" rx="44" ry="32"/><ellipse cx="22" cy="-26" rx="52" ry="40"/><ellipse cx="70" cy="-6" rx="36" ry="24"/></g>
+    </defs>
+
+    <rect width="1600" height="900" fill="url(#tvSky)"/>
+    <g class="tv-rays" style="transform-origin:1010px 520px">
+      <path d="M1010 520 L760 -80 L860 -80Z M1010 520 L1160 -80 L1260 -80Z M1010 520 L1600 40 L1600 160Z M1010 520 L300 -40 L420 -80Z M1010 520 L1600 300 L1600 380Z" fill="#fff6d6" opacity=".16"/>
+    </g>
+    <rect width="1600" height="900" fill="url(#tvSunGlow)"/>
+    <circle cx="1010" cy="520" r="62" fill="#fff8e0"/>
+    <circle class="tv-sun-halo" cx="1010" cy="520" r="84" fill="none" stroke="#fff3c8" stroke-width="10" opacity=".35"/>
+
+    <g class="tv-clouds" fill="#ffffff">
+      <use href="#tvCloud" class="tv-cloud tv-cloud-a" x="300" y="170" opacity=".92"/>
+      <use href="#tvCloud" class="tv-cloud tv-cloud-b" x="1300" y="120" opacity=".85"/>
+      <use href="#tvCloud" class="tv-cloud tv-cloud-c" x="760" y="260" opacity=".7"/>
+    </g>
+    <g class="tv-birds" fill="none" stroke="#35506b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+      <path class="tv-bird" d="M560 300q10-10 20 0q10-10 20 0"/>
+      <path class="tv-bird tv-bird-2" d="M610 330q7-7 14 0q7-7 14 0"/>
+      <path class="tv-bird tv-bird-3" d="M530 345q6-6 12 0q6-6 12 0"/>
+    </g>
+
+    <!-- far snowy range -->
+    <path d="M0 560 L90 470 L160 520 L260 400 L340 470 L420 430 L520 520 L600 450 L700 360 L800 470 L880 420 L960 500 L1060 410 L1150 470 L1240 380 L1340 470 L1430 430 L1520 500 L1600 450 V600 H0Z" fill="#a9bfe0"/>
+    <path d="M260 400 L300 436 L284 446 L268 432 L250 446 L234 426Z M700 360 L742 404 L724 412 L706 398 L690 414 L668 392Z M1240 380 L1282 420 L1262 428 L1246 414 L1228 430 L1210 410Z M1060 410 L1088 436 L1070 440 L1052 432 L1040 430Z" fill="#f6f9ff"/>
+    <path d="M0 600 L120 520 L220 570 L330 500 L450 575 L560 520 L660 580 L780 500 L900 580 L1010 530 L1120 585 L1240 515 L1360 580 L1480 530 L1600 570 V640 H0Z" fill="#87a5cf"/>
+    <rect y="520" width="1600" height="140" fill="url(#tvHaze)"/>
+
+    <!-- far hills -->
+    <path d="M0 640 C140 590 260 600 380 620 C520 640 600 590 760 600 C900 610 1000 640 1140 610 C1280 585 1420 600 1600 630 V720 H0Z" fill="url(#tvHillA)"/>
+    <g opacity=".9">
+      <use href="#tvPine" x="120" y="626"/><use href="#tvPine" x="150" y="620"/><use href="#tvPine" x="1380" y="606"/><use href="#tvPine" x="1410" y="612"/><use href="#tvPine" x="1440" y="608"/>
+    </g>
+
+    <!-- river -->
+    <path d="M980 612 C960 640 1010 660 990 690 C960 730 860 740 820 780 C780 820 840 860 800 900 H930 C960 860 900 830 950 790 C1010 744 1080 730 1060 690 C1046 660 1000 640 1000 612Z" fill="url(#tvRiver)"/>
+    <path class="tv-shimmer" d="M992 650 C1000 680 960 710 900 740 M880 800 C860 830 900 860 880 890" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-dasharray="18 30" opacity=".8"/>
+
+    <!-- mid hills with orchards -->
+    <path d="M0 700 C160 650 300 660 440 690 C540 712 620 690 700 672 C780 652 860 662 920 690 L960 720 C900 760 820 780 760 800 H0Z" fill="url(#tvHillB)"/>
+    <path d="M1080 690 C1180 660 1300 650 1420 670 C1500 682 1560 690 1600 700 V800 H1000 C1040 760 1080 730 1060 700Z" fill="url(#tvHillB)"/>
+    <g class="tv-trees">
+      <use href="#tvTree" x="230" y="688"/><use href="#tvTree" x="290" y="696"/><use href="#tvTree" x="350" y="690"/>
+      <use href="#tvTree" x="1210" y="676"/><use href="#tvTree" x="1270" y="672"/><use href="#tvPine" x="1490" y="690"/><use href="#tvPine" x="1525" y="696"/>
+      <circle cx="226" cy="676" r="3.5" fill="#e0443a"/><circle cx="296" cy="684" r="3.5" fill="#e0443a"/><circle cx="1216" cy="662" r="3.5" fill="#e0443a"/>
+    </g>
+
+    <!-- the forge on its hill -->
+    <path d="M560 760 C620 700 700 680 780 684 C860 688 900 712 940 760 V820 H560Z" fill="url(#tvHillC)"/>
+    <g class="tv-forge" transform="translate(745 690)">
+      <g class="tv-smoke" fill="#fbf7f0">
+        <circle class="tv-puff" cx="54" cy="-74" r="10"/><circle class="tv-puff tv-puff-2" cx="54" cy="-74" r="12"/><circle class="tv-puff tv-puff-3" cx="54" cy="-74" r="9"/>
+      </g>
+      <rect x="44" y="-74" width="20" height="40" rx="3" fill="#8d7d6a"/><rect x="41" y="-78" width="26" height="8" rx="2" fill="#6f6152"/>
+      <path d="M-70-8 L-70-40 L0-78 L70-40 L70-8Z" fill="#e6d6b8"/>
+      <path d="M-82-36 L0-86 L82-36 L74-30 L0-74 L-74-30Z" fill="#c9533a"/><path d="M0-86 L82-36 L74-30 L0-74Z" fill="#a8412d"/>
+      <rect x="-70" y="-40" width="140" height="44" fill="#d9c7a5"/>
+      <path d="M-70-40 H70 V-34 H-70Z" fill="#b9a585"/>
+      <rect x="-18" y="-28" width="36" height="32" rx="16" fill="#6b3f22"/>
+      <circle class="tv-glow" cx="0" cy="-10" r="34" fill="url(#tvWindow)"/>
+      <rect x="-12" y="-22" width="24" height="26" rx="12" fill="#ffb347"/>
+      <rect x="-52" y="-28" width="18" height="16" rx="3" fill="#ffcf6e"/><rect x="34" y="-28" width="18" height="16" rx="3" fill="#ffcf6e"/>
+      <path d="M-102 6 V-50" stroke="#7a5230" stroke-width="4" stroke-linecap="round"/>
+      <path class="tv-flag" d="M-100-50 h34 l-8 9 8 9 h-34z" fill="#e8692b"/>
+      <path d="M-30 4 h60" stroke="#5a8f3c" stroke-width="6" stroke-linecap="round"/>
+    </g>
+
+    <!-- near ground -->
+    <path d="M0 790 C180 750 340 760 500 790 C640 816 720 800 820 806 C980 816 1080 780 1240 770 C1400 760 1520 780 1600 800 V900 H0Z" fill="url(#tvNear)"/>
+    <g class="tv-flowers">
+      <circle cx="140" cy="830" r="5" fill="#ffd166"/><circle cx="170" cy="846" r="4" fill="#ff8fb1"/><circle cx="210" cy="826" r="4" fill="#ffffff"/>
+      <circle cx="420" cy="820" r="4" fill="#ffd166"/><circle cx="460" cy="836" r="5" fill="#ff8fb1"/><circle cx="1120" cy="812" r="5" fill="#ffd166"/>
+      <circle cx="1160" cy="830" r="4" fill="#ffffff"/><circle cx="1330" cy="806" r="4" fill="#ff8fb1"/><circle cx="1370" cy="826" r="5" fill="#ffd166"/>
+    </g>
+    <!-- a crystal outcrop: the land's magic -->
+    <g class="tv-crystals" transform="translate(1420 812)">
+      <circle class="tv-crystal-glow" r="70" fill="url(#tvCrystal)"/>
+      <path d="M-40 14 L-30-12 L-6-22 L22-14 L40 14Z" fill="#6a7486"/><path d="M-6-22 L22-14 L40 14 L8 14Z" fill="#525b6b"/>
+      <path d="M-18-10 L-10-62 L2-12Z" fill="#8fdcff"/><path d="M-10-62 L2-12 L-4-10Z" fill="#5bb8f0"/>
+      <path d="M6-12 L20-48 L26-10Z" fill="#a8e6ff"/><path d="M-30-6 L-34-34 L-20-8Z" fill="#7fd0ff"/>
+    </g>
+    <g class="tv-motes" fill="#fff6c8">
+      <circle class="tv-mote" cx="1400" cy="780" r="3"/><circle class="tv-mote tv-mote-2" cx="1440" cy="790" r="2.4"/><circle class="tv-mote tv-mote-3" cx="1420" cy="770" r="2"/>
+      <circle class="tv-mote tv-mote-4" cx="760" cy="640" r="2.4"/><circle class="tv-mote tv-mote-5" cx="740" cy="660" r="2"/>
+    </g>
   </svg>
-  <span class="ember" style="--x:12%;--d:9s;--delay:0s"></span>
-  <span class="ember" style="--x:28%;--d:12s;--delay:3s"></span>
-  <span class="ember" style="--x:47%;--d:10s;--delay:6s"></span>
-  <span class="ember" style="--x:63%;--d:13s;--delay:1.5s"></span>
-  <span class="ember" style="--x:78%;--d:11s;--delay:4.5s"></span>
-  <span class="ember" style="--x:90%;--d:14s;--delay:8s"></span>
 </div>
 
 <!-- ============ Welcome ============ -->
 <main id="lobby" class="lobby">
   <div class="card">
     <header class="masthead">
-      <svg class="crest" aria-hidden="true"><use href="#i-anvil"/></svg>
+      <span class="crest-medal" aria-hidden="true"><svg class="crest"><use href="#i-anvil"/></svg></span>
       <h1>Brann’s Forge</h1>
-      <p class="lede">Walk the land. Shape the world.<br>Your own adventure, or bring friends along.</p>
+      <p class="lede"><span>Walk the land. Shape the world.</span> <span>Your own adventure, or bring friends along.</span></p>
     </header>
 
     <!-- New: shown by lobby-ui.js bindConnectivity() when navigator.onLine is false -->
@@ -199,8 +293,7 @@
 
       <div class="actions">
         <section class="create-block">
-          <button id="create" class="btn btn-primary btn-large" type="button">Play</button>
-          <p id="playHint" class="hint">Your own world. Picks up right where you left off.</p>
+          <button id="create" class="btn btn-primary btn-large btn-play" type="button" aria-describedby="playHint"><span class="play-label">Play</span><span id="playHint" class="play-sub">Your own world. Picks up right where you left off.</span></button>
           <button id="newWorld" class="btn btn-secondary new-world-btn" type="button">New world…</button>
           <button id="friends" class="btn btn-quiet friends-btn" type="button">Play with friends</button>
           <button id="runLaunch" hidden class="btn btn-quiet rx-launch-entry" type="button">Expedition Roguelite <span class="rx-exp">Experimental</span></button>
@@ -226,7 +319,17 @@
 
     <div id="lobbyStatus" class="status" role="status" aria-live="polite" hidden>
       <span class="spinner" aria-hidden="true"></span>
+      <span class="status-emblem" aria-hidden="true">
+        <svg viewBox="0 0 120 120" focusable="false">
+          <circle class="se-ring" cx="60" cy="60" r="52" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="10 12" opacity=".55"/>
+          <g class="se-hammer"><path d="M100 60 H66" stroke="#8a5a32" stroke-width="7" stroke-linecap="round"/><path d="M100 60 H84" stroke="#5a3a22" stroke-width="8" stroke-linecap="round"/><rect x="54" y="44" width="16" height="25" rx="3" fill="#d4dae3"/><rect x="54" y="44" width="16" height="6" rx="2" fill="#f1f4f8"/></g>
+          <use href="#i-anvil" x="28" y="46" width="64" height="64" class="se-anvil"/>
+          <g class="se-sparks" fill="#ffd27a"><circle cx="62" cy="68" r="2.6"/><circle cx="62" cy="68" r="2"/><circle cx="62" cy="68" r="2.2"/><circle cx="62" cy="68" r="1.8"/></g>
+        </svg>
+      </span>
       <p id="lobbyStatusText"></p>
+      <span class="status-bar" aria-hidden="true"><span></span></span>
+      <p id="lobbyTip" class="status-tip" aria-live="off"></p>
       <div class="status-actions">
         <button id="statusSolo" class="btn btn-secondary" type="button" hidden>Play solo instead</button>
         <button id="statusRetry" class="btn btn-secondary" type="button" hidden>Try again</button>
