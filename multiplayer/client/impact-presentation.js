@@ -6,55 +6,79 @@
 // wood did, so no sparks at all), kind ('bite' | 'rebound' | 'cleave' | 'thud' from strike-feel.js).
 import * as THREE from 'three';
 
-export const IMPACT_CAPS = Object.freeze({ chips: 160, sparks: 96, dust: 96, flashes: 24 });
+export const IMPACT_CAPS = Object.freeze({ chips: 192, sparks: 96, dust: 96, flashes: 24 });
 
 const MATERIALS = ['stone', 'metal', 'bone', 'wood', 'earth', 'crystal'];
 const hex = (h) => { const c = new THREE.Color(h); return [c.r, c.g, c.b]; };
 
-// count = base particles at energy 1 / full detail. shape = flake scale ratios (x,y,z).
+// chips/sparks/puffs = base particle counts at energy 1 / full detail (puffs was once a second `dust` key that the
+// palette silently overwrote, so no dust ever showed; 2026-10-29). shape = flake scale ratios (x,y,z).
 // cone = max ejection angle from the normal (radians). Speeds in m/s, sizes in metres.
 const PROFILES = {
   stone: {
-    chips: 7, sparks: 2, dust: 3, cone: 1.2, speed: [1.4, 3.6], size: [0.010, 0.026],
+    chips: 7, sparks: 2, puffs: 3, cone: 1.2, speed: [1.4, 3.6], size: [0.010, 0.026],
     shape: [1.0, 0.6, 0.85], palette: ['#2f2d2b', '#4a443d', '#6b5e4b', '#9a7a45'],
     spark: ['#fff1d0', '#e9b46a'], dust: ['#6f6659', '#8f7b57'], dustSize: [0.025, 0.06], dustAlpha: 0.2,
   },
   metal: {
-    chips: 2, sparks: 14, dust: 1, cone: 1.05, speed: [3.0, 7.0], size: [0.006, 0.012],
+    chips: 2, sparks: 14, puffs: 1, cone: 1.05, speed: [3.0, 7.0], size: [0.006, 0.012],
     shape: [0.9, 0.25, 0.7], palette: ['#565c63', '#7b838b', '#3b4046'],
     spark: ['#fff6df', '#ffc572'], dust: ['#77746f'], dustSize: [0.02, 0.04], dustAlpha: 0.12,
   },
   bone: {
-    chips: 6, sparks: 0, dust: 3, cone: 1.25, speed: [1.2, 3.2], size: [0.008, 0.02],
+    chips: 6, sparks: 0, puffs: 3, cone: 1.25, speed: [1.2, 3.2], size: [0.008, 0.02],
     shape: [1.6, 0.35, 0.6], palette: ['#f2e9d2', '#e0d3b4', '#c9ba98', '#f8f1e0'],
     spark: ['#ffffff', '#ffffff'], dust: ['#e6dcc6', '#d6c9aa'], dustSize: [0.02, 0.05], dustAlpha: 0.17,
   },
   wood: {
     // Long fresh splinters (pale heartwood) mixed with darker bark flakes.
-    chips: 9, sparks: 0, dust: 3, cone: 1.35, speed: [1.5, 3.8], size: [0.010, 0.026],
+    chips: 9, sparks: 0, puffs: 3, cone: 1.35, speed: [1.5, 3.8], size: [0.010, 0.026],
     shape: [2.6, 0.26, 0.42], palette: ['#b07a3e', '#8b5a2b', '#e6c48c', '#d2a56a', '#f0d8a8', '#5d3a20'],
     spark: ['#ffffff', '#ffffff'], dust: ['#d8b67c', '#a8834f'], dustSize: [0.02, 0.055], dustAlpha: 0.17,
   },
   earth: {
     // Clods and grit: chunky, low and heavy, with a brown puff that hangs a moment.
-    chips: 6, sparks: 0, dust: 5, cone: 1.0, speed: [0.9, 2.6], size: [0.012, 0.03],
+    chips: 6, sparks: 0, puffs: 5, cone: 1.0, speed: [0.9, 2.6], size: [0.012, 0.03],
     shape: [1.0, 0.75, 0.9], palette: ['#5a4630', '#6e5638', '#47382a', '#5f6b34'],
     spark: ['#ffffff', '#ffffff'], dust: ['#8a7356', '#7a6a4e'], dustSize: [0.04, 0.11], dustAlpha: 0.24,
   },
   crystal: {
     // Glassy shards that catch the light, a few cold sparkles.
-    chips: 7, sparks: 4, dust: 2, cone: 1.15, speed: [1.8, 4.2], size: [0.008, 0.02],
+    chips: 7, sparks: 4, puffs: 2, cone: 1.15, speed: [1.8, 4.2], size: [0.008, 0.02],
     shape: [0.55, 1.8, 0.55], palette: ['#9fe6ff', '#5fb8ff', '#d8f6ff', '#7fd8e8'],
     spark: ['#f2fdff', '#7fd0ff'], dust: ['#bfe9ff'], dustSize: [0.02, 0.05], dustAlpha: 0.12,
   },
 };
+// Mining (2026-10-29): a pick into a deposit throws the rock's own matrix, flecks of the ore it carries and a few fat
+// chunks that land and lie in the grass a moment (rubble), with sparks tinted by the mineral. Each derives from stone.
+// burst (event hint): the deposit giving way; a wide, heavy spray in every direction instead of a cone off the face.
+const ORE = {
+  stone:   {palette: ['#4a443d', '#6b5e4b', '#8a8174', '#5a5550'], fleck: ['#b9b2a6', '#d8d0c0'], spark: ['#fff1d0', '#ffb45a']},
+  iron:    {palette: ['#5b3a2c', '#7a4a31', '#3a2a26', '#9a5a36'], fleck: ['#c9cfd4', '#e0c3a8', '#b06a3e'], spark: ['#fff3da', '#ff9a3c']},
+  copper:  {palette: ['#4b4338', '#5d5244', '#3d3a33'], fleck: ['#e09a62', '#5fd0a2', '#f2b07a'], spark: ['#fff4dc', '#ff9a52']},
+  gold:    {palette: ['#6e665a', '#d8cfbe', '#8a8170'], fleck: ['#ffd65a', '#fff0a8', '#e6b23a'], spark: ['#fffbe0', '#ffcf4a']},
+  mithril: {palette: ['#4e5458', '#6b7378', '#3e4246'], fleck: ['#c8f6ff', '#8fe4f0', '#ffffff'], spark: ['#f2feff', '#7fe6ff']},
+  crystal: {palette: ['#5a4e66', '#6e5f7c', '#433a4c'], fleck: ['#c9a8ff', '#e8dcff', '#9a6be8'], spark: ['#f6efff', '#b88aff']},
+  meteor:  {palette: ['#241f20', '#3a3030', '#191516'], fleck: ['#ffb84a', '#ffe0a0', '#ff8a12'], spark: ['#fff2d6', '#ff8a2a']},
+};
+ORE.star = ORE.meteor;
+for (const [kind, o] of Object.entries(ORE)) {
+  PROFILES['ore:' + kind] = {
+    ...PROFILES.stone, chips: 9, sparks: 4, puffs: 4, size: [0.012, 0.03], palette: o.palette, fleck: o.fleck, spark: o.spark,
+    chunks: 3, chunkSize: [0.035, 0.06], rubble: [1.4, 2.4], dustSize: [0.04, 0.1], dustAlpha: 0.24,
+  };
+  MATERIALS.push('ore:' + kind);
+}
+export const ORE_KINDS = Object.freeze(Object.keys(ORE));
 // Contact glint colour per material (hot core of the moment of contact). Missing = no glint.
 const FLASH = { stone: '#fff0c8', metal: '#fff6e0', crystal: '#d8f8ff', bone: '#fffaf0' };
+for (const kind of Object.keys(ORE)) FLASH['ore:' + kind] = ORE[kind].spark[0];
 for (const k of MATERIALS) {
   const p = PROFILES[k];
   p.paletteRgb = p.palette.map(hex);
   p.sparkRgb = p.spark.map(hex);
   p.dustRgb = p.dust.map(hex);
+  p.fleckRgb = p.fleck ? p.fleck.map(hex) : null;
 }
 const FLASH_RGB = Object.fromEntries(Object.entries(FLASH).map(([k, v]) => [k, hex(v)]));
 
@@ -190,7 +214,7 @@ export function createImpactPresentation({ scene, height = 0, camera = null } = 
   const chips = mk(chipCap);
   chips.q = new Float32Array(chipCap * 4); chips.w = new Float32Array(chipCap * 3);
   chips.s = new Float32Array(chipCap * 3); chips.rest = new Uint8Array(chipCap);
-  chips.bounce = new Uint8Array(chipCap);
+  chips.bounce = new Uint8Array(chipCap); chips.hold = new Float32Array(chipCap);
   const sparks = mk(sparkCap);
   sparks.hot = new Float32Array(sparkCap * 3); sparks.base = new Float32Array(sparkCap * 3);
   sparks.w = new Float32Array(sparkCap); sparks.bounce = new Uint8Array(sparkCap);
@@ -247,6 +271,7 @@ export function createImpactPresentation({ scene, height = 0, camera = null } = 
       if (al > 1e-6) { nx = ax / al; ny = ay / al; nz = az / al; }
     }
     const e = fin(ev.energy) ? clamp(ev.energy, 0.2, 2) : 1;
+    const burst = ev.burst === true;
     const seed = fin(ev.seed) ? Math.trunc(ev.seed) | 0 : 0;
     const rnd = mulberry32((seed ^ Math.imul(MATERIALS.indexOf(ev.material) + 1, 0x9E3779B1)) | 0);
     const lod = detail(px, py, pz);
@@ -282,27 +307,31 @@ export function createImpactPresentation({ scene, height = 0, camera = null } = 
       out[i * 3 + 2] = pz + t1z * ca + t2z * sa + nz * lift;
     };
 
-    const hard = ev.material === 'stone' || ev.material === 'metal' || ev.material === 'crystal';
-    const sparkBase = ev.steel === false ? 0 : ev.steel === true && hard ? Math.max(8, prof.sparks * 2.5) : prof.sparks;
-    const chipBase = prof.chips * (ev.kind === 'bite' ? 1.3 : ev.kind === 'rebound' ? 0.7 : 1);
-    const nChips = count(chipBase), nSparks = count(sparkBase), nDust = lod < 0.3 ? 0 : count(prof.dust);
+    const hard = ev.material === 'stone' || ev.material === 'metal' || ev.material === 'crystal' || !!prof.fleck;
+    const sparkBase = (ev.steel === false ? 0 : ev.steel === true && hard ? Math.max(8, prof.sparks * 2.5) : prof.sparks) * (burst ? 1.6 : 1);
+    const chipBase = prof.chips * (ev.kind === 'bite' || ev.kind === 'pry' ? 1.3 : ev.kind === 'rebound' ? 0.7 : 1) * (burst ? 3 : 1);
+    const nChips = count(chipBase), nSparks = count(sparkBase), nDust = lod < 0.3 ? 0 : count(prof.puffs * (burst ? 3 : 1));
+    const nChunks = prof.chunks ? count(prof.chunks * (burst ? 3 : 1)) : 0;
+    const coneMax = burst ? 1.5 : prof.cone;
     const glint = FLASH_RGB[ev.material] && (ev.material === 'bone' || ev.steel !== false) ? FLASH_RGB[ev.material] : null;
     if (glint && lod > 0.25) {
       const i = slot(flashes);
       flashes.p[i * 3] = px + n0x * 0.02; flashes.p[i * 3 + 1] = py + n0y * 0.02; flashes.p[i * 3 + 2] = pz + n0z * 0.02;
-      flashes.life[i] = 0.1 + 0.04 * e;
-      flashes.size[i] = (ev.material === 'bone' ? 0.16 : 0.32) * (0.75 + 0.25 * e) * (ev.steel === true ? 1.15 : 1);
+      flashes.life[i] = (0.1 + 0.04 * e) * (burst ? 2.2 : 1);
+      flashes.size[i] = (ev.material === 'bone' ? 0.16 : 0.32) * (0.75 + 0.25 * e) * (ev.steel === true ? 1.15 : 1) * (burst ? 3.2 : 1);
       flashTint.array[i * 4] = glint[0]; flashTint.array[i * 4 + 1] = glint[1]; flashTint.array[i * 4 + 2] = glint[2];
       flashTint.array[i * 4 + 3] = 0;
     }
 
-    for (let k = 0; k < nChips; k++) {
+    for (let k = 0; k < nChips + nChunks; k++) {
+      // The last nChunks are fat rubble: slower, heavier, and they lie where they land for a moment.
+      const chunk = k >= nChips, fleck = !chunk && prof.fleckRgb && k % 3 === 2;
       const i = slot(chips);
-      origin(chips.p, i, 0.006, 0.003);
-      cone(prof.cone);
-      const sp = (prof.speed[0] + rnd() * (prof.speed[1] - prof.speed[0])) * eSpeed;
-      chips.v[i * 3] = vA.x * sp; chips.v[i * 3 + 1] = vA.y * sp; chips.v[i * 3 + 2] = vA.z * sp;
-      const sz = (prof.size[0] + rnd() * (prof.size[1] - prof.size[0])) * eSize;
+      origin(chips.p, i, burst ? 0.12 : 0.006, 0.003);
+      cone(chunk ? coneMax * 0.8 : coneMax);
+      const sp = (prof.speed[0] + rnd() * (prof.speed[1] - prof.speed[0])) * eSpeed * (chunk ? 0.6 : 1) * (burst ? 1.35 : 1);
+      chips.v[i * 3] = vA.x * sp; chips.v[i * 3 + 1] = vA.y * sp + (burst ? 1.2 : 0); chips.v[i * 3 + 2] = vA.z * sp;
+      const sz = (chunk ? prof.chunkSize[0] + rnd() * (prof.chunkSize[1] - prof.chunkSize[0]) : (prof.size[0] + rnd() * (prof.size[1] - prof.size[0])) * (fleck ? 0.7 : 1)) * eSize;
       chips.size[i] = sz;
       chips.s[i * 3] = sz * prof.shape[0] * (0.75 + rnd() * 0.5);
       chips.s[i * 3 + 1] = sz * prof.shape[1] * (0.7 + rnd() * 0.6);
@@ -312,17 +341,18 @@ export function createImpactPresentation({ scene, height = 0, camera = null } = 
       const spin = 8 + rnd() * 18;
       vA.set(rnd() - 0.5, rnd() - 0.5, rnd() - 0.5).normalize();
       chips.w[i * 3] = vA.x * spin; chips.w[i * 3 + 1] = vA.y * spin; chips.w[i * 3 + 2] = vA.z * spin;
-      chips.life[i] = 0.85 + rnd() * 0.5;
+      chips.life[i] = chunk ? 4.5 : 0.85 + rnd() * 0.5;
+      chips.hold[i] = chunk ? prof.rubble[0] + rnd() * (prof.rubble[1] - prof.rubble[0]) : 0.3;
       chips.rest[i] = 0; chips.bounce[i] = 0;
-      const c = prof.paletteRgb[(rnd() * prof.paletteRgb.length) | 0], j = 0.88 + rnd() * 0.24;
+      const list = fleck ? prof.fleckRgb : prof.paletteRgb, c = list[(rnd() * list.length) | 0], j = 0.88 + rnd() * 0.24;
       const ca = chipMesh.instanceColor.array;
       ca[i * 3] = c[0] * j; ca[i * 3 + 1] = c[1] * j; ca[i * 3 + 2] = c[2] * j;
     }
 
     for (let k = 0; k < nSparks; k++) {
       const i = slot(sparks);
-      origin(sparks.p, i, 0.003, 0.002);
-      cone(prof.cone);
+      origin(sparks.p, i, burst ? 0.08 : 0.003, 0.002);
+      cone(coneMax);
       const sp = (prof.speed[0] + rnd() * (prof.speed[1] - prof.speed[0])) * eSpeed;
       sparks.v[i * 3] = vA.x * sp; sparks.v[i * 3 + 1] = vA.y * sp; sparks.v[i * 3 + 2] = vA.z * sp;
       sparks.life[i] = (0.16 + rnd() * 0.22) * (0.8 + 0.2 * e);
@@ -334,14 +364,14 @@ export function createImpactPresentation({ scene, height = 0, camera = null } = 
 
     for (let k = 0; k < nDust; k++) {
       const i = slot(dust);
-      origin(dust.p, i, 0.01, 0.006);
-      cone(prof.cone * 0.7);
-      const sp = (0.25 + rnd() * 0.6) * eSpeed;
+      origin(dust.p, i, burst ? 0.25 : 0.01, 0.006);
+      cone(coneMax * 0.7);
+      const sp = (0.25 + rnd() * 0.6) * eSpeed * (burst ? 2.2 : 1);
       dust.v[i * 3] = vA.x * sp; dust.v[i * 3 + 1] = vA.y * sp + 0.1; dust.v[i * 3 + 2] = vA.z * sp;
-      dust.life[i] = 0.35 + rnd() * 0.3;
-      const s0 = (prof.dustSize[0] + rnd() * 0.3 * (prof.dustSize[1] - prof.dustSize[0])) * (0.8 + 0.2 * e);
+      dust.life[i] = (0.35 + rnd() * 0.3) * (burst ? 2.6 : 1);
+      const s0 = (prof.dustSize[0] + rnd() * 0.3 * (prof.dustSize[1] - prof.dustSize[0])) * (0.8 + 0.2 * e) * (burst ? 3 : 1);
       dust.size[i] = s0;
-      dust.size1[i] = (s0 + (prof.dustSize[1] - prof.dustSize[0]) * (0.5 + rnd() * 0.5) * (0.8 + 0.2 * e)) * farBoost;
+      dust.size1[i] = (s0 + (prof.dustSize[1] - prof.dustSize[0]) * (0.5 + rnd() * 0.5) * (0.8 + 0.2 * e) * (burst ? 5 : 1)) * farBoost;
       dust.amax[i] = prof.dustAlpha * (0.7 + 0.3 * rnd()) * (0.6 + 0.4 * Math.min(e, 1.5));
       const c = prof.dustRgb[(rnd() * prof.dustRgb.length) | 0];
       dustTint.array[i * 4] = c[0]; dustTint.array[i * 4 + 1] = c[1]; dustTint.array[i * 4 + 2] = c[2];
@@ -349,9 +379,9 @@ export function createImpactPresentation({ scene, height = 0, camera = null } = 
     }
 
     // New chip colours must reach the GPU (they were written above but never uploaded, so every chip drew black).
-    if (nChips) chipMesh.instanceColor.needsUpdate = true;
+    if (nChips + nChunks) chipMesh.instanceColor.needsUpdate = true;
     emitted++;
-    return { chips: nChips, sparks: nSparks, dust: nDust, flash: !!glint };
+    return { chips: nChips, chunks: nChunks, sparks: nSparks, dust: nDust, flash: !!glint };
   }
 
   const kill = (mesh, i) => { mesh.instanceMatrix.array.set(ZERO16, i * 16); };
@@ -379,7 +409,7 @@ export function createImpactPresentation({ scene, height = 0, camera = null } = 
             P.w[i3] *= 0.5; P.w[i3 + 1] *= 0.5; P.w[i3 + 2] *= 0.5;
             if (++P.bounce[i] >= 2 || vy < 0.45) {
               P.rest[i] = 1; vy = 0;
-              P.life[i] = Math.min(P.life[i], P.age[i] + 0.3 + CHIP_FADE);
+              P.life[i] = Math.min(P.life[i], P.age[i] + P.hold[i] + CHIP_FADE);
             }
           }
         }

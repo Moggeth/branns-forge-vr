@@ -19,7 +19,10 @@ const fractureKey=(meshes,id,chunks)=>meshes.map(m=>m.geometry.uuid).join('|')+'
 function releasePartition(part,key){if(--part.users<=0){for(const c of part.cells){for(const s of c.shells)s.geometry.dispose();c.crater.dispose();}for(const w of part.walls)w.geometry.dispose();cache.delete(key);}}
 
 // root: the Group returned by authored('boulder'|'meteor') (already tagged with userData.targetId).
-export function attachFracture(T,root,id,{chunks=CHUNKS}={}){
+// ground(x,z) (optional): world floor height, so popped chips bounce and settle instead of shrinking in mid-air.
+// heat(amount, hex) lights the freshly exposed interior for a moment after each blow (the strike's own heat and dust);
+// glow(hex, level) is a steady inner light for minerals that carry their own (crystal, mithril, star ore).
+export function attachFracture(T,root,id,{chunks=CHUNKS,ground=null}={}){
  const meshes=[];root.traverse(n=>{if(n.isMesh&&!n.userData.fractureOwned)meshes.push(n);});
  if(!meshes.length)return null;
  const host=meshes[0].parent; // all primitives of the authored node share this space (glTF multi-primitive -> sibling meshes)
@@ -38,15 +41,28 @@ export function attachFracture(T,root,id,{chunks=CHUNKS}={}){
  function setDamage(hits,maxHits,{animate=true}={}){const max=Math.max(1,maxHits||1);const want=Math.min(chunks-3,Math.floor((chunks-3)*Math.min(1,(hits||0)/max)+1e-9));
   while(level<want){const k=part.order[level++];removed.add(k);const cell=cells[k];
    for(const s of cell.shells){if(!animate){s.removeFromParent();continue;}s.updateWorldMatrix(true,false);const chip=s;root.parent?.attach(chip);delete chip.userData.targetId;chip.userData.ignoreContact=true;chip.raycast=()=>{};
-    const r=rng(hash(id+':'+k));const out=part.cells[k].centroid.clone().normalize();chip.userData.fly={t:0,v:out.multiplyScalar(1.5+r()).applyQuaternion(host.getWorldQuaternion(new T.Quaternion())).add(new T.Vector3(0,2.2,0)),spin:new T.Vector3(r()*5,r()*5,r()*5),s0:chip.scale.x};chips.push(chip);}
+    const r=rng(hash(id+':'+k));const out=part.cells[k].centroid.clone().normalize();
+    // Pivot the shell about its own centre, so it tumbles like a broken-off flake rather than orbiting the rock's origin.
+    const centre=part.cells[k].centroid.clone().add(part.centre).applyMatrix4(host.matrixWorld),pivot=new T.Group();pivot.position.copy(centre);root.parent?.add(pivot);pivot.updateMatrixWorld(true);pivot.attach(chip);
+    pivot.userData.fly={t:0,v:out.multiplyScalar(1.4+r()*1.2).applyQuaternion(host.getWorldQuaternion(new T.Quaternion())).add(new T.Vector3(0,2.4+r(),0)),spin:new T.Vector3(r()*9-4.5,r()*9-4.5,r()*9-4.5),s0:pivot.scale.x,rest:false,life:1.15+r()*.5,radius:Math.max(.05,s.geometry.boundingSphere?.radius*.25||.08)};chips.push(pivot);}
    cell.shells.length=0;host.add(cell.crater);cell.crater.visible=true;}
   for(const w of walls){const on=removed.has(w.a)!==removed.has(w.b)&&removed.has(w.facing);if(on&&!w.on)host.add(w.mesh);else if(!on&&w.on)w.mesh.removeFromParent();w.on=on;}
   return level;}
- function update(dt){for(let i=chips.length-1;i>=0;i--){const c=chips[i],f=c.userData.fly;f.t+=dt;f.v.y-=9.8*dt;c.position.addScaledVector(f.v,dt*.35);c.rotation.x+=f.spin.x*dt;c.rotation.z+=f.spin.z*dt;
-  const k=Math.max(0,1-f.t/.6);c.scale.setScalar(f.s0*k);if(f.t>.6){c.removeFromParent();chips.splice(i,1);}}}
+ function update(dt){for(let i=chips.length-1;i>=0;i--){const c=chips[i],f=c.userData.fly;f.t+=dt;
+   if(!f.rest){f.v.y-=9.8*dt;c.position.addScaledVector(f.v,dt);c.rotation.x+=f.spin.x*dt;c.rotation.y+=f.spin.y*dt;c.rotation.z+=f.spin.z*dt;
+    const floor=ground?ground(c.position.x,c.position.z)+f.radius:-Infinity;
+    if(c.position.y<floor){c.position.y=floor;if(f.v.y<-1.2){f.v.y*=-.3;f.v.x*=.55;f.v.z*=.55;f.spin.multiplyScalar(.5);}else f.rest=true;}}
+   const k=Math.min(1,Math.max(0,(f.life-f.t)/.35));c.scale.setScalar(f.s0*k*k*(3-2*k));if(f.t>f.life){c.removeFromParent();chips.splice(i,1);}}
+  if(heatLevel>0||glowLevel>0){heatLevel=Math.max(0,heatLevel-dt*3.2);const h=heatLevel*heatLevel;// Added on top of the interior's own crystal light, never in place of it.
+   const k=1/Math.max(1e-4,baseIntensity);interior.emissive.copy(baseEmissive).addScaledVector(glowColor,glowLevel*.1*k).addScaledVector(heatColor,h*.16*k);interior.emissiveIntensity=baseIntensity;}}
+ const heatColor=new T.Color(),glowColor=new T.Color(),baseEmissive=interior.emissive.clone(),baseIntensity=interior.emissiveIntensity;let heatLevel=0,glowLevel=0;
+ function heat(amount=1,hex=0xff9a3c){heatColor.setHex(hex);heatLevel=Math.min(1.2,Math.max(heatLevel,amount));}
+ function glow(hex,level){glowColor.setHex(hex);glowLevel=Math.max(0,Math.min(1,level));if(!glowLevel&&heatLevel<=0){interior.emissive.copy(baseEmissive);interior.emissiveIntensity=baseIntensity;}}
+ /** Hand every shell still on the rock to the caller (the break burst), detached from the tagged hierarchy. */
+ function release(){const out=[];for(let k=0;k<cells.length;k++)if(!removed.has(k))for(const s of cells[k].shells){s.updateWorldMatrix(true,false);delete s.userData.targetId;s.raycast=()=>{};out.push({mesh:s,centroid:part.cells[k].centroid.clone().add(part.centre).applyMatrix4(host.matrixWorld),out:part.cells[k].centroid.clone().normalize().applyQuaternion(host.getWorldQuaternion(new T.Quaternion()))});}return out;}
  function dispose(){if(disposed)return;disposed=true;interior.dispose();for(const c of chips)c.removeFromParent();chips.length=0;releasePartition(part,key);}
  function stats(){return {variant,chunks,removed:removed.size,chips:chips.length,walls:walls.filter(w=>w.on).length,cachedPartitions:cache.size};}
- return {setDamage,update,dispose,stats,removedCells:()=>[...removed]};
+ return {setDamage,update,dispose,stats,heat,glow,release,removedCells:()=>[...removed]};
 }
 
 /** Prepare at most 12 unique nearby deposit/variant partitions without changing

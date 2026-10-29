@@ -11,6 +11,7 @@ import {createCrystalWall} from './crystal-wall.js';
 import {attachFracture,prepareFractureWarmup,prepareFractureWarmupAsync} from './mining-fracture.js';
 import {createGeodeLight,setGeodeLightTime,geodeLightGlobalStats,GEODE_LIGHT_BUDGET,GEODE_LIGHT_DISTANCE} from './geode-light.js';
 import {createTreeView} from './tree-view.js';
+import {createMiningFeel} from './mining-feel.js';
 
 // Installed GLBs plus the Opus-authored reusable mineral and tree-detail kit.
 // Trees (notches, hinge fall, stumps, physical logs, LOD) are delegated to tree-view.js; this module keeps props.
@@ -25,13 +26,17 @@ function bayPlate(kind,amount){if(typeof document==='undefined')return null;cons
  const draw=n=>{g.clearRect(0,0,256,88);g.fillStyle='rgba(18,13,9,.82)';g.beginPath();g.roundRect(6,10,244,68,30);g.fill();g.strokeStyle='rgba(233,202,117,.75)';g.lineWidth=3;g.stroke();
   g.textAlign='center';g.textBaseline='middle';g.font='700 40px Georgia, serif';g.fillStyle=BAY_COLORS[kind]||'#ffe1a0';g.fillText(`${n} ${materialLabel(kind)}`,128,45);tex.needsUpdate=true;};
  const tex=new T.CanvasTexture(canvas);tex.colorSpace=T.SRGBColorSpace;const sprite=new T.Sprite(new T.SpriteMaterial({map:tex,transparent:true,depthWrite:false}));sprite.scale.set(.66,.23,1);sprite.renderOrder=3;sprite.userData.ownMaterial=true;sprite.userData.draw=draw;sprite.userData.amount=amount;draw(amount);return sprite;}
-export function createWorldContent({scene,templates,instantiate,height,camera=null}) {
+export function createWorldContent({scene,templates,instantiate,height,camera=null,emit=()=>null,reducedMotion=false}) {
  const objects=new Map(),batches=[],formations=[],decorationGroups=new Map(),readyDecorations=new Set(DECORATION_ASSETS.filter(name=>templates.has(name)));let generation=0,alive=true;let terrainKey=null,foundationKey=null,last=null,seed=null,treeAssets='',previousTerrainEdits=[],previousTerrainTick=Infinity;
  const resourceArt=createResourceArt();let miningWarmup=null;
  const resourceVariant=id=>{let h=2166136261;for(const ch of id)h=Math.imul(h^ch.charCodeAt(0),16777619);return (h>>>0)%3;};
  const treeView=createTreeView({scene,templates,height,camera});
  const crystalWall=createCrystalWall({THREE:T,scene,height});let previousTickTime=null;
  const matrix=new T.Matrix4(),dummy=new T.Object3D();
+ // Mining feel: struck rocks rock and glow, broken ones burst apart; rewards that appear in the rubble hop out of it.
+ const floorAt=(x,z)=>height(x,z,last?.edits);
+ const miningFeel=createMiningFeel({scene,height:floorAt,emit,reducedMotion});const recentBursts=[];
+ function ensureFracture(e){if(!e.fracture){e.fracture=attachFracture(T,e.root,e.data.id,{ground:floorAt});if(e.data.kind==='meteor'&&e.fracture)e.light=createGeodeLight({root:e.root,id:e.data.id,fracture:e.fracture});}return e.fracture;}
  const lightCandidates=[],cameraPosition=new T.Vector3();
  function nearbyDeposits(){
   const deposits=[...objects.values()].filter(e=>e.data.type==='deposit');
@@ -60,14 +65,21 @@ export function createWorldContent({scene,templates,instantiate,height,camera=nu
     else if(templates.has(PICKUP_ASSETS[c.kind])){root=new T.Group();root.add(templates.get(PICKUP_ASSETS[c.kind]).scene.clone(true));root.userData.authoredPickup=true;}
     else continue; // Wait for the authored asset; never show a temporary primitive pickup.
     if(!root)continue;if(c.type==='deposit'&&!root.userData.authoredDeposit&&!['stone','meteor'].includes(c.kind)){root.traverse(n=>{if(n.isMesh){n.material=n.material.clone();n.material.color.lerp(new T.Color(DEPOSIT_CATALOG[c.kind]?.color||0xffffff),.65);n.userData.ownMaterial=true;}});}scene.add(root);tag(root,c.id);e={root,data:c,bay:!!root.userData.barStack};if(e.bay){e.plate=bayPlate(c.kind,c.amount);if(e.plate){e.plate.position.y=Math.ceil(root.userData.barStack/3)*.073+.32;root.add(e.plate);}}objects.set(c.id,e);
+    if(c.type==='pickup'&&!e.bay){e.born=performance.now();if(recentBursts.some(b=>e.born-b.at<1500&&Math.hypot(b.x-c.x,b.z-c.z)<1.2))e.pop={t:-1};}
    }if(e.plate&&e.plate.userData.amount!==c.amount){e.plate.userData.amount=c.amount;e.plate.userData.draw(c.amount);}e.data=c;const floor=height(c.x,c.z,s.edits);e.root.position.set(c.x,c.type==='bridge'?c.y:floor+(c.type==='pickup'?pickupLift(e):0),c.z);if(c.type==='bridge')e.root.rotation.y=c.yaw;
    if(c.type==='deposit'&&c.hits>0){
-    if(!e.fracture){e.fracture=attachFracture(T,e.root,c.id);if(c.kind==='meteor'&&e.fracture)e.light=createGeodeLight({root:e.root,id:c.id,fracture:e.fracture});}
+    ensureFracture(e);
     // Capture the fracture shells before saved damage removes them without chips.
     e.fracture?.setDamage(c.hits,c.maxHits,{animate:!newlyCreated});e.light?.damage(c.hits/Math.max(1,c.maxHits));
    }
   }
-  for(const [id,e]of objects)if(!objectIds.has(id)){e.light?.dispose();e.fracture?.dispose();remove(e.root);if(e.root.isMesh)e.root.geometry.dispose();objects.delete(id);}
+  for(const [id,e]of objects)if(!objectIds.has(id)){objects.delete(id);
+   // Mined out: the rock bursts apart (mining-feel.js owns its shells until they land and sink away).
+   if(e.data.type==='deposit'&&s.deposits?.some(d=>d.id===id&&d.depleted)){const foot=[e.root.position.x,e.root.position.y,e.root.position.z];const at=performance.now();recentBursts.push({x:foot[0],z:foot[2],at});if(recentBursts.length>8)recentBursts.shift();
+    // Its reward usually arrives in this same snapshot (created above): pop it out of the rubble too.
+    for(const p of objects.values())if(p.data.type==='pickup'&&!p.bay&&!p.pop&&at-p.born<50&&Math.hypot(p.data.x-foot[0],p.data.z-foot[2])<1.2)p.pop={t:-1};
+    miningFeel.burst({root:e.root,fracture:e.fracture,light:e.light,kind:e.data.kind,position:foot,attach:root=>attachFracture(T,root,id,{ground:floorAt}),done:()=>remove(e.root)});continue;}
+   e.light?.dispose();e.fracture?.dispose();remove(e.root);if(e.root.isMesh)e.root.geometry.dispose();}
   if(seed!==s.seed){clearDecorations();for(const b of batches){b.mesh.removeFromParent();b.mesh.dispose();}batches.length=0;for(const f of formations)f.mesh.removeFromParent();formations.length=0;seed=s.seed;scatter(s);terrainKey=null;}
   const nextFoundationKey=foundationTerrainKey(s),nextTerrainKey=terrainFrameKey(s.edits,s.tick)+'|'+nextFoundationKey;if(nextTerrainKey!==terrainKey){
    const full=terrainKey===null||nextFoundationKey!==foundationKey,dirty=terrainDirtyEdits(previousTerrainEdits,s.edits,previousTerrainTick,s.tick),touched=p=>full||dirty.some(e=>Math.hypot(p.x-e.x,p.z-e.z)<=e.radius+TERRAIN_GRID.step);
@@ -109,19 +121,24 @@ export function createWorldContent({scene,templates,instantiate,height,camera=nu
   readyDecorations.add(name);decorationGroups.get(name).reveal=reveal;scene.add(group);
  }
  // simTick may be fractional (interpolated render tick); tree falls are pure functions of it so every client agrees.
- function tick(now,simTick=last?.tick??0){resourceArt.update(now/1000);treeView.tick(now,simTick);const dt=previousTickTime===null?0:Math.max(0,Math.min(.1,(now-previousTickTime)/1000));previousTickTime=now;for(const entry of decorationGroups.values())entry.reveal?.update(dt);crystalWall.update(dt,simTick);for(const e of objects.values())e.fracture?.update(dt);
+ function tick(now,simTick=last?.tick??0){resourceArt.update(now/1000);treeView.tick(now,simTick);const dt=previousTickTime===null?0:Math.max(0,Math.min(.1,(now-previousTickTime)/1000));previousTickTime=now;for(const entry of decorationGroups.values())entry.reveal?.update(dt);crystalWall.update(dt,simTick);for(const e of objects.values())e.fracture?.update(dt);miningFeel.update(dt);
   setGeodeLightTime(now/1000);lightCandidates.length=0;if(camera)camera.getWorldPosition(cameraPosition);else cameraPosition.set(0,0,0);
   for(const e of objects.values())if(e.light){e.lightDistance=e.root.position.distanceToSquared(cameraPosition);e.lightRank=Infinity;if(e.lightDistance<=GEODE_LIGHT_DISTANCE**2)lightCandidates.push(e);}
   lightCandidates.sort((a,b)=>a.lightDistance-b.lightDistance);for(let i=0;i<Math.min(GEODE_LIGHT_BUDGET,lightCandidates.length);i++)lightCandidates[i].lightRank=i;
   // Release old slots first, so moving toward another geode changes priority this frame.
   for(const e of objects.values())if(e.light&&e.lightRank>=GEODE_LIGHT_BUDGET)e.light.update(dt,camera,false);
   for(let i=0;i<Math.min(GEODE_LIGHT_BUDGET,lightCandidates.length);i++)lightCandidates[i].light.update(dt,camera);
-  for(const e of objects.values())if(e.data.type==='pickup'&&!e.bay){e.root.position.y=height(e.data.x,e.data.z,last.edits)+pickupLift(e)+.15*!e.root.userData.authoredPickup+Math.sin(now*.002+e.data.x)*.045;if(e.data.kind!=='wood')e.root.rotation.y=now*.0007;}}
- return {installDecoration,prepareMiningWarmup,prepareMiningWarmupAsync,sync,tick,terrainMoved,collectibleTargets:()=>treeView.collectibleTargets().concat([...objects.values()].filter(e=>e.data.type==='pickup').map(e=>e.root)),collectibleId:hit=>treeView.collectibleId(hit),targets:()=>treeView.targets().concat(crystalWall.targets(),[...objects.values()].filter(e=>e.data.type==='deposit').map(e=>e.root)),
+  for(const e of objects.values())if(e.data.type==='pickup'&&!e.bay){let hop=0;
+   // Popped out of a broken rock: thrown up out of the rubble, growing to size, then a little bounce into its bob.
+   if(e.pop){if(e.pop.t<0)e.pop.t=now;const u=(now-e.pop.t)/650;if(u>=1){e.root.scale.setScalar(e.pop.s0??e.root.scale.x);delete e.pop;}else{e.pop.s0??=e.root.scale.x;const g=Math.min(1,u*2.2),grow=1+Math.sin(g*Math.PI)*.25*(1-g);e.root.scale.setScalar(e.pop.s0*Math.max(.05,g*grow));hop=u<.7?Math.sin(u/.7*Math.PI)*.85:Math.sin((u-.7)/.3*Math.PI)*.12;}}
+   e.root.position.y=height(e.data.x,e.data.z,last.edits)+pickupLift(e)+.15*!e.root.userData.authoredPickup+Math.sin(now*.002+e.data.x)*.045+hop;if(e.data.kind!=='wood')e.root.rotation.y=now*.0007+(e.pop?(now-e.pop.t)*.012:0);}}
+ /** A pick blow this client just showed on a deposit (presentation only). */
+ function depositStruck(id,{normal=null}={}){const e=objects.get(id);if(!e||e.data.type!=='deposit')return false;const fracture=ensureFracture(e);miningFeel.strike({root:e.root,fracture,kind:e.data.kind,normal,weakness:Math.min(1,((e.data.hits||0)+1)/Math.max(1,e.data.maxHits||1))});return true;}
+ return {depositStruck,miningFeel,installDecoration,prepareMiningWarmup,prepareMiningWarmupAsync,sync,tick,terrainMoved,collectibleTargets:()=>treeView.collectibleTargets().concat([...objects.values()].filter(e=>e.data.type==='pickup').map(e=>e.root)),collectibleId:hit=>treeView.collectibleId(hit),targets:()=>treeView.targets().concat(crystalWall.targets(),[...objects.values()].filter(e=>e.data.type==='deposit').map(e=>e.root)),
   // Raycast hit -> {id, point, normal (world), instanced}: instanced tree batches map instanceId to the tree id; deposits/entities use userData.targetId.
   resolveTarget(hit){const t=treeView.resolveTarget(hit)||crystalWall.resolveTarget(hit);if(t)return t;let n=hit?.object;while(n&&!n.userData.targetId)n=n.parent;if(!n)return null;
    return {id:n.userData.targetId,point:hit.point.toArray(),normal:hit.face?hit.face.normal.clone().transformDirection(hit.object.matrixWorld).toArray():null,instanced:false};},
   crystalWall,grabTarget:(origin,direction,max)=>treeView.grabTarget(origin,direction,Math.min(max??2.5,2.5))?.id||null,surfaceVisible:treeView.surfaceVisible,trees:treeView,
-  reload(){seed=null;for(const [id,e]of objects)if(e.data.type==='pickup'&&e.root.isMesh&&templates.has(PICKUP_ASSETS[e.data.kind])){remove(e.root);e.root.geometry.dispose();objects.delete(id);}if(last)sync(last);},dispose(){alive=false;clearDecorations();miningWarmup?.dispose();miningWarmup=null;treeView.dispose();crystalWall.dispose();for(const e of objects.values()){e.light?.dispose();e.fracture?.dispose();remove(e.root);}for(const f of formations)f.mesh.removeFromParent();for(const b of batches){b.mesh.removeFromParent();b.mesh.dispose();}resourceArt.dispose();},
-  stats:()=>({...treeView.stats(),resourceArt:resourceArt.stats(),resourceModels:[...objects.values()].map(e=>({id:e.data.id,kind:e.data.kind,type:e.data.type,art:e.root.userData.resourceArt||(e.data.type==='deposit'?(e.data.kind==='meteor'?'meteor':'boulder'):PICKUP_ASSETS[e.data.kind]||e.data.kind)})),decorations:{groups:decorationGroups.size,fading:[...decorationGroups.values()].filter(e=>e.reveal&&!e.reveal.done).length},props:batches.reduce((n,b)=>n+b.points.length,0),deposits:objects.size,crystalWalls:crystalWall.stats(),geodeLights:{...geodeLightGlobalStats(),geodes:[...objects.values()].filter(e=>e.light).map(e=>e.light.stats())},fractures:[...objects.values()].filter(e=>e.fracture).map(e=>e.fracture.stats())})};
+  reload(){seed=null;for(const [id,e]of objects)if(e.data.type==='pickup'&&e.root.isMesh&&templates.has(PICKUP_ASSETS[e.data.kind])){remove(e.root);e.root.geometry.dispose();objects.delete(id);}if(last)sync(last);},dispose(){alive=false;miningFeel.dispose();clearDecorations();miningWarmup?.dispose();miningWarmup=null;treeView.dispose();crystalWall.dispose();for(const e of objects.values()){e.light?.dispose();e.fracture?.dispose();remove(e.root);}for(const f of formations)f.mesh.removeFromParent();for(const b of batches){b.mesh.removeFromParent();b.mesh.dispose();}resourceArt.dispose();},
+  stats:()=>({...treeView.stats(),resourceArt:resourceArt.stats(),resourceModels:[...objects.values()].map(e=>({id:e.data.id,kind:e.data.kind,type:e.data.type,art:e.root.userData.resourceArt||(e.data.type==='deposit'?(e.data.kind==='meteor'?'meteor':'boulder'):PICKUP_ASSETS[e.data.kind]||e.data.kind)})),decorations:{groups:decorationGroups.size,fading:[...decorationGroups.values()].filter(e=>e.reveal&&!e.reveal.done).length},props:batches.reduce((n,b)=>n+b.points.length,0),deposits:objects.size,crystalWalls:crystalWall.stats(),geodeLights:{...geodeLightGlobalStats(),geodes:[...objects.values()].filter(e=>e.light).map(e=>e.light.stats())},mining:miningFeel.stats(),fractures:[...objects.values()].filter(e=>e.fracture).map(e=>e.fracture.stats())})};
 }
