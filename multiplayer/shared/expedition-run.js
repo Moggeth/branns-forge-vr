@@ -182,7 +182,7 @@ function applyKit(state, run, p, ctx, out) {
     const kit = KITS[run.kits[p.id]] || KITS[KIT_IDS[mix(run.seed, nameKey(p.name)) % KIT_IDS.length]];
     run.kits[p.id] = kit.id;
     for (const [k, n] of Object.entries(kit.pack)) p.resources[k] = Math.min(999, (p.resources[k] || 0) + n);
-    if (hall.packmule) for (const k of ['wood', 'stone', 'iron']) p.resources[k] = Math.min(999, (p.resources[k] || 0) + 4 * hall.packmule);
+    if (hall.packmule) for (const k of ['wood', 'iron', 'gems']) p.resources[k] = Math.min(999, (p.resources[k] || 0) + 4 * hall.packmule);
     p.tool = kit.tool;
     grantBoon(state, run, p, kit.boon, ctx, out);
     if (hall.seasoned) ctx.grantXp?.(state, p, 30 * hall.seasoned, out.events, p.position);

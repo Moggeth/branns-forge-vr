@@ -36,7 +36,7 @@ const GUARDS = {
 // Rewards: real materials, scaled by tier, so exploring pays for building and crafting.
 const REWARDS = {
   camp: t => [['wood', 4 + 2 * t], ['ironOre', 2 + t], ['apple', 2]],
-  ruin: t => [['stone', 4 + 2 * t], ['gems', 1 + t], ...(t >= 2 ? [['mithrilOre', t]] : [])],
+  ruin: t => [['stone', 4 + 2 * t], ['gems', 2 + t], ...(t >= 2 ? [['mithrilOre', t]] : [])],
   cache: t => [['copperOre', 2 + t], ['goldOre', t], ['gems', 1]],
   shrine: t => [['gems', 2 + t], ['starOre', 1 + (t >> 1)]],
   grove: () => [['apple', 4], ['wood', 3]],
@@ -68,8 +68,9 @@ export function newWildsState(state, world, terrainHeight) {
   state.wilds = createWilds();
   state.landmarks = false;
   state.deposits = [];
-  // Starting resources at the forge yard: enough for a first tool upgrade and a campfire, never a whole base.
-  const supplies = [['wood', 6, -3.2, 4.2], ['stone', 4, 3.4, 4.4], ['apple', 3, -1.4, 6.2], ['ironOre', 2, 2.2, -4.6]], [ox, oz] = wildsOrigin(state, world);
+  // Starting resources at the forge yard: a generous first stack of Timber, Iron and Crystal, enough for a
+  // Storehouse, a Sanctuary and a Timberline before you have chopped a single tree (2026-10-29 economy pass).
+  const supplies = [['wood', 10, -3.2, 4.2], ['wood', 10, -4.4, 3.2], ['stone', 4, 3.4, 4.4], ['apple', 3, -1.4, 6.2], ['ironOre', 8, 2.2, -4.6], ['gems', 4, 3.6, -3.4]], [ox, oz] = wildsOrigin(state, world);
   state.pickups = supplies.map(([kind, amount, x, z], i) => ({id: `wstart${i}`, kind, x: x + ox, z: z + oz, y: terrainHeight(state, x + ox, z + oz), amount}));
   syncWildsContent(state, world);
   return state;

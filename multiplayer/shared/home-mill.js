@@ -7,11 +7,14 @@ import {baseFallen, homeBattle, homePiece, pieceWorld} from './home-bases.js';
 
 export const MILL = Object.freeze({
   hopper: Object.freeze([0, 3.3]), crank: Object.freeze([-2, 3]), chute: Object.freeze([1.3, 3]), reach: 2.3, crankReach: 1.9,
-  // Gold per unit tipped in: gold ore pays double, copper one each, stone a coin for every four.
-  rates: Object.freeze({goldOre: 2, copperOre: 1, stone: .25}),
+  // Gold per unit tipped in: gold ore pays double, copper one each, stone a coin for every four. Ore banks as
+  // metal since the 2026-10-29 economy pass (gold ore is Gold already), so Copper itself mills too.
+  rates: Object.freeze({goldOre: 2, copperOre: 1, copper: 1, stone: .25}),
   coinTicks: 75, crankedTicks: 25, crankHold: 12, queue: 12, maxOwed: 999,
 });
 const fail = code => ({ok: false, code, events: []});
+/** What a pack would mill into, before item bonuses: the same rates and Stone-in-fours rule as millFeed. */
+export const millWorth = r => Object.entries(MILL.rates).reduce((n, [kind, rate]) => { const have = r?.[kind] || 0; return n + (kind === 'stone' ? have - have % 4 : have) * rate; }, 0);
 export const millAt = (side, point) => pieceWorld(homePiece(side, 'mill'), point);
 export const isMillAction = action => action === 'millFeed' || action === 'millCrank';
 const near = (p, [x, z], r) => Math.hypot(p.position[0] - x, p.position[2] - z) <= r;

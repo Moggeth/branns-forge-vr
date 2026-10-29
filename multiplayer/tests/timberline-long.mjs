@@ -15,7 +15,7 @@ function world(){
  const sim=createSimulation();sim.addPlayer({id:'gunner',role:'hero'});
  const s=sim.adventureWorld();s.enemies=[];s.pickups=[];s.deposits=[];s.landmarks=false;
  s.harvestedTrees=worldTrees(s).map(t=>({id:t.id,cuts:3,cutHeight:terrainHeight(s,t.x,t.z,false)+.5,felledTick:1,fallYaw:0,landed:true}));
- const p=s.players[0];for(const k of Object.keys(p.resources))p.resources[k]=200;
+ const p=s.players[0];for(const k of Object.keys(p.resources))p.resources[k]=/Ore$/.test(k)?0:200; // ore banks as metal, so packs never hold it
  const at=(x,z)=>[x,terrainHeight(s,x,z,false),z];
  const b={id:'building1',type:'timberline',position:at(0,-8),yaw:0,hp:200,maxHp:200,side:'party',builtTick:0,readyTick:0,fireTick:-1000,open:false,charge:0,armed:false,aimYaw:0};
  s.inventions.structures.push(b);s.inventions.seq=1;p.position=at(0,-6);

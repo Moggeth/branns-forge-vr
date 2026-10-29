@@ -29,7 +29,7 @@ assert.equal(act('gunner','inventionUse',{aim:{yaw:Math.PI*.98,pitch:.2}}).ok,tr
 const shot=s.inventions.shots.at(-1);assert.equal(shot.pitch,.2);
 const launch=timberlineLaunch(shot);assert.ok(launch.forward[2]>.9,'fires along the barrel (behind the original facing)');
 assert.ok(Math.abs(Math.asin(launch.forward[1])-.2)<1e-9,'elevation carried into flight');
-assert.equal(gunner.resources.wood,before.wood-2);assert.equal(gunner.resources.iron,before.iron-1);
+assert.equal(gunner.resources.wood,before.wood-1);assert.equal(gunner.resources.iron,before.iron-1);
 assert.equal(act('helper','inventionUse',{aim:{yaw:0,pitch:0}}).code,'not_operator','only the operator fires the manned way');
 
 // Winding: self-winding alone takes the full 4 s; operator R doubles the reload part, a helper quadruples it.
@@ -58,24 +58,24 @@ assert.equal(sim.command('gunner',{type:'action',seq:++seq,action:'inventionUse'
 assert.ok(Math.abs(s.inventions.shots.at(-1).target[0]-47.9)<1e-6,'edge shot ends at the boundary');
 console.log(`timberline-manned: mount, 360 aim, elevation, barrel fire, winding boosts, exclusivity, checkpoint PASS (${((performance.now()-t0)/1000).toFixed(3)}s)`);
 {
-// Crafted bolts: 2 Wood + 1 Iron at the forge makes 4 bolts on the side's rack; shots spend bolts before raw materials.
+// Crafted bolts: 1 Timber + 1 Iron at the forge makes 6 bolts on the side's rack; shots spend bolts before raw materials.
 const {BOLT_RECIPE}=await import('../shared/inventions.js');
 const sim2=createSimulation();sim2.addPlayer({id:'smith',role:'hero'});const w=sim2.adventureWorld(),smith=w.players[0];
-for(const k of Object.keys(smith.resources))smith.resources[k]=0;smith.resources.wood=2;smith.resources.iron=1;
+for(const k of Object.keys(smith.resources))smith.resources[k]=0;smith.resources.wood=1;smith.resources.iron=1;
 smith.position=[30,terrainHeight(w,30,0,false),0];let q=0;const cmd=(m)=>sim2.command('smith',{type:'action',seq:++q,...m});
 assert.equal(cmd({action:'inventionCraft',recipe:'timberlineBolts'}).code,'too_far','crafting happens at the forge');
 smith.position=[0,terrainHeight(w,0,5,false),5];
-assert.equal(cmd({action:'inventionCraft',recipe:'timberlineBolts'}).ok,true);assert.equal(w.inventions.bolts.party,4);
+assert.equal(cmd({action:'inventionCraft',recipe:'timberlineBolts'}).ok,true);assert.equal(w.inventions.bolts.party,BOLT_RECIPE.output);
 assert.equal(smith.resources.wood+smith.resources.iron,0,'one raw shot of materials spent');
 assert.equal(cmd({action:'inventionCraft',recipe:'timberlineBolts'}).code,'insufficient_resources');
 const m2={id:'building1',type:'timberline',position:[0,terrainHeight(w,0,-6,false),-6],yaw:0,hp:200,maxHp:200,side:'party',builtTick:0,readyTick:0,fireTick:-1000,open:false,charge:0,armed:false,aimYaw:0};
 w.inventions.structures.push(m2);w.inventions.seq=Math.max(w.inventions.seq,1);smith.position=[0,terrainHeight(w,0,-4.5,false),-4.5];
 assert.equal(cmd({action:'inventionMount',structureId:'building1'}).ok,true);
-for(let n=0;n<4;n++){m2.readyTick=0;assert.equal(cmd({action:'inventionUse',structureId:'building1',aim:{yaw:0,pitch:0}}).ok,true,'bolt shot '+n);}
-assert.equal(w.inventions.bolts.party,0,'four shots from one craft');
+for(let n=0;n<BOLT_RECIPE.output;n++){m2.readyTick=0;assert.equal(cmd({action:'inventionUse',structureId:'building1',aim:{yaw:0,pitch:0}}).ok,true,'bolt shot '+n);}
+assert.equal(w.inventions.bolts.party,0,'six shots from one craft');
 m2.readyTick=0;assert.equal(cmd({action:'inventionUse',structureId:'building1',aim:{yaw:0,pitch:0}}).code,'insufficient_resources','then raw ammo is needed');
 w.inventions.bolts.party=BOLT_RECIPE.cap-2;smith.resources.wood=2;smith.resources.iron=1;smith.position=[0,terrainHeight(w,0,5,false),5];
 assert.equal(cmd({action:'inventionCraft',recipe:'timberlineBolts'}).code,'rack_full');
 const back=loadSimulation(sim2.checkpoint());assert.equal(back.checkpoint().inventions.bolts.party,BOLT_RECIPE.cap-2,'rack survives a checkpoint');
-console.log('timberline-manned: crafted bolts 4x per material, spent first, rack cap, checkpoint PASS');
+console.log('timberline-manned: crafted bolts 6 per craft, spent first, rack cap, checkpoint PASS');
 }

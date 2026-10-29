@@ -11,7 +11,7 @@ export const TIMBERLINE_SCOPE=Object.freeze({fov:47,
 // The operator's ammo counter: crafted bolts first, then whole shots the carried and stored Wood and Iron pay for.
 export function timberlineAmmoText({bolts=0,raw=0}={}){
  if(!bolts&&!raw)return 'Out of ammo';
- const b=`${bolts} bolt${bolts===1?'':'s'}`;if(!raw)return b;const r=`${raw} from Wood/Iron`;return bolts?`${b} + ${r}`:`${raw} shot${raw===1?'':'s'} from Wood/Iron`;}
+ const b=`${bolts} bolt${bolts===1?'':'s'}`;if(!raw)return b;const r=`${raw} from Timber/Iron`;return bolts?`${b} + ${r}`:`${raw} shot${raw===1?'':'s'} from Timber/Iron`;}
 
 export function createTimberlineAmmoHud({parent=document.body}={}){
  const el=document.createElement('div');el.className='timberline-ammo';el.setAttribute('role','status');el.setAttribute('aria-live','polite');el.hidden=true;

@@ -32,8 +32,9 @@ for (const {capacity, carried} of [{capacity:0, carried:0}, {capacity:256, carri
       for(let i=0;i<capacity;i++) state.pickups.push({id:`filler${i}`,kind:'wood',amount:1,x:20,z:20,y:0});
       const total = () => {
         const world = session.simulation.adventureWorld();
-        return world.pickups.filter(p=>p.kind==='ironOre').reduce((n,p)=>n+p.amount,0)
-          + world.players.reduce((n,p)=>n+p.resources.ironOre+(p.heldOre==='ironOre'?1:0),0);
+        // Carried ore banks as Iron when a pack is restored, so ore and Iron count together.
+        return world.pickups.filter(p=>p.kind==='ironOre'||p.kind==='iron').reduce((n,p)=>n+p.amount,0)
+          + world.players.reduce((n,p)=>n+p.resources.ironOre+p.resources.iron+(p.heldOre==='ironOre'?1:0),0);
       };
       const before = total();
       for(let i=0;i<3;i++) {
@@ -41,7 +42,7 @@ for (const {capacity, carried} of [{capacity:0, carried:0}, {capacity:256, carri
         connection.roster.get('guest').online=true; connection.emit('peer_joined',{id:'guest'});
         assert.equal(total(),before,'ground + pack + held ore remains constant');
         const returning = session.simulation.adventureWorld().players.find(p=>p.id==='guest');
-        assert.equal(returning.resources.ironOre,capacity===256?carried:0);
+        assert.equal(returning.resources.ironOre+returning.resources.iron,capacity===256?carried:0);
         assert.equal(returning.heldOre,capacity===256?'ironOre':undefined);
       }
     } finally { session.dispose(); }

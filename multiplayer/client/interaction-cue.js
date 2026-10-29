@@ -1,7 +1,7 @@
 import {isTestingGift,giftContents} from '../shared/testing-supplies.js';
 import {STRUCTURES, MACHINE_AMMO, inventionAvailable, timberlineAmmo} from '../shared/inventions.js';
 import {STORMREEL, chargeShots, nearestFreePack} from '../shared/stormreel.js';
-import {materialLabel,materialInfo,DEPOSIT_CATALOG} from '../shared/material-catalog.js';
+import {materialLabel,materialInfo,DEPOSIT_CATALOG,bankKey} from '../shared/material-catalog.js';
 // Contextual harvesting cue: one short line telling a first-person Hero what the looked-at tree, ore, loose log,
 // nearby pickup or forge needs, and which control does it. Pure decision model: no DOM, no Three.js, no clock.
 // It never mutates the snapshot and never fires actions. Rules mirror the authoritative simulation; each mirrored
@@ -9,7 +9,7 @@ import {materialLabel,materialInfo,DEPOSIT_CATALOG} from '../shared/material-cat
 import {nearestCollectible, collectibleCandidate} from '../shared/collection-target.js';
 import {HOME, HOME_LAYOUT, HOME_MANNED, bellPostAt, homePoint} from '../shared/home-bases.js';
 import {SHOP, counterAt, draughtCap} from '../shared/home-shop.js';
-import {MILL, millAt} from '../shared/home-mill.js';
+import {MILL, millAt, millWorth} from '../shared/home-mill.js';
 import {STORES, WORKSHOP, backTownSpot} from '../shared/home-workshop.js';
 import {ORE_RECIPES} from '../shared/material-catalog.js';
 import {TAVERN, TAVERN_NAMES, taverns, tavernBar} from '../shared/taverns.js';
@@ -110,8 +110,8 @@ export function decideCue(view, self, snapshot, aim, ctx) {
   const snackCue = c => make('pickup','ready',c.id,c.held?`${c.half?'Apple half':'Apple'} · bite ${c.bites+1} of ${c.biteCount||3}`:c.half?'Apple half':c.stick==='arrow'?'Apple on an arrow':c.stick==='bolt'?'Apple on a bolt':'Apple',c.held?'Bite':'Pick up',keys.collect,c.held?'Heals a little each bite':c.half?'A treat: +25 health in two bites':'A treat: +50 health in three bites');
   // Ore and finished bars read as one rewarding stack: "Pick up 7 Iron Bars", "Pick up 4 Mithril Ore".
   const stackCue = c => { const metal = METAL_BARS.has(c.kind), ore = /Ore$/.test(c.kind); if (!metal && !ore) return null; const n = c.amount | 0, label = titleCase(materialLabel(c.kind)), noun = metal ? `${label} Bar${n === 1 ? '' : 's'}` : label;
-    return make('pickup', 'ready', c.id, metal && String(c.id).startsWith('ingot') ? `Output bay · ${noun}` : noun, `Pick up ${n} ${noun}`, keys.collect, materialInfo(c.kind)?.use || ''); };
-  const pickupCue = c => c.type==='snack'?snackCue(c):(c.type !== 'log' && !isTestingGift(c.id) && stackCue(c)) || (isTestingGift(c.id)?make('pickup','ready',c.id,'Timberline gift basket','Collect supplies',keys.collect,giftContents(snapshot).map(q=>`${q.amount} ${materialLabel(q.kind)}`).join(' · ')):make(c.type==='log'?'log':'pickup','ready',c.id,c.type==='log'?'Wood':c.kind==='apple'?'Apple':`${materialLabel(c.kind)} ×${c.amount}`,c.kind==='apple'?'Pick up':'Collect',keys.collect,c.kind==='apple'?'A treat: +50 health in three bites':materialInfo(c.kind)?.use||''));
+    return make('pickup', 'ready', c.id, metal && String(c.id).startsWith('ingot') ? `Output bay · ${noun}` : noun, `Pick up ${n} ${noun}`, keys.collect, ore ? `Banks as ${n} ${materialLabel(bankKey(c.kind))}` : materialInfo(c.kind)?.use || ''); };
+  const pickupCue = c => c.type==='snack'?snackCue(c):(c.type !== 'log' && !isTestingGift(c.id) && stackCue(c)) || (isTestingGift(c.id)?make('pickup','ready',c.id,'Timberline gift basket','Collect supplies',keys.collect,giftContents(snapshot).map(q=>`${q.amount} ${materialLabel(q.kind)}`).join(' · ')):make(c.type==='log'?'log':'pickup','ready',c.id,c.type==='log'?'Timber':c.kind==='apple'?'Apple':`${materialLabel(c.kind)} ×${c.amount}`,c.kind==='apple'?'Pick up':'Collect',keys.collect,c.kind==='apple'?'A treat: +50 health in three bites':materialInfo(c.kind)?.use||''));
   // Mounts (shared/mounts.js): a wild tiger takes the apple in your hand before you would bite it yourself.
   const riding = mountOf(snapshot, self), nearMount = !riding && mountNear(snapshot, self);
   if (nearMount && !nearMount.tamed && (snapshot.fruit?.drops || []).some(d => d.heldBy === self.id)) return make('mount', 'ready', nearMount.id, 'Wild tiger', 'Offer the apple', keys.collect, 'a friend for life, and a ride');
@@ -134,7 +134,7 @@ export function decideCue(view, self, snapshot, aim, ctx) {
     if (log) {
       if (log.t > CUE_RULES.grabReach) return make('log', 'far', log.l.id, 'Loose log', 'Move closer', '');
       const candidate=collectibleCandidate(snapshot,self,log.l.id,{height:ctx.height});
-      if(candidate?.full)return make('log','full',log.l.id,'Wood','Pack full','');
+      if(candidate?.full)return make('log','full',log.l.id,'Timber','Pack full','');
       // An explicit null means the real scene visibility probe found no collectible.
       if(candidate&&!(aim&&Object.hasOwn(aim,'collectible')))return pickupCue(candidate);
       return null;
@@ -189,9 +189,9 @@ function homeCue(self, snapshot, keys, make) {
   const mill = base.mill, owed = mill?.queue?.find(q => q.id === self.id)?.gold || 0;
   if (at(millAt(base.side, MILL.crank), MILL.crankReach)) return mill?.queue?.length ? make('home', 'ready', 'mill-crank', 'Mill capstan', 'Crank', keys.crank || keys.collect, 'hold to grind three times as fast') : make('home', 'full', 'mill-crank', 'Mill capstan', 'Nothing grinding', '');
   if (at(millAt(base.side, MILL.hopper), MILL.reach)) {
-    const r = self.resources || {}, worth = (r.goldOre || 0) * 2 + (r.copperOre || 0) + Math.floor((r.stone || 0) / 4);
+    const worth = Math.floor(millWorth(self.resources));
     return worth ? make('home', 'ready', 'mill', 'Gold mill', 'Tip it in', keys.collect, `about ${worth} Gold${owed ? ` · ${owed} still grinding` : ''}`)
-      : make('home', 'full', 'mill', 'Gold mill', owed ? `${owed} Gold grinding` : 'Bring ore', '', 'gold ore, copper ore or stone');
+      : make('home', 'full', 'mill', 'Gold mill', owed ? `${owed} Gold grinding` : 'Bring copper', '', 'copper, or stone in fours');
   }
   // Back town (shared/home-workshop.js): the Workshop smelts ore from your pack on its own; the Stores banks your haul.
   if (at(backTownSpot(base.side, 'workshop', WORKSHOP.anvil), WORKSHOP.reach)) {

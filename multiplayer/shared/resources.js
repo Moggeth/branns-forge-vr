@@ -4,7 +4,7 @@ import {snackAction,isFruitDrop,takeGroundApple} from './fruit.js';
 import {nextEntityId} from './entity-id.js';
 import {isTestingGift,giftContents} from './testing-supplies.js';
 import {BLOOM,addBloom} from './bloom.js';
-import {MATERIAL_KEYS,emptyMaterials,restoreMaterials,DEPOSIT_CATALOG,materialLabel} from './material-catalog.js';
+import {MATERIAL_KEYS,emptyMaterials,restoreMaterials,DEPOSIT_CATALOG,materialLabel,bankKey} from './material-catalog.js';
 import {isVein} from './ore-veins.js';
 // Shared collection and spending: authority validates role, range and benefit before consuming.
 import {collectLog,chopTree} from './trees.js';
@@ -14,7 +14,7 @@ import {collectibleCandidate,goldenBoltPickup} from './collection-target.js';
 import {specialCooldown} from './special-cooldowns.js';
 export {nearestCollectible} from './collection-target.js';
 export const RESOURCE_RECIPES=Object.freeze({
- wood:{cost:3,hero:'Bandage Â· +35 health',god:'Mend Forge Â· +20 integrity'},
+ wood:{cost:2,hero:'Bandage Â· +35 health',god:'Mend Forge Â· +20 integrity'},
  stone:{cost:2,hero:'Reinforce Forge Â· +35 integrity',god:'Reinforce Forge Â· +35 integrity'},
  gems:{cost:1,hero:'Rekindle Â· +35 health, ready special and cool weapon',god:'Restore Mana Â· +40 mana'}
 });
@@ -52,15 +52,16 @@ export function collectTarget(state,p,m,ctx){
   if(!collectibleCandidate(state,p,q.id,{height:ctx.terrainHeight?(x,z)=>ctx.terrainHeight(state,x,z,false):undefined}))return fail('out_of_reach');
   if(isTestingGift(q)){
    const bundle=giftContents(state);
-   if(bundle.some(item=>(p.resources[item.kind]||0)+item.amount>999))return fail('inventory_full');
-   for(const item of bundle){p.resources[item.kind]=(p.resources[item.kind]||0)+item.amount;state.pickups.splice(state.pickups.indexOf(item),1);}
+   if(bundle.some(item=>(p.resources[bankKey(item.kind)]||0)+item.amount>999))return fail('inventory_full');
+   for(const item of bundle){p.resources[bankKey(item.kind)]=(p.resources[bankKey(item.kind)]||0)+item.amount;state.pickups.splice(state.pickups.indexOf(item),1);}
    (p.stats??={kills:0,deaths:0,harvested:0,contribution:0}).harvested=Math.min(1e9,(p.stats.harvested||0)+bundle.reduce((n,item)=>n+item.amount,0));
    return ok(bundle.map(item=>({kind:'pickup',id:item.id,position:[item.x,item.y,item.z],material:item.kind})));
   }
   if(q.kind==='apple'){const took=takeGroundApple(state,{nextId:nextEntityId},p,q);if(took)return took;if(p.hp>=heroMaxHp(p))return fail('not_needed');} // ground apples are picked up and eaten in three bites
-  if(q.kind!=='apple'&&p.resources[q.kind]+q.amount>999)return fail('inventory_full');
+  const bank=bankKey(q.kind); // ore banks straight in as its metal
+  if(q.kind!=='apple'&&(p.resources[bank]||0)+q.amount>999)return fail('inventory_full');
   state.pickups.splice(state.pickups.indexOf(q),1);
-  if(q.kind==='apple')p.hp=Math.min(heroMaxHp(p),p.hp+35);else {p.resources[q.kind]+=q.amount;(p.stats??={kills:0,deaths:0,harvested:0,contribution:0}).harvested=Math.min(1e9,(p.stats.harvested||0)+q.amount);}
+  if(q.kind==='apple')p.hp=Math.min(heroMaxHp(p),p.hp+35);else {p.resources[bank]=(p.resources[bank]||0)+q.amount;(p.stats??={kills:0,deaths:0,harvested:0,contribution:0}).harvested=Math.min(1e9,(p.stats.harvested||0)+q.amount);}
   const events=[{kind:'pickup',id:q.id,position:[q.x,q.y,q.z],material:q.kind}];
   if(q.kind==='apple')addBloom(state,BLOOM.apple,events,[q.x,q.y,q.z]); // Fruit eaten spreads the seed.
   return ok(events);
@@ -137,8 +138,9 @@ const flat=(a,b)=>Math.hypot(a[0]-b[0],a[2]-b[2]);
 const bounded=(v,a,b)=>Number.isFinite(v)&&v>=a&&v<=b;
 const integer=(v,a,b)=>Number.isSafeInteger(v)&&v>=a&&v<=b;
 export function createSettlement(){return {v:1,stock:emptyMaterials(),workers:[],level:0,defenses:0,completed:0,encounter:null,lastResult:'',cooldownUntil:0,delivered:0};}
-const upgradeCost=s=>({wood:6*(s.level+1),stone:4*(s.level+1),gems:s.level});
-const defenseCost=s=>({wood:4+2*s.defenses,stone:3+2*s.defenses,gems:0});
+// Generous on purpose (2026-10-29): Timber, Iron and Crystal only, tighten later if building feels too free.
+const upgradeCost=s=>({wood:3*(s.level+1),iron:s.level+1,gems:s.level});
+const defenseCost=s=>({wood:3+s.defenses,iron:1,gems:0});
 const canPay=(s,cost)=>Object.entries(cost).every(([k,n])=>s.stock[k]>=n);
 const pay=(s,cost)=>{for(const [k,n] of Object.entries(cost))s.stock[k]-=n;};
 const managed=p=>p.role==='god'||Math.hypot(p.position[0],p.position[2])<=SETTLEMENT_RULES.range;
@@ -229,8 +231,8 @@ export function stepSettlement(state,ctx,events,recent=[]){
   if(w.cargo){
    w.phase='returning';const home=[HOME[0],ctx.ground(...HOME),HOME[1]];
    if(flat(w.position,home)>.8){walk(w,home,ctx);continue;}
-   const amount=Math.min(w.cargo,999-s.stock[w.job]);if(!amount){w.phase='store_full';continue;}
-   s.stock[w.job]+=amount;s.delivered=Math.min(1e9,s.delivered+amount);w.cargo-=amount;
+   const bank=bankKey(w.job),amount=Math.min(w.cargo,999-s.stock[bank]);if(!amount){w.phase='store_full';continue;}
+   s.stock[bank]+=amount;s.delivered=Math.min(1e9,s.delivered+amount);w.cargo-=amount;
    events.push({kind:'worker_delivery',id:w.id,resource:w.job,amount,position:[...w.position]});w.phase='seeking';continue;
   }
   const target=targetFor(state,w,trees);
