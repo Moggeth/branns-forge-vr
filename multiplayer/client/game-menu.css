@@ -62,3 +62,21 @@
   #menu .menu-card[data-mc-tabs="on"]:not(:has(#menuCopyCode:disabled)) > :is([data-open-forge], #menuPatchNotes) { grid-column: 1 / -1; }
   #menu .menu-card[data-mc-tabs="on"] #roleSwitchHint { font-size: .74rem; }
 }
+
+/* Graphics and damage numbers: a tidy row and a real switch (the checkbox was picking up the big text-field style). */
+#menu .menu-card:not([data-mc-tabs="on"]) > .menu-section:has(#graphicsMode),
+#menu .menu-card[data-mc-tabs="on"][data-mc-active="controls"] > .menu-section:has(#graphicsMode) { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 4px 12px; }
+#menu .menu-section:has(#graphicsMode) > label[for="graphicsMode"] { color: var(--parchment); font-weight: 600; }
+#menu .menu-section:has(#graphicsMode) > #graphicsMode { justify-self: start; }
+#menu .menu-section:has(#graphicsMode) > .hint { grid-column: 1 / -1; margin: 0 0 6px; }
+#menu .menu-section:has(#graphicsMode) > .bf-toggle { grid-column: 1 / -1; justify-self: start; gap: 12px; color: var(--parchment); font-weight: 600; }
+#menu .menu-section:has(#graphicsMode) > .bf-toggle { min-height: 44px; padding: 0; border: 0; background: none; }
+#menu .menu-section:has(#graphicsMode) .bf-switch { width: 46px; height: 28px; flex: none; border-color: rgba(236, 196, 120, .45); background: rgba(255, 240, 210, .1); }
+#menu .menu-section:has(#graphicsMode) .bf-switch::after { top: 3px; left: 3px; width: 20px; height: 20px; background: #d8c8a8; }
+#menu .menu-section:has(#graphicsMode) input:checked + .bf-switch { background: linear-gradient(180deg, #ffb067, #e8692b); }
+#menu .menu-section:has(#graphicsMode) input:checked + .bf-switch::after { transform: translateX(18px); background: #fff6e4; }
+#menu .menu-section:has(#graphicsMode) .bf-toggle > input { position: absolute; opacity: 0; width: 1px; height: 1px; min-height: 0; padding: 0; margin: 0; border: 0; }
+#menu .menu-section:has(#graphicsMode) .bf-toggle > input:focus-visible + .bf-switch { outline: 3px solid var(--brass-hi); outline-offset: 2px; }
+/* Leave world stays the last thing in the menu, after panels other modules append. */
+#menu .menu-card:not([data-mc-tabs="on"]) > #leave { order: 99; margin-top: 4px; }
+#menu #touchLeftHanded { appearance: auto; -webkit-appearance: checkbox; accent-color: var(--ember, #e8692b); width: 24px; height: 24px; min-height: 0; padding: 0; margin: 0; border: 0; background: none; }
