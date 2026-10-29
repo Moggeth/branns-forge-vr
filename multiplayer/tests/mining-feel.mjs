@@ -45,7 +45,7 @@ const scene = new T.Scene();
   let heat = 0, glow = 0;
   const fracture = {heat: a => { heat = a; }, glow: (hex, l) => { glow = l; }};
   feel.strike({root, fracture, kind: 'crystal', normal: [1, 0, 0], weakness: .5});
-  assert.ok(heat > 0, 'fresh fracture glows'); assert.ok(glow > 0, 'crystal carries its own light');
+  assert.equal(heat, 0, 'plain strike heat is off'); assert.ok(glow > 0, 'crystal carries its own light');
   feel.strike({root: new T.Group(), fracture, kind: 'iron', normal: [0, 0, 1]}); // iron has no inner light of its own
   feel.update(1 / 60);
   assert.ok(root.quaternion.angleTo(q0) > .005, 'rocked'); assert.ok(root.scale.y < s0.y, 'squashed');
