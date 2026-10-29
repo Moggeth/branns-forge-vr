@@ -1,0 +1,278 @@
+/* Brann's Forge — the title screen: a sunlit vista behind the welcome panel, and the loading screen.
+   One owner for the welcome layout at every size (it used to be split over lobby.css, styles.css, mobile-compact.css
+   and role-choice.css). Every id and control is unchanged; this file only places and dresses them.
+   Motion is transform/opacity only, and lobby.css's prefers-reduced-motion rule stops all of it. */
+
+/* ------------------------------------------------------------------ the vista */
+.title-vista { background: #7cc4ec; transition: opacity .6s ease, visibility 0s linear 0s; }
+/* In the world the vista is gone: hidden, and its animations paused so phones spend nothing on it. */
+body[data-phase="game"] .title-vista { visibility: hidden; transition: opacity .6s ease, visibility 0s linear .6s; }
+body[data-phase="game"] .title-vista * { animation-play-state: paused; }
+.title-vista .tv-scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+body[data-phase="lobby"] #world, body[data-phase="connecting"] #world { filter: none; }
+.tv-rays { animation: tv-rays 90s linear infinite; }
+.tv-sun-halo { transform-box: fill-box; transform-origin: center; animation: tv-halo 6s ease-in-out infinite; }
+.tv-cloud { animation: tv-drift 70s ease-in-out infinite alternate; }
+.tv-cloud-b { animation-duration: 90s; animation-direction: alternate-reverse; }
+.tv-cloud-c { animation-duration: 110s; }
+.tv-birds { animation: tv-birds 40s linear infinite; }
+.tv-bird { transform-box: fill-box; transform-origin: center; animation: tv-flap .9s ease-in-out infinite alternate; }
+.tv-bird-2 { animation-delay: -.3s; } .tv-bird-3 { animation-delay: -.6s; }
+.tv-puff { transform-box: fill-box; transform-origin: center; opacity: 0; animation: tv-puff 6s ease-out infinite; }
+.tv-puff-2 { animation-delay: -2s; } .tv-puff-3 { animation-delay: -4s; }
+.tv-glow { transform-box: fill-box; transform-origin: center; animation: tv-flicker 2.6s ease-in-out infinite; }
+.tv-flag { transform-box: fill-box; transform-origin: 0 50%; animation: tv-flag 2.4s ease-in-out infinite; }
+.tv-shimmer { animation: tv-shimmer 3.5s linear infinite; }
+.tv-crystal-glow { transform-box: fill-box; transform-origin: center; animation: tv-halo 4s ease-in-out infinite; }
+.tv-mote { transform-box: fill-box; opacity: 0; animation: tv-mote 5s ease-out infinite; }
+.tv-mote-2 { animation-delay: -1.2s; } .tv-mote-3 { animation-delay: -2.6s; } .tv-mote-4 { animation-delay: -3.4s; } .tv-mote-5 { animation-delay: -.6s; }
+@keyframes tv-rays { to { transform: rotate(360deg); } }
+@keyframes tv-halo { 0%, 100% { transform: scale(.94); opacity: .55; } 50% { transform: scale(1.06); opacity: .9; } }
+@keyframes tv-drift { from { transform: translateX(-60px); } to { transform: translateX(60px); } }
+@keyframes tv-birds { from { transform: translate(-700px, 40px); } to { transform: translate(1500px, -60px); } }
+@keyframes tv-flap { from { transform: scaleY(1); } to { transform: scaleY(.45); } }
+@keyframes tv-puff { 0% { opacity: 0; transform: translate(0, 0) scale(.5); } 15% { opacity: .9; } 100% { opacity: 0; transform: translate(26px, -110px) scale(2.4); } }
+@keyframes tv-flicker { 0%, 100% { opacity: .75; transform: scale(.95); } 40% { opacity: 1; transform: scale(1.08); } 70% { opacity: .85; } }
+@keyframes tv-flag { 0%, 100% { transform: skewY(0) scaleX(1); } 50% { transform: skewY(-6deg) scaleX(.92); } }
+@keyframes tv-shimmer { to { stroke-dashoffset: -96; } }
+@keyframes tv-mote { 0% { opacity: 0; transform: translateY(0); } 20% { opacity: 1; } 100% { opacity: 0; transform: translateY(-90px); } }
+
+/* ------------------------------------------------------------------ layout shell */
+#lobby.lobby { display: grid; place-items: center; overflow-y: auto; overscroll-behavior: contain;
+  padding: max(18px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+#lobby.lobby > .card {
+  /* The card is now a transparent stage: brand on the sky, a forge panel for the choices. */
+  width: 100%; max-width: 480px; margin: 0; padding: 0; background: none; border: 0; box-shadow: none; border-radius: 0;
+  backdrop-filter: none; -webkit-backdrop-filter: none; animation: none;
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-content: center;
+}
+#lobby.lobby > .card::before { content: none; }
+#lobby.lobby > .card > * { min-width: 0; margin: 0; }
+
+/* ------------------------------------------------------------------ brand */
+#lobby.lobby .masthead { display: grid; justify-items: center; gap: 6px; text-align: center; animation: ts-rise .7s cubic-bezier(.2, .8, .2, 1) both; }
+#lobby.lobby .crest-medal {
+  display: grid; place-items: center; width: 78px; height: 78px; border-radius: 50%;
+  background: radial-gradient(circle at 50% 38%, #ffcf86 0, #e8692b 42%, #8a3a14 74%);
+  box-shadow: 0 0 0 4px #f6d79a, 0 0 0 7px #7a4a1c, 0 10px 26px rgba(70, 30, 8, .45), 0 0 40px rgba(255, 190, 110, .55);
+}
+#lobby.lobby .crest-medal .crest { width: 48px; height: 48px; color: #3a1c08; filter: drop-shadow(0 1px 0 rgba(255, 230, 190, .7)); }
+#lobby.lobby .masthead h1 {
+  margin: 4px 0 0; font-size: clamp(2.6rem, 7.4vw, 4.9rem); line-height: 1; letter-spacing: .015em;
+  background: linear-gradient(180deg, #fff6d8 8%, #ffd27a 46%, #e59a3a 70%, #b8641e);
+  -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: none;
+  filter: drop-shadow(0 2px 0 #6b3510) drop-shadow(0 -1px 0 #6b3510) drop-shadow(2px 0 0 #6b3510) drop-shadow(-2px 0 0 #6b3510) drop-shadow(0 10px 18px rgba(40, 24, 10, .4));
+}
+#lobby.lobby .masthead .lede {
+  max-width: none; margin: 6px 0 0; padding: 7px 16px; border-radius: 999px;
+  display: inline-flex; flex-wrap: wrap; justify-content: center; gap: 0 .4em;
+  font-size: .98rem; font-weight: 600; line-height: 1.35; color: #fffaf0;
+  background: rgba(30, 44, 58, .58); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .18), 0 6px 18px rgba(20, 30, 40, .2);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .35);
+}
+
+/* ------------------------------------------------------------------ the forge panel */
+#lobby.lobby .lobby-form {
+  position: relative; display: grid; gap: 14px; padding: 20px 20px 18px; border-radius: 22px;
+  background: linear-gradient(180deg, rgba(56, 40, 26, .97), rgba(26, 20, 15, .97) 38%);
+  border: 1px solid rgba(236, 196, 120, .55);
+  box-shadow: 0 0 0 4px rgba(26, 18, 12, .35), 0 24px 60px rgba(30, 20, 10, .45), inset 0 1px 0 rgba(255, 230, 180, .22);
+  animation: ts-rise .7s .08s cubic-bezier(.2, .8, .2, 1) both;
+}
+#lobby.lobby .lobby-form::before { /* brass inner rule */
+  content: ""; position: absolute; inset: 6px; border-radius: 17px; pointer-events: none; border: 1px solid rgba(236, 196, 120, .13);
+}
+#lobby.lobby .field { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 12px; }
+#lobby.lobby .field label { margin: 0; }
+#lobby.lobby #name { min-height: 44px; height: 44px; padding: 0 14px; font-size: 1rem; border-radius: 12px; }
+#lobby.lobby #nameHelp { grid-column: 1 / -1; margin: 6px 0 0; font-size: .8rem; }
+#lobby.lobby .roles legend { width: 100%; text-align: center; margin-bottom: 8px; }
+#lobby.lobby .role-grid-scenes { gap: 12px; }
+#lobby.lobby .role-card-scene .role-body { padding: 0 0 10px; gap: 2px; border-radius: 16px; }
+#lobby.lobby .role-card-scene .role-scene { height: 104px; margin-bottom: 6px; }
+#lobby.lobby .role-card-scene .role-icon { display: none; }
+#lobby.lobby .role-card-scene .role-name { font-size: 1.4rem; }
+#lobby.lobby .role-card-scene .role-desc { font-size: .86rem; }
+#lobby.lobby .role-card-scene .role-detail { font-size: .74rem; margin-top: 2px; }
+#lobby.lobby .role-swap { top: 52px; }
+#lobby.lobby .role-switch-note { margin-top: 8px; font-size: .8rem; }
+
+/* Play, then the two other ways in side by side. */
+#lobby.lobby .actions { display: block; }
+#lobby.lobby .create-block { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 2px 0 0; }
+#lobby.lobby .create-block > #create { grid-column: 1 / -1; }
+#lobby.lobby .create-block > .new-world-btn, #lobby.lobby .create-block > .friends-btn { display: flex; margin: 0; min-width: 0; width: 100%; min-height: 46px; padding: 8px 10px; font-size: .95rem; }
+#lobby.lobby .create-block > .friends-btn { color: var(--parchment); border-color: rgba(185, 170, 142, .4); background: rgba(255, 240, 210, .04); }
+#lobby.lobby .create-block > .friends-btn:hover { border-color: rgba(236, 210, 154, .7); background: rgba(255, 240, 210, .09); }
+#lobby.lobby .create-block > .rx-launch-entry:not([hidden]) { grid-column: 1 / -1; }
+#lobby.lobby .divider, #lobby.lobby #joinBlock { display: none; }
+#lobby.lobby #create.btn-play {
+  position: relative; overflow: hidden; width: 100%; min-height: 72px; margin: 0; padding: 8px 22px; border-radius: 18px;
+  display: grid; justify-items: center; align-content: center; gap: 1px;
+  background: linear-gradient(180deg, #ffd58c 0%, #ff9a45 38%, #e8692b 62%, #c24d17 100%);
+  border: 1px solid rgba(255, 224, 170, .9);
+  box-shadow: 0 0 0 3px rgba(120, 50, 12, .55), 0 10px 28px rgba(232, 105, 43, .45), inset 0 2px 0 rgba(255, 246, 220, .75), inset 0 -3px 0 rgba(120, 40, 8, .35);
+}
+#lobby.lobby #create.btn-play::after { /* a slow sheen, so the main door looks alive */
+  content: ""; position: absolute; inset: -20% auto -20% -40%; width: 30%; transform: skewX(-20deg) translateX(-200%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .45), transparent); animation: ts-sheen 5.5s 1.2s ease-in-out infinite; pointer-events: none;
+}
+#lobby.lobby #create.btn-play:hover { filter: brightness(1.06); transform: translateY(-1px); }
+#lobby.lobby #create.btn-play:active { transform: translateY(1px) scale(.99); }
+#lobby.lobby .play-label { font: 700 1.85rem/1 var(--serif); letter-spacing: .06em; color: #3a1804; text-shadow: 0 1px 0 rgba(255, 228, 190, .6); }
+#lobby.lobby .play-sub { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 .8rem/1.3 var(--sans); letter-spacing: .02em; color: rgba(58, 24, 4, .78); text-shadow: none; }
+#lobby.lobby .play-sub:empty { display: none; }
+#lobby.lobby.has-invite #create, .has-invite #lobby.lobby #create.btn-play { min-height: 72px; font-size: inherit; }
+
+/* Guides and saved worlds: glass chips on the meadow. */
+#lobby.lobby > .card > .howto-row { display: flex; justify-content: center; gap: 10px; animation: ts-rise .7s .16s cubic-bezier(.2, .8, .2, 1) both; }
+#lobby.lobby .howto-row .btn-howto, #lobby.lobby #savedWorlds > summary {
+  min-height: 44px; padding: 8px 16px; border-radius: 999px; color: #fff6e4; font-size: .92rem;
+  background: rgba(28, 22, 16, .72); border: 1px solid rgba(236, 196, 120, .5); box-shadow: 0 6px 16px rgba(20, 30, 20, .25);
+}
+#lobby.lobby .howto-row .btn-howto:hover, #lobby.lobby #savedWorlds > summary:hover { background: rgba(40, 30, 20, .85); border-color: rgba(255, 214, 140, .85); }
+#lobby.lobby .howto-row .btn-howto svg { width: 18px; height: 18px; }
+#lobby.lobby > .card > #savedWorlds { border: 0; padding: 0; justify-self: center; width: min(100%, 440px); }
+#lobby.lobby #savedWorlds > summary { width: max-content; margin: 0 auto; justify-content: center; }
+#lobby.lobby #savedWorlds[open] > .saved-body {
+  margin-top: 8px; padding: 12px 14px; border-radius: 16px; background: rgba(26, 20, 15, .94); border: 1px solid rgba(236, 196, 120, .4);
+}
+#lobby.lobby #offlineNote { margin: 0; justify-self: center; }
+body.first-play #lobby.lobby #howToPlay { color: #ffd9a8; border-color: var(--ember-hi); }
+
+/* ------------------------------------------------------------------ loading screen and problems */
+#lobby.lobby #lobbyStatus { margin: 0; }
+#lobby.lobby #lobbyStatus .spinner { display: none !important; }
+#lobby.lobby #lobbyStatus .status-emblem, #lobby.lobby #lobbyStatus .status-bar, #lobby.lobby #lobbyStatus .status-tip { display: none; }
+#lobby.lobby #lobbyStatus.busy {
+  position: fixed; inset: 0; z-index: 40; border: 0; border-radius: 0;
+  display: grid; place-content: center; justify-items: center; gap: 14px; padding: 24px; text-align: center;
+  background: radial-gradient(70% 60% at 50% 46%, rgba(26, 18, 12, .55), rgba(16, 12, 8, .84));
+  animation: ts-fade .35s ease both;
+}
+body.lobby-busy #lobby.lobby > .card > :not(#lobbyStatus) { visibility: hidden; }
+#lobby.lobby #lobbyStatus.busy .status-emblem { display: block; width: 132px; height: 132px; color: var(--brass-hi); filter: drop-shadow(0 0 22px rgba(255, 170, 90, .45)); }
+#lobby.lobby #lobbyStatus.busy .status-emblem svg { width: 100%; height: 100%; overflow: visible; }
+#lobby.lobby #lobbyStatus.busy #lobbyStatusText { font: 600 clamp(1.4rem, 4vw, 2rem)/1.2 var(--serif); color: #fff4dc; letter-spacing: .02em; text-shadow: 0 2px 10px rgba(0, 0, 0, .45); }
+#lobby.lobby #lobbyStatus.busy .status-bar { display: block; position: relative; width: min(280px, 70vw); height: 8px; border-radius: 99px; overflow: hidden; background: rgba(255, 230, 180, .14); box-shadow: inset 0 0 0 1px rgba(236, 196, 120, .35); }
+#lobby.lobby #lobbyStatus.busy .status-bar > span { position: absolute; inset: 0 auto 0 0; width: 40%; border-radius: inherit; background: linear-gradient(90deg, #ffb067, #ffe1a6, #ffb067); animation: ts-bar 1.6s ease-in-out infinite; }
+#lobby.lobby #lobbyStatus.busy .status-tip { display: block; max-width: 40ch; min-height: 2.8em; margin: 6px 0 0; font-size: .95rem; line-height: 1.4; color: #e9dcc2; }
+#lobby.lobby #lobbyStatus.busy .status-tip.tip-in { animation: ts-fade .5s ease both; }
+#lobby.lobby #lobbyStatus.busy .status-tip:not(:empty)::before { content: "Tip"; display: block; margin-bottom: 2px; font: 700 .7rem/1.2 var(--sans); letter-spacing: .16em; text-transform: uppercase; color: var(--brass); }
+#lobby.lobby #lobbyStatus.busy .status-actions { margin-top: 4px; }
+#lobby.lobby #lobbyStatus.busy .status-actions .btn { min-width: 140px; color: #f2e6cd; background: rgba(20, 16, 12, .6); border-color: rgba(236, 196, 120, .45); }
+.se-hammer { transform-origin: 100px 60px; animation: se-strike 1.2s cubic-bezier(.6, 0, .4, 1) infinite; }
+.se-ring { transform-origin: 60px 60px; animation: tv-rays 14s linear infinite; }
+.se-sparks circle { opacity: 0; animation: se-spark 1.2s ease-out infinite; }
+.se-sparks circle:nth-child(1) { --dx: -16px; --dy: -14px; } .se-sparks circle:nth-child(2) { --dx: 14px; --dy: -18px; }
+.se-sparks circle:nth-child(3) { --dx: -6px; --dy: -22px; } .se-sparks circle:nth-child(4) { --dx: 20px; --dy: -6px; }
+@keyframes se-strike { 0%, 20% { transform: rotate(-38deg); } 46% { transform: rotate(2deg); } 52% { transform: rotate(-4deg); } 100% { transform: rotate(-38deg); } }
+@keyframes se-spark { 0%, 44% { opacity: 0; transform: translate(0, 0); } 47% { opacity: 1; } 75% { opacity: 0; transform: translate(var(--dx), var(--dy)); } 100% { opacity: 0; } }
+@keyframes ts-bar { 0% { transform: translateX(-110%); } 100% { transform: translateX(260%); } }
+
+/* A problem is a small dialog over the welcome panel, not a line lost under it. */
+#lobby.lobby #lobbyStatus.problem {
+  position: fixed; z-index: 40; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(440px, calc(100vw - 32px));
+  padding: 22px 20px 18px; border-radius: 20px; text-align: center;
+  background: linear-gradient(180deg, rgba(60, 30, 20, .98), rgba(28, 20, 15, .98)); border: 1px solid rgba(240, 140, 110, .6); border-left-width: 1px;
+  box-shadow: 0 0 0 100vmax rgba(16, 12, 8, .55), 0 24px 60px rgba(0, 0, 0, .5);
+  animation: ts-fade .25s ease both;
+}
+#lobby.lobby #lobbyStatus.problem #lobbyStatusText { font-size: 1.02rem; line-height: 1.45; color: #fff1e0; }
+#lobby.lobby #lobbyStatus.problem::before { content: "!"; display: grid; place-items: center; width: 38px; height: 38px; margin: 0 auto 10px; border-radius: 50%; font: 800 1.3rem/1 var(--serif); color: #3a1206; background: #ffb38f; }
+
+@keyframes ts-rise { from { opacity: 0; transform: translateY(14px); } }
+@keyframes ts-fade { from { opacity: 0; } }
+@keyframes ts-sheen { 0%, 70% { transform: skewX(-20deg) translateX(-200%); } 100% { transform: skewX(-20deg) translateX(560%); } }
+
+/* ------------------------------------------------------------------ wide screens: brand left, panel right */
+@media (min-width: 980px) and (min-height: 600px) {
+  #lobby.lobby > .card {
+    max-width: 1180px; grid-template-columns: minmax(0, 1fr) 460px; column-gap: clamp(32px, 6vw, 96px); row-gap: 14px;
+    grid-template-areas: "brand panel" "links panel" "saved panel" "note panel"; grid-template-rows: auto auto auto 1fr; align-items: start;
+  }
+  #lobby.lobby .masthead { grid-area: brand; align-self: end; justify-items: start; text-align: left; padding-top: 8vh; }
+  #lobby.lobby .masthead .lede { justify-content: flex-start; }
+  #lobby.lobby .lobby-form { grid-area: panel; align-self: center; padding: 24px 24px 22px; }
+  #lobby.lobby > .card > .howto-row { grid-area: links; justify-content: flex-start; }
+  #lobby.lobby > .card > #savedWorlds { grid-area: saved; justify-self: start; }
+  #lobby.lobby #savedWorlds > summary { margin: 0; }
+  #lobby.lobby #offlineNote { grid-area: note; justify-self: start; }
+  #lobby.lobby .role-card-scene .role-scene { height: 118px; }
+  #lobby.lobby .role-swap { top: 59px; }
+}
+
+/* ------------------------------------------------------------------ phones held upright */
+@media (max-width: 600px) {
+  #lobby.lobby { place-items: start center; }
+  #lobby.lobby > .card { gap: 12px; padding-top: 4px; }
+  #lobby.lobby .crest-medal { width: 58px; height: 58px; }
+  #lobby.lobby .crest-medal .crest { width: 36px; height: 36px; }
+  #lobby.lobby .masthead h1 { font-size: clamp(2.3rem, 11vw, 3rem); }
+  #lobby.lobby .masthead .lede { font-size: .84rem; padding: 5px 12px; }
+  #lobby.lobby .masthead .lede span + span { display: none; }
+  #lobby.lobby .lobby-form { padding: 14px 14px 14px; gap: 10px; border-radius: 20px; }
+  #lobby.lobby .lobby-form::before { border-radius: 15px; }
+  #lobby.lobby #nameHelp, #lobby.lobby .role-card-scene .role-detail { display: none; }
+  #lobby.lobby .role-card-scene .role-scene { height: 76px; margin-bottom: 4px; }
+  #lobby.lobby .role-card-scene .role-name { font-size: 1.15rem; }
+  #lobby.lobby .role-card-scene .role-desc { font-size: .74rem; line-height: 1.25; padding: 0 6px; }
+  #lobby.lobby .role-swap { width: 32px; height: 32px; margin: -16px 0 0 -16px; top: 38px; }
+  #lobby.lobby .role-swap svg { width: 18px; height: 18px; }
+  #lobby.lobby .role-switch-note { font-size: .74rem; margin-top: 6px; }
+  #lobby.lobby .role-switch-note span { display: none; }
+  #lobby.lobby .role-switch-note::after { content: "Hotbar button or F9."; }
+  #lobby.lobby #create.btn-play { min-height: 64px; }
+  #lobby.lobby .play-label { font-size: 1.6rem; }
+  #lobby.lobby .howto-row .btn-howto { flex: 1 1 0; min-width: 0; padding: 8px 10px; }
+}
+
+/* ------------------------------------------------------------------ phones turned sideways: brand left, panel right */
+@media (orientation: landscape) and (max-height: 560px) {
+  html body.touch-fullscreen-surface #lobby.lobby { padding-top: max(8px, env(safe-area-inset-top)) !important; }
+  #lobby.lobby { place-items: center; padding: max(8px, env(safe-area-inset-top)) max(64px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+  #lobby.lobby > .card {
+    max-width: 860px; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); column-gap: 18px; row-gap: 8px;
+    grid-template-areas: "brand panel" "links panel" "saved panel" "note panel"; grid-template-rows: auto auto auto 1fr; align-items: start;
+  }
+  #lobby.lobby .masthead { grid-area: brand; gap: 2px; align-self: end; }
+  #lobby.lobby .crest-medal { width: 44px; height: 44px; box-shadow: 0 0 0 3px #f6d79a, 0 0 0 5px #7a4a1c, 0 6px 16px rgba(70, 30, 8, .45); }
+  #lobby.lobby .crest-medal .crest { width: 28px; height: 28px; }
+  #lobby.lobby .masthead h1 { font-size: clamp(1.9rem, 5.4vw, 2.6rem); }
+  #lobby.lobby .masthead .lede { font-size: .76rem; padding: 4px 10px; margin-top: 4px; }
+  #lobby.lobby .masthead .lede span + span { display: none; }
+  #lobby.lobby .lobby-form { grid-area: panel; align-self: center; padding: 10px 12px; gap: 7px; border-radius: 18px; max-height: calc(100dvh - 16px); overflow-y: auto; }
+  #lobby.lobby .lobby-form::before { border-radius: 13px; }
+  #lobby.lobby > .card > .howto-row { grid-area: links; gap: 8px; }
+  #lobby.lobby .howto-row .btn-howto, #lobby.lobby #savedWorlds > summary { min-height: 40px; padding: 6px 12px; font-size: .82rem; }
+  #lobby.lobby > .card > #savedWorlds { grid-area: saved; }
+  #lobby.lobby #offlineNote { grid-area: note; font-size: .76rem; }
+  #lobby.lobby #nameHelp, #lobby.lobby .roles legend, #lobby.lobby .role-card-scene .role-detail { display: none; }
+  #lobby.lobby .field label { font-size: .68rem; }
+  #lobby.lobby #name { min-height: 38px; height: 38px; }
+  #lobby.lobby .role-grid-scenes { gap: 8px; }
+  #lobby.lobby .role-card-scene .role-body {
+    display: grid; grid-template-columns: 60px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 8px; row-gap: 0;
+    align-items: center; text-align: left; padding: 4px 8px 4px 4px; border-radius: 12px;
+  }
+  #lobby.lobby .role-card-scene .role-scene { grid-row: 1 / 3; width: 60px; height: 40px; margin: 0; border: 0; border-radius: 9px; }
+  #lobby.lobby .role-card-scene .role-name { font-size: 1.05rem; line-height: 1.1; }
+  #lobby.lobby .role-card-scene .role-desc { font-size: .7rem; line-height: 1.2; padding: 0; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  #lobby.lobby .role-swap { top: 50%; width: 28px; height: 28px; margin: -14px 0 0 -14px; }
+  #lobby.lobby .role-swap svg { width: 16px; height: 16px; }
+  #lobby.lobby .role-switch-note { display: none; }
+  #lobby.lobby .create-block { gap: 7px; }
+  #lobby.lobby #create.btn-play { min-height: 56px; border-radius: 14px; }
+  #lobby.lobby .play-label { font-size: 1.45rem; }
+  #lobby.lobby .play-sub { font-size: .72rem; }
+  #lobby.lobby .create-block > .new-world-btn, #lobby.lobby .create-block > .friends-btn { min-height: 40px; font-size: .86rem; }
+  #lobby.lobby #lobbyStatus.busy .status-emblem { width: 92px; height: 92px; }
+  #lobby.lobby #lobbyStatus.busy { gap: 8px; }
+}
+
+/* The how-to card opens as its own sheet over the title screen. */
+#lobby #controlsCard:not([hidden]) {
+  position: fixed; z-index: 30; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(760px, calc(100vw - 16px)); max-height: calc(100dvh - 16px); margin: 0; overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box;
+  box-shadow: 0 0 0 100vmax rgba(16, 12, 8, .5), 0 24px 60px rgba(0, 0, 0, .5);
+}

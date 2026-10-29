@@ -63,10 +63,14 @@ import {insideTavern} from './shared/taverns.js';
 import './client/hero-progress.css';
 import './client/quartermaster.css';
 import './client/ui-polish.css';
+import './client/title-screen.css';
+import './client/game-menu.css';
+import {startLoadingTips} from './client/loading-tips.js';
 
 // ---------------------------------------------------------------- helpers
 const $ = id => document.getElementById(id);
 const body = document.body;
+startLoadingTips();
 const canvas = $('world');
 // Header controls wrap as room state and viewport width change.
 const hudHeader = document.querySelector('.hud-top');
@@ -201,7 +205,7 @@ if (ROOM_PATTERN.test(invited)) {
 
 $('lobbyForm').addEventListener('submit', event => {
   event.preventDefault();
-  if ($('joinBlock').hidden) { quickPlay(); return; }   // Enter in the name field means Play (always now)
+  if ($('joinBlock').hidden) { play(); return; }   // Enter in the name field means Play (always now)
   if (!event.submitter && document.activeElement === nameInput && !roomInput.value.trim()) { $('create').focus(); return; }
   joinFromForm();
 });
@@ -211,7 +215,26 @@ const devSolo = import.meta.env?.DEV && new URLSearchParams(location.search).has
 // A shared world link (?world=wilds&seed=mossy-heron-417&preset=continent) starts that generated world when you create one.
 const linkedWorld = (() => { const q = new URLSearchParams(location.search), kind = q.get('world'); if (!kind) return null;
   try { return worldDescriptor({kind, seed: q.get('seed') || friendlySeed(Date.now() % 100000), preset: q.get('preset') || 'continent'}); } catch { return null; } })();
-$('create').addEventListener('click', () => devSolo ? start({create: true, solo: true}) : linkedWorld ? start({create: true}) : quickPlay());
+$('create').addEventListener('click', () => play());
+$('friends').addEventListener('click', () => quickPlay());
+// Play is single-player first (2026-10-28): your own world on this device, no room service. An invite link still
+// joins that friend's world; a shared world link starts that world solo; otherwise the newest solo save comes back,
+// or a fresh Great Wilds world is lit. Play with friends keeps the old quick play.
+const latestSoloSave = () => { try { return new WorldSaves().list().find(save => save.checkpoint?.room === 'SOLO') || null; } catch { return null; } };
+function play() {
+  if (devSolo) { start({create: true, solo: true}); return; }
+  if (ROOM_PATTERN.test(invited)) { quickPlay(); return; }
+  if (linkedWorld) { start({create: true, solo: true}); return; }
+  const save = latestSoloSave();
+  if (save) { start({create: true, save}); return; }
+  start({create: true, solo: true, world: worldDescriptor({kind: 'wilds', seed: friendlySeed(Math.floor(Math.random() * 1e6)), preset: 'continent'})});
+}
+function refreshPlayHint() {
+  if (ROOM_PATTERN.test(invited)) { setText($('playHint'), 'Join your friend’s world'); return; }
+  const save = latestSoloSave();
+  setText($('playHint'), save ? `Continue ${save.name || 'your world'}` : 'Start your own Great Wilds world');
+}
+refreshPlayHint();
 
 // Quick play: join the fullest open world in your region, or start one if none has room.
 // A world that turns out full or gone is skipped; after three misses we just light a new one.
@@ -259,9 +282,9 @@ function wildsBanner(e, me) {
 const worldMenu = createWorldMenu({
   available: kind => ['arena', 'wilds', 'expedition', 'underways'].includes(kind) ? true : 'Arriving in a coming update. This mode is still being built.',
   onStart: async choice => {
-    if (choice.kind === 'expedition') { runWorld = choice.world || null; runLauncher.open(); return; } // the run launcher picks format and seed; the run plays on the menu's generated world
+    if (choice.kind === 'expedition') { runWorld = choice.world || null; runFriends = !!choice.friends; runLauncher.open(); return; } // the run launcher picks format and seed; the run plays on the menu's generated world
     if (!game && !rendererFailed) { const revision = ++startRevision; showLobbyStatus('Preparing the world…', {busy: true, cancel: true}); await rendererPromise; if (revision !== startRevision) return; }
-    start({create: true, solo: devSolo, ...(choice.world ? {world: choice.world} : {})});
+    start({create: true, solo: devSolo || !choice.friends, ...(choice.world ? {world: choice.world} : {})});
   }});
 $('newWorld').addEventListener('click', () => worldMenu.open());
 $('statusSolo').addEventListener('click',()=>start({create:true,solo:true,save:lastAttempt?.save,run:lastAttempt?.run}));
@@ -367,7 +390,8 @@ function setPhase(next) {
   $('lobby').hidden = next === 'game';
   $('hud').hidden = next !== 'game';
   if (next !== 'game') {restoreFieldLock=false;holdOverlays?.close();closeMenu(false);}
-  if (next === 'lobby' && $('savedWorlds').open) refreshSavedWorlds();   // autosaves/reset copies made while playing
+  if (next === 'lobby' && $('savedWorlds').open) refreshSavedWorlds();
+  if (next === 'lobby') refreshPlayHint();   // autosaves/reset copies made while playing
   if (next === 'game') controlsCard?.close({restoreFocus: false});
   syncActive();
 }
@@ -427,7 +451,7 @@ async function start(attempt) {
   next.addEventListener('welcome', mine(onWelcome));
   next.addEventListener('status', mine(onStatus));
   next.addEventListener('snapshot', mine(onSnapshot));
-  next.addEventListener('event', mine(detail => { lastEvent = detail; game?.handleEvent(detail); const banner=rewardBanner(detail,lastSnapshot?.players?.find(p=>p.id===playerId)?.side||'party'); if(banner)toast(banner); const wild=wildsBanner(detail,playerId); if(wild)toast(wild); if(detail.kind==='respawn'&&detail.id===playerId)toast('Back on your feet. Three seconds of protection to get your bearings.');if(detail.kind==='shop_buy'&&detail.id===playerId)quartermaster.bought(detail.item);if(detail.kind==='level_up'){if(detail.id===playerId)heroProgress.levelUp(detail);else{const who=lastSnapshot?.players?.find(p=>p.id===detail.id)?.name;if(who)toast(`${who} reached level ${detail.level}!`);}} if(detail.kind==='god_gift')giftToast(detail); if(detail.kind==='bloom_level')bloomToast(detail); if(detail.kind==='weather')toast(detail.by===playerId?'Rain is coming. Groves bloom twice as fast and Heroes mend while it falls.':'The God calls the rain: you slowly mend while it falls.'); runHud.handleEvent(detail); if(detail.kind==='party_reward')toast('Expedition milestone: +20 health, +30 mana for the party.'); if(detail.kind==='adventure_reward')toast('Expedition complete! Fully restored, +6 wood, +4 stone, +3 gems each.'); }));
+  next.addEventListener('event', mine(detail => { lastEvent = detail; game?.handleEvent(detail); const banner=rewardBanner(detail,lastSnapshot?.players?.find(p=>p.id===playerId)?.side||'party'); if(banner)toast(banner); const wild=wildsBanner(detail,playerId); if(wild)toast(wild); if(detail.kind==='respawn'&&detail.id===playerId)toast('Back on your feet. Three seconds of protection to get your bearings.');if(detail.kind==='shop_buy'&&detail.id===playerId)quartermaster.bought(detail.item);if(detail.kind==='level_up'){if(detail.id===playerId)heroProgress.levelUp(detail);else{const who=lastSnapshot?.players?.find(p=>p.id===detail.id)?.name;if(who)toast(`${who} reached level ${detail.level}!`);}} if(detail.kind==='god_gift')giftToast(detail); if(detail.kind==='keep_war_on')toast('The keeps are at war! Squads march down the lane in 20 seconds.'); if(detail.kind==='keep_war_off')toast('The keeps make peace. The lane goes quiet.'); if(detail.kind==='bloom_level')bloomToast(detail); if(detail.kind==='weather')toast(detail.by===playerId?'Rain is coming. Groves bloom twice as fast and Heroes mend while it falls.':'The God calls the rain: you slowly mend while it falls.'); runHud.handleEvent(detail); if(detail.kind==='party_reward')toast('Expedition milestone: +20 health, +30 mana for the party.'); if(detail.kind==='adventure_reward')toast('Expedition complete! Fully restored, +6 wood, +4 stone, +3 gems each.'); }));
   next.addEventListener('error', mine(onSessionError));
   next.addEventListener('hosting', mine(() => { refreshHostControls(); }));
   next.addEventListener('host_changed', mine(detail => {
@@ -738,8 +762,9 @@ const runHud = createRunHud({parent: body,
   toast: text => toast(text),
   onModal: open => { runModal = open; if (open) { game?.clearControls(); if (document.pointerLockElement) document.exitPointerLock?.(); } syncActive(); }});
 let runWorld = null; // the generated world chosen in the New world menu (null: today's valley)
-const runLauncher = createRunLauncher({parent: body, openHall: () => runHud.openHall(), onStart: run => start({create: true, run: runWorld ? {...run, world: runWorldFor(run, runWorld)} : run, ...(devSolo ? {solo: true} : {})})});
-$('runLaunch')?.addEventListener('click', () => { runWorld = null; runLauncher.open(); });
+let runFriends = false; // runs are solo unless the New world menu's "Open to friends" was ticked
+const runLauncher = createRunLauncher({parent: body, openHall: () => runHud.openHall(), onStart: run => start({create: true, run: runWorld ? {...run, world: runWorldFor(run, runWorld)} : run, ...(devSolo || !runFriends ? {solo: true} : {})})});
+$('runLaunch')?.addEventListener('click', () => { runWorld = null; runFriends = false; runLauncher.open(); });
 // Failures: short red standalone text that fades on its own (the recovery hint sits small beneath).
 function fail(text) { if (text) calloutLane().error(text); }
 

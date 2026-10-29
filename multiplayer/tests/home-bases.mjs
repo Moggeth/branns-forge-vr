@@ -16,8 +16,21 @@ test('new worlds open with both home bases running and restore them',()=>{
  assert.equal(sim.command('host',{type:'battle',action:'stop',seq:1}).code,'always_on');
 });
 
+test('keeps are peaceful until the host turns the keep war on, and off again',()=>{
+ const {sim,w}=rig();assert.equal(w.battle.war,false);
+ assert.ok(!steps(sim,HOME.firstWaveTicks+HOME.waveTicks+2).some(e=>e.kind==='battle_wave'));assert.equal(w.enemies.filter(battleBot).length,0);
+ assert.equal(loadSimulation(sim.checkpoint()).snapshot().battle.war,false);
+ assert.equal(sim.command('host',{type:'battle',action:'war_off',seq:1}).code,'war_off');
+ const on=sim.command('host',{type:'battle',action:'war_on',seq:2});assert.ok(on.ok);assert.equal(on.events[0].kind,'keep_war_on');
+ assert.ok(steps(sim,HOME.firstWaveTicks+1).some(e=>e.kind==='battle_wave'));assert.ok(w.enemies.filter(battleBot).length>0);
+ assert.equal(loadSimulation(sim.checkpoint()).snapshot().battle.war,true);
+ assert.ok(sim.command('host',{type:'battle',action:'war_off',seq:3}).ok);assert.equal(w.battle.war,false);assert.equal(w.enemies.filter(battleBot).length,0,'squads go home');
+ // A save from before the switch existed (no war flag) comes back peaceful.
+ const old=sim.checkpoint();delete old.battle.war;assert.equal(loadSimulation(old).snapshot().battle.war,false);
+});
+
 test('barracks send squads down the lane on the wave clock',()=>{
- const {sim,w}=rig();const ev=steps(sim,HOME.firstWaveTicks+1);const wave=ev.find(e=>e.kind==='battle_wave');
+ const {sim,w}=rig();w.battle.war=true;const ev=steps(sim,HOME.firstWaveTicks+1);const wave=ev.find(e=>e.kind==='battle_wave');
  assert.ok(wave);assert.equal(wave.count,6);assert.equal(w.enemies.filter(e=>battleBot(e)&&e.side==='party').length,3);
  for(const e of w.enemies.filter(battleBot))assert.ok(Math.hypot(e.position[0]-(e.side==='party'?-34:34),e.position[2]-(e.side==='party'?-34:34))<HOME.domeRadius);
  const twin=loadSimulation(sim.checkpoint());steps(sim,240);for(let i=0;i<240;i++)twin.step();assert.deepEqual(twin.snapshot().enemies,sim.snapshot().enemies);

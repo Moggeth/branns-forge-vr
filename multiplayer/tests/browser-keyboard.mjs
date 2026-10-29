@@ -16,7 +16,7 @@ async function launch(){
 }
 async function enterWorld(page,{role,name}){
  await page.goto(`${process.env.ACCEPT_BASE||'http://127.0.0.1:5188'}/?acceptanceProbe`);
- await page.fill('#name',name);await page.check(`input[name="role"][value="${role}"]`,{force:true});await page.click('#create');
+ await page.fill('#name',name);await page.check(`input[name="role"][value="${role}"]`,{force:true});await page.click('#friends');
  await page.waitForFunction(role=>window.brannHarness?.snapshot()?.players.some(p=>p.id===window.brannHarness.state().playerId&&p.role===role),role);
  await sleep(800);
 }

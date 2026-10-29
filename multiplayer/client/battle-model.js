@@ -31,7 +31,7 @@ export function battlePanelModel(snapshot,playerId,{isHost=false,connected=false
     expeditionActive:expeditionRunning(snapshot?.adventure),
     wave:status==='off'?0:nonnegative(battle.wave),
     nextWaveSeconds:status==='running'?Math.max(0,Math.ceil((nonnegative(battle.nextWaveTick)-nonnegative(snapshot?.tick))/60)):0,
-    bots,bases,winner:status==='victory'&&BATTLE_SIDES.includes(battle.winner)?battle.winner:null,home:battle?.v===2};
+    bots,bases,winner:status==='victory'&&BATTLE_SIDES.includes(battle.winner)?battle.winner:null,home:battle?.v===2,war:battle?.v===2&&battle.war===true};
 }
 
 // null means the caller should use its ordinary adventureView instead.
@@ -54,7 +54,8 @@ function homeQuestView(snapshot,playerId) {
 
 export function battleQuestView(snapshot,playerId) {
   if(snapshot?.run)return null; // an Expedition Roguelite run shows its own strip (client/run-panel.js); the keeps send no squads
-  if(snapshot?.battle?.v===2&&snapshot.battle.status==='running'&&snapshot.battle.bases?.length===2)return homeQuestView(snapshot,playerId);
+  // Peaceful keeps (the keep war is off) leave the quest card to the world's own guide or the forge quest.
+  if(snapshot?.battle?.v===2)return snapshot.battle.status==='running'&&snapshot.battle.war===true&&snapshot.battle.bases?.length===2?homeQuestView(snapshot,playerId):null;
   const model=battlePanelModel(snapshot,playerId);
   if(model.status==='off')return null;
   const players=snapshot?.players||[],me=players.find(p=>p.id===playerId),role=me?.role==='god'?'god':'hero';
