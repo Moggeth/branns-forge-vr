@@ -40,9 +40,9 @@ export function boonBonus(p, key) {
 
 // Starting kits: the early equipment choice at camp. A kit is a starting pack plus one boon.
 export const KITS = Object.freeze(Object.fromEntries(Object.entries({
-  woodcutter: {name: 'Woodcutter', tool: 'axe', boon: 'ironhide', text: 'Axe in hand, +30 max health, and a pack of timber for quick walls and bridges.', pack: {wood: 12, stone: 2}},
-  prospector: {name: 'Prospector', tool: 'pick', boon: 'stoneskin', text: 'Pick in hand, take 10% less damage, and a pack of stone and iron.', pack: {stone: 8, iron: 6}},
-  skirmisher: {name: 'Skirmisher', tool: 'crossbow', boon: 'fleet', text: 'Crossbow in hand, run 12% faster, and a few gems for the road.', pack: {wood: 4, gems: 3}},
+  woodcutter: {name: 'Woodcutter', tool: 'axe', boon: 'ironhide', text: 'Axe in hand, +30 max health, and a pack of timber for quick walls and bridges.', pack: {wood: 12, iron: 2}},
+  prospector: {name: 'Prospector', tool: 'pick', boon: 'stoneskin', text: 'Pick in hand, take 10% less damage, and a pack of iron and crystal.', pack: {iron: 8, gems: 3}},
+  skirmisher: {name: 'Skirmisher', tool: 'crossbow', boon: 'fleet', text: 'Crossbow in hand, run 12% faster, and a little crystal for the road.', pack: {wood: 6, gems: 3}},
 }).map(([id, spec]) => [id, Object.freeze({id, ...spec, pack: Object.freeze(spec.pack)})])));
 export const KIT_IDS = Object.freeze(Object.keys(KITS));
 

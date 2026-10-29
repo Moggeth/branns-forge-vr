@@ -16,6 +16,7 @@ import './client/callouts.css';
 import './client/hotbar.css';
 import './client/resource-bar.css';
 import {createResourceBar} from './client/resource-bar.js';
+import {BRIDGE_TIMBER} from './shared/simulation.js';
 import {createSpellbook} from './client/spellbook.js';
 import {createInventionPanel} from './client/invention-panel.js';
 import {createQuickBuild} from './client/quick-build.js';
@@ -592,7 +593,7 @@ function onSnapshot(snapshot) {
   if (snapshots === 1) removeNotice('loading');
   const self = snapshot.players.find(player => player.id === playerId);
   if (self) {
-    setText($('supplyCount'),`Wood ${self.resources?.wood||0} · Stone ${self.resources?.stone||0} · Gems ${self.resources?.gems||0}`);
+    setText($('supplyCount'),`Timber ${self.resources?.wood||0} · Iron ${self.resources?.iron||0} · Crystal ${self.resources?.gems||0}`);
     for(const b of document.querySelectorAll('[data-resource-use]')){const kind=b.dataset.resourceUse,r=RESOURCE_RECIPES[kind];setText(b,`${r[self.role]} · ${r.cost} ${kind}`);b.disabled=(self.resources?.[kind]||0)<r.cost;}
     const waitSeconds = Number.isFinite(self.roleTick) ? Math.max(0, Math.ceil((120 - (snapshot.tick - self.roleTick)) / 60)) : 0;
     for (const radio of document.querySelectorAll('input[name="menuRole"]')) {
@@ -628,7 +629,7 @@ function onSnapshot(snapshot) {
   const count = session?.connection.local?'This device':`${snapshot.players.length} of ${session?.connection.maxPeers ?? snapshot.maxPlayers ?? 32} here`;
   if (shown.players !== count) { shown.players = count; setText($('hudPlayers'), count); }
   if (self) {
-    setText($('resources'), `Wood ${self.resources?.wood||0} · Stone ${self.resources?.stone||0} · Gems ${self.resources?.gems||0}`);
+    setText($('resources'), `Timber ${self.resources?.wood||0} · Iron ${self.resources?.iron||0} · Crystal ${self.resources?.gems||0}`);
     resourceBar ??= createResourceBar(document.querySelector('.hud-bottom')||$('hud'));
     resourceBar.update(self.resources, snapshot.inventions?.stockpiles?.[self.side==='rivals'?'rivals':'party']);
     for(const b of document.querySelectorAll('[data-equip]'))b.setAttribute('aria-pressed',String(b.dataset.equip===(self.tool||'axe')));
@@ -914,7 +915,8 @@ forgePanel=createInventionPanel({mount:body,onAction:(action,detail)=>{if(action
 for(const button of document.querySelectorAll('[data-open-forge]'))button.addEventListener('click',openForge);
 function quickBuildModel(snapshot){
   const model=inventionView(snapshot,playerId),self=snapshot.players.find(p=>p.id===playerId),wood=self?.resources?.wood||0;
-  return {...model,recipes:[...(model.recipes||[]),{id:'bridge',name:'Bridge',cost:{wood:3},missing:{wood:Math.max(0,3-wood)},enabled:self?.role==='hero'&&wood>=3,reason:self?.role!=='hero'?'Switch to Hero to build a bridge':wood<3?`Carry ${3-wood} more Wood`:''}]};
+  const n=BRIDGE_TIMBER;
+  return {...model,recipes:[...(model.recipes||[]),{id:'bridge',name:'Bridge',cost:{wood:n},missing:{wood:Math.max(0,n-wood)},enabled:self?.role==='hero'&&wood>=n,reason:self?.role!=='hero'?'Switch to Hero to build a bridge':wood<n?`Carry ${n-wood} more Timber`:''}]};
 }
 function closeQuickBuild(){quickBuildOpen=false;quickBuild?.hide();body.classList.remove('quick-build-open');syncActive();}
 function openQuickBuild(){

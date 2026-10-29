@@ -1,17 +1,22 @@
 import assert from 'node:assert/strict';
-import {MATERIAL_KEYS,MATERIAL_CATALOG,ORE_RECIPES,DEPOSIT_CATALOG,depositReward,restoreMaterials,emptyMaterials,materialLabel} from '../shared/material-catalog.js';
+import {MATERIAL_KEYS,MATERIAL_CATALOG,ORE_RECIPES,DEPOSIT_CATALOG,depositReward,restoreMaterials,emptyMaterials,materialLabel,bankKey} from '../shared/material-catalog.js';
 import {initialDeposits,renewGeology} from '../shared/world-content.js';
 import {createEnemy,hitEnemyPart,mineGolemRemains} from '../shared/combat.js';
 
 assert.equal(materialLabel('gems'),'Crystal');assert.equal(materialLabel('crystal'),'Crystal');
-assert.equal(materialLabel('wood'),'Wood');assert.equal(materialLabel('starMetal'),'Star metal');
+assert.equal(materialLabel('wood'),'Timber');assert.equal(materialLabel('starMetal'),'Star metal');
 for(const key of MATERIAL_KEYS){assert.ok(MATERIAL_CATALOG[key].use.length>12);assert.ok(MATERIAL_CATALOG[key].source.length>12);assert.ok(MATERIAL_CATALOG[key].recipes.length||MATERIAL_CATALOG[key].groundwork,`${key} needs a recipe or an explicit groundwork flag`);}
 assert.deepEqual(restoreMaterials({wood:2,stone:3,gems:4}),{...emptyMaterials(),wood:2,stone:3,gems:4});
 assert.equal(restoreMaterials({crystal:5}).gems,5);
+// Old saves: carried or stored ore folds into its metal (one ore made one bar), capped at the pack limit.
+assert.deepEqual(restoreMaterials({iron:3,ironOre:4,starOre:2,goldOre:1}),{...emptyMaterials(),iron:7,starMetal:2,gold:1});
+assert.equal(restoreMaterials({iron:998,ironOre:5}).iron,999);
+for(const ore of Object.keys(ORE_RECIPES))assert.equal(bankKey(ore),ORE_RECIPES[ore].output);
+assert.equal(bankKey('wood'),'wood');assert.equal(bankKey('gems'),'gems');
 for(const invalid of [NaN,Infinity,-1,1000,1.5,'2',null,undefined])assert.throws(()=>restoreMaterials({iron:invalid}));
 assert.throws(()=>restoreMaterials([]));assert.throws(()=>restoreMaterials(null));
 for(const [input,recipe]of Object.entries(ORE_RECIPES)){assert.ok(MATERIAL_KEYS.includes(input)&&MATERIAL_KEYS.includes(recipe.output));assert.equal(recipe.input,recipe.amount);assert.ok(recipe.ticks<=180);}
-assert.deepEqual(depositReward('meteor'),{kind:'starOre',amount:2});assert.deepEqual(depositReward('crystal'),{kind:'gems',amount:2});assert.equal(depositReward('bogus'),null);assert.equal(depositReward('constructor'),null);
+assert.deepEqual(depositReward('meteor'),{kind:'starOre',amount:2});assert.deepEqual(depositReward('crystal'),{kind:'gems',amount:4});assert.equal(depositReward('bogus'),null);assert.equal(depositReward('constructor'),null);
 const deposits=initialDeposits();assert.equal(deposits.length,13);assert.equal(new Set(deposits.map(d=>d.id)).size,deposits.length);
 assert.ok(deposits.filter(d=>d.kind==='iron'&&Math.hypot(d.x,d.z)<13).length>=3);
 assert.ok(deposits.filter(d=>d.kind==='mithril').every(d=>Math.hypot(d.x,d.z)>25));

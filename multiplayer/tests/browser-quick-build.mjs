@@ -25,10 +25,10 @@ try{
  const beforeTool=await page.evaluate(()=>window.brannHarness.controls().weapon.tool);
  await page.keyboard.press('b');await page.waitForFunction(()=>window.brannHarness.state().quickBuildOpen);
  assert.equal(await page.evaluate(()=>window.brannHarness.state().controlsActive),false);
- assert.equal(await page.locator('[data-qb-place="bridge"]').getAttribute('aria-disabled'),'true','bridge needs carried Wood even beside full shared stores');
+ assert.equal(await page.locator('[data-qb-place="bridge"]').getAttribute('aria-disabled'),'true','bridge needs carried Timber even beside full shared stores');
  await page.keyboard.press('6');assert.equal(await page.evaluate(()=>window.brannHarness.state().quickBuildOpen),true);
  assert.equal(await page.evaluate(()=>window.brannHarness.controls().weapon.tool),beforeTool,'tray number does not equip a weapon');
- assert.match(await page.locator('[data-qb-place="bridge"]').innerText(),/Carry 3 more Wood/);
+ assert.match(await page.locator('[data-qb-place="bridge"]').innerText(),/Carry 2 more Timber/);
  await page.keyboard.press('b');assert.equal(await page.evaluate(()=>window.brannHarness.state().quickBuildOpen),false);
  await page.keyboard.press('b');await page.keyboard.press('2');
  await page.waitForFunction(()=>window.brannHarness.controls().inventionPlacement==='timberline');

@@ -15,7 +15,7 @@ for(const k of Object.keys(p.resources))p.resources[k]=100;
 const act=(action,detail={})=>sim.command(p.id,{type:'action',seq:p.seq+1,action,...detail});
 let tile;
 for(let x=-36;x<=36&&!tile;x+=6)for(let z=-36;z<=36&&!tile;z+=6){if(act('inventionBuild',{kind:'foundation',position:[x,0,z],yaw:1}).ok)tile=s.inventions.structures.at(-1);}
-assert.ok(tile);assert.equal(tile.yaw,0);assert.equal(p.resources.stone,92);
+assert.ok(tile);assert.equal(tile.yaw,0);assert.equal(p.resources.stone,97);
 const [x,y,z]=tile.position;
 assert.equal(act('inventionBuild',{kind:'foundation',position:[x,0,z]}).code,'occupied');
 assert.equal(act('inventionBuild',{kind:'timberline',position:[x+2.5,0,z]}).code,'foundation_edge');

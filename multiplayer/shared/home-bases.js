@@ -19,7 +19,7 @@ export const HOME = Object.freeze({
     spire: Object.freeze({hp: 250, range: 9, cooldown: 90, damage: 14}),
     ballista: Object.freeze({hp: 300, range: 17, cooldown: 240, damage: 40, heroDamage: 20}), // range trimmed as the keep widened: same reach from the heart
   }),
-  reward: Object.freeze({iron: 12, wood: 12, gems: 6, starOre: 3}),
+  reward: Object.freeze({iron: 12, wood: 12, gems: 6, starMetal: 3}),
   // Hands-on pieces (shared/home-interact.js): drink at the fountain, ring the barracks bell, hammer-mend parts.
   drink: Object.freeze({reach: 3 * 1.3, heal: 40, cooldown: 10 * 60}), // per hero; also fills the Healing Draught
   bell: Object.freeze({reach: 2.6, cooldown: 75 * 60}),

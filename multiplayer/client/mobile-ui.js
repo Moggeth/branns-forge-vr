@@ -169,7 +169,7 @@ function buildSettings() {
           ['Primary face button (A/X)', 'Jump'],
           ['Left squeeze', 'Cycle seven weapons'],
           ['Right squeeze', 'Grab or drop a bone; otherwise collect / eat'],
-          ['Right stick click', 'Build bridge (3 wood)'],
+          ['Right stick click', 'Build bridge (2 timber)'],
           ['Secondary face button (B/Y)', 'Exit VR and open Menu'],
         ]),
         guideBlock('Menu', [

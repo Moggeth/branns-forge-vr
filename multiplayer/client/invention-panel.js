@@ -8,7 +8,7 @@ export const STRUCTURES = [
   ['forge', 'Forge', 'Permanent heart of the settlement. Refines ore and powers inventions.', 'anvil'],
   ['foundation', 'Stone Foundation', 'Anchored tile resists earth magic. Build machines on top.', 'stone'],
   ['storehouse', 'Storehouse', 'Safe storage. Stored goods count toward every recipe.', 'storehouse'],
-  ['loggingYard', 'Logging Yard', 'Gathers nearby fallen Wood into shared stores.', 'axe'],
+  ['loggingYard', 'Logging Yard', 'Gathers nearby fallen Timber into shared stores.', 'axe'],
   ['prospector', 'Prospector', 'Surveys seams and focuses new geological growth.', 'pick'],
   ['sanctuary', 'Sanctuary', 'Restores the wounded and steadies the ward line.', 'sanctuary'],
   ['barracks', 'Barracks', 'Houses defenders who answer raids.', 'helm'],
@@ -23,17 +23,18 @@ export const STRUCTURES = [
 const STRUCT = Object.fromEntries(STRUCTURES.map(([id, name, purpose, ico]) => [id, { id, name, purpose, ico }]));
 const OPERABLE = new Set(['timberline', 'launcher']);
 
-/** Resources in display order, with purpose text shown on the Stores tab. */
+/** Resources in display order, with purpose text shown on the Stores tab: the three primaries, then extras. */
 export const RESOURCES = [
-  ['wood', 'Wood', 'Frames, walls and timber ammunition', 'wood'],
-  ['stone', 'Stone', 'Foundations, towers and launcher shot', 'stone'],
-  ['iron', 'Iron', 'Hinges, blades, trap jaws', 'ingot'],
-  ['mithril', 'Mithril', 'Light, strong fittings for advanced work', 'mithril'],
-  ['crystal', 'Crystal', 'Wards, sanctuary focus, rune work', 'crystal'],
-  ['starMetal', 'Star metal', 'Rarest alloy for master inventions', 'star'],
-  ['copper', 'Copper', 'Wiring, bells and warm fittings for coming inventions', 'ingot'],
-  ['gold', 'Gold', 'Inlay and enchanting foci for coming inventions', 'ingot'],
+  ['wood', 'Timber', 'The main building material: frames, walls, bridges and bolts', 'wood'],
+  ['iron', 'Iron', 'Fittings, blades, trap jaws and machine parts', 'ingot'],
+  ['crystal', 'Crystal', 'Wards, sanctuaries, heartstones and rune work', 'crystal'],
+  ['stone', 'Stone', 'Extra: foundations and launcher shot', 'stone'],
+  ['gold', 'Gold', 'Extra: spend it at the keep shop', 'ingot'],
+  ['copper', 'Copper', 'Extra: kept for coming inventions', 'ingot'],
+  ['mithril', 'Mithril', 'Extra: kept for coming inventions', 'mithril'],
+  ['starMetal', 'Star metal', 'Extra: kept for coming inventions', 'star'],
 ];
+const PRIMARY = new Set(['wood', 'iron', 'crystal']);
 export const ORES = [
   ['ironOre', 'Iron ore', 'iron', 'Refine at the forge into Iron'],
   ['mithrilOre', 'Mithril ore', 'mithril', 'Refine at the forge into Mithril'],
@@ -215,6 +216,9 @@ export function createInventionPanel({ mount = document.body, onAction = () => {
     const sm = m.smelt && typeof m.smelt === 'object' ? m.smelt : { ore: oreTotal, enabled: oreTotal > 0, reason: 'No ore carried or stored' };
     const rjobs = (Array.isArray(m.jobs) ? m.jobs : []).filter(j => j && /refin|smelt/i.test(String(j.kind)));
     const ores = ORES.filter(([k]) => d.avail(k) > 0);
+    const bayAny = Array.isArray(m.bay) && m.bay.some(b => b && num(b.amount) > 0);
+    // Ore banks as metal now; the furnace only shows for ore left over from an older world.
+    if (ores.length || rjobs.length || bayAny) {
     out.push(`<section class="ip-smelt" aria-label="Smelting"><div class="ip-smelt-head">${icon('flame', 'ip-ico ip-big')}<div><h3>Smelting</h3>
       <p>Ore smelts by itself while a hero stands at the Forge. Bars come out in the output bay, one stack per metal.</p></div></div>
       <div class="ip-orechips">${ores.length ? ores.map(([k, name]) => `<span class="ip-orechip">${icon('ore', 'ip-ico ip-r-' + k)}<b>${d.avail(k)}</b> ${esc(name)}</span>`).join('') : '<span class="ip-empty">No ore carried or stored. Mine ore seams with the pick.</span>'}</div>
@@ -228,12 +232,14 @@ export function createInventionPanel({ mount = document.body, onAction = () => {
     if (bay.length) out.push(`<div class="ip-bay"><span class="ip-bay-label">Output bay</span>${bay.map(b => `<span class="ip-orechip ip-barchip">${icon(RES_ICO[b.kind] || 'ingot', 'ip-ico ip-r-' + b.kind)}<b>${num(b.amount)}</b> ${esc(RES_NAME[b.kind] || b.kind)} bar${num(b.amount) === 1 ? '' : 's'}</span>`).join('')}
       ${btn('collect-bars', 'data-ip-act="inventionCollectOutput"', `${icon('chest')}<span>Collect all</span>`, true, '')}</div>`);
     out.push('</section>');
+    }
     const anyCarried = Object.values(d.carried).some(n => n > 0);
     const depEnabled = has(m.canDeposit) ? !!m.canDeposit : anyCarried;
     out.push(`<div class="ip-deposit">${btn('deposit', 'data-ip-act="inventionDeposit"', `${icon('chest')}<span>Deposit everything carried</span>`, depEnabled,
       m.depositReason || (anyCarried ? 'Storehouse unavailable' : 'You are not carrying anything'), 'ip-wide')}</div>`);
     out.push(`<table class="ip-inv"><caption class="ip-sr">Materials</caption><thead><tr><th scope="col">Material</th><th scope="col">Carried</th><th scope="col">Stored</th></tr></thead><tbody>`);
     for (const [k, name, purpose, ico] of RESOURCES) {
+      if (!PRIMARY.has(k) && !num(d.carried[k]) && !num(d.stored[k])) continue;
       out.push(`<tr><th scope="row">${icon(ico, 'ip-ico ip-r-' + k)}<span><b>${name}</b><small>${purpose}</small></span></th><td>${num(d.carried[k])}</td><td>${num(d.stored[k])}</td></tr>`);
     }
     out.push('</tbody></table>');
@@ -243,7 +249,7 @@ export function createInventionPanel({ mount = document.body, onAction = () => {
       for (const r of craft) {
         const cost = Object.entries(r.input || {}).map(([k, n]) => `${num(n)} ${RES_NAME[k] || k}`).join(' + ');
         out.push(`<li class="ip-ore">${icon('aim', 'ip-ico')}<div class="ip-ore-main"><b>${esc(r.name)}</b>
-        <small>${num(r.have)} on your rack · ${cost} makes ${num(r.output)}</small><small>Each Timberline shot uses one bolt before raw Wood and Iron.</small></div>
+        <small>${num(r.have)} on your rack · ${cost} makes ${num(r.output)}</small><small>Each Timberline shot uses one bolt before raw Timber and Iron.</small></div>
         ${btn(`craft-${esc(r.id)}`, `data-ip-act="inventionCraft" data-ip-recipe="${esc(r.id)}"`, `${icon('aim')}<span>Craft ${num(r.output)}</span>`, !!r.enabled, r.reason || 'Unavailable right now')}</li>`);
       }
       out.push('</ul>');
@@ -309,7 +315,7 @@ export function createInventionPanel({ mount = document.body, onAction = () => {
     const oreN = ORES.reduce((n, [k]) => n + d.avail(k), 0);
     const T = [['build', 'Build', 'hammer', ready ? `${ready} ready` : ''], ['stores', 'Stores', 'chest', oreN ? `${oreN} ore` : ''], ['built', 'Built', 'tower', damaged ? `${damaged} hurt` : built ? String(built) : '']];
     const tabsHTML = T.map(([k, l, ico, badge]) => `<button type="button" role="tab" id="${id}-tab-${k}" class="ip-tab" data-ip-key="tab-${k}" data-ip-tab="${k}" aria-selected="${tab === k}" aria-controls="${id}-p" tabindex="${tab === k ? 0 : -1}">${icon(ico)}<span>${l}</span>${badge ? `<em>${esc(badge)}</em>` : ''}</button>`).join('');
-    const purseHTML = RESOURCES.map(([k, name, , ico]) => `<span class="ip-p" title="${name}: ${num(d.carried[k])} carried, ${num(d.stored[k])} stored">${icon(ico, 'ip-ico ip-r-' + k)}<b>${num(d.carried[k])}</b><i>+${num(d.stored[k])}</i><span class="ip-sr">${name} carried plus stored</span></span>`).join('');
+    const purseHTML = RESOURCES.filter(([k]) => PRIMARY.has(k) || num(d.carried[k]) || num(d.stored[k])).map(([k, name, , ico]) => `<span class="ip-p" title="${name}: ${num(d.carried[k])} carried, ${num(d.stored[k])} stored">${icon(ico, 'ip-ico ip-r-' + k)}<b>${num(d.carried[k])}</b><i>+${num(d.stored[k])}</i><span class="ip-sr">${name} carried plus stored</span></span>`).join('');
     const bodyHTML = tab === 'stores' ? storesTab(m, d) : tab === 'built' ? builtTab(m) : buildTab(m, d);
 
     const ae = document.activeElement, focusKey = host.contains(ae) ? ae?.dataset?.ipKey : null;

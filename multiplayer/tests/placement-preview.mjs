@@ -12,9 +12,9 @@ const ctx={terrainHeight:()=>0},at=(x=18,z=0,kind='foundation')=>({action:'inven
 const check=(message,code,extraCtx=ctx)=>{const before=JSON.stringify(s);const preview=validateInventionPlacement(s,p,message,extraCtx);assert.equal(preview.code,code);assert.equal(JSON.stringify(s),before,'preview never mutates authority');const result=inventionAction(s,p,message,extraCtx);assert.equal(result.code,preview.code);assert.equal(result.reason,preview.reason);assert.ok(preview.reason.length>12);return preview;};
 check(at(47),'outside_boundary');check(at(49),'outside_boundary');check(at(0),'protected_forge');check(at(18),'uneven_ground',{terrainHeight:(_s,x)=>x*.5});
 s.deposits.push({id:'blocking-ore',x:18,z:0,depleted:false});assert.match(check(at(),'occupied').reason,/Mine it/);s.deposits=[];
-p.resources.stone=0;const poor=check(at(),'insufficient_resources');assert.equal(poor.missing.stone,8);assert.match(poor.reason,/8 Stone/);p.resources.stone=100;
+p.resources.stone=0;const poor=check(at(),'insufficient_resources');assert.equal(poor.missing.stone,3);assert.match(poor.reason,/3 Stone/);p.resources.stone=100;
 p.role='hero';p.position=[0,0,0];check(at(),'too_far');p.role='god';
-const ready=validateInventionPlacement(s,p,at(),ctx);assert.equal(ready.ok,true);assert.equal(inventionAction(s,p,at(),ctx).ok,true);const tile=s.inventions.structures.at(-1);assert.equal(p.resources.stone,92);
+const ready=validateInventionPlacement(s,p,at(),ctx);assert.equal(ready.ok,true);assert.equal(inventionAction(s,p,at(),ctx).ok,true);const tile=s.inventions.structures.at(-1);assert.equal(p.resources.stone,97);
 assert.match(check(at(),'occupied').reason,/edge-to-edge/);check(at(20.5,0,'timberline'),'foundation_edge');
 assert.equal(validateInventionPlacement(s,p,at(18,0,'timberline'),ctx).ok,true);
 for(const [dx,dz] of [[0,0],[2.25,2.25],[3,3],[-3,-3]]){const x=18+dx,z=dz;assert.equal(terrainHeight(s,x,z,false),0);assert.ok(Math.abs(terrainRenderHeight(s,x,z,false)+FOUNDATION_SOIL_RECESS)<1e-6);}

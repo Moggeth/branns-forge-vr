@@ -73,7 +73,7 @@ test('ore: Mine with pick, wrong tool, star shard naming, progress', () => {
   const s = snap({deposits: [{id: 'ore1', x: 0, z: -2.5, kind: 'stone', hits: 1, maxHits: 3, depleted: false}, {id: 'm1', x: 0, z: -2.5, kind: 'meteor', hits: 0, maxHits: 5, depleted: false}]});
   const p = [0, .6, -2.0];
   const m = decideCue(view(), hero({tool: 'pick'}), s, aimAt(p, 'ore1'), ctx());
-  assert.deepEqual([m.kind, m.name, m.action, m.control, m.note, m.progress], ['ore', 'Stone boulder', 'Mine', 'Click', 'Foundations, walls and heavy ammunition.', {done: 1, total: 3}]);
+  assert.deepEqual([m.kind, m.name, m.action, m.control, m.note, m.progress], ['ore', 'Stone boulder', 'Mine', 'Click', 'Foundations and heavy launcher shot.', {done: 1, total: 3}]);
   const w = decideCue(view(), hero(), s, aimAt(p, 'ore1'), ctx());
   assert.deepEqual([w.action, w.control], ['Needs the Pick', '2']);
   assert.equal(decideCue(view(), hero({tool: 'pick'}), s, aimAt(p, 'm1'), ctx()).name, 'Meteor');
@@ -81,9 +81,9 @@ test('ore: Mine with pick, wrong tool, star shard naming, progress', () => {
 test('loose log in reach: Collect E directly', () => {
   const s = snap({looseLogs: [log('log1', [0, .16, -1.8])]});
   const c = decideCue(view(), hero(), s, aimAt([0, .16, -1.8], null), ctx());
-  assert.deepEqual([c.kind, c.action, c.control, c.note], ['log', 'Collect', 'E', 'Frames, ammunition shafts and repairs.']);
+  assert.deepEqual([c.kind, c.action, c.control, c.note], ['log', 'Collect', 'E', 'The main building material: frames, walls, bridges and bolts.']);
   const t = decideCue(view({mode: 'touch'}), hero(), s, aimAt([0, .16, -1.8], null), ctx());
-  assert.deepEqual([t.control, t.note], ['Collect', 'Frames, ammunition shafts and repairs.']);
+  assert.deepEqual([t.control, t.note], ['Collect', 'The main building material: frames, walls, bridges and bolts.']);
 });
 test('log beyond grab reach: Move closer', () => {
   const s = snap({looseLogs: [log('log1', [0, .16, -4])]});
@@ -188,13 +188,13 @@ test('Timberline cue when looked at within 5 m: ammo cost, shortfall, reload, re
   assert.equal(decideCue(view(),at(24.5),s(),null,ctx()),null);                 // not looking at it: no cue
   let c=decideCue(view(),at(24.5),s(),look(24.5),ctx());
   assert.deepEqual([c.target,c.name,c.action,c.control,c.state],['tl1','Timberline','Aim & fire','E','short']);
-  assert.equal(c.note,'Out of ammo · needs 2 Wood + 1 Iron per shot or crafted bolts');
+  assert.equal(c.note,'Out of ammo · needs 1 Timber + 1 Iron per shot or crafted bolts');
   c=decideCue(view(),hero({position:[0,0,24.5],resources:{wood:3,iron:1}}),s(),look(24.5),ctx());
-  assert.deepEqual([c.state,c.note],['ready','1 shot · 2 Wood + 1 Iron each']);
+  assert.deepEqual([c.state,c.note],['ready','1 shot · 1 Timber + 1 Iron each']);
   c=decideCue(view(),hero({position:[0,0,24.5],resources:{wood:5,iron:2}}),s({readyTick:300}),look(24.5),ctx());
   assert.deepEqual([c.state,c.action,c.control,c.note],['busy','Reloading','Hold R','Crank to wind it faster · 2 shots']);
   c=decideCue(view(),at(24.5),s({readyTick:300}),look(24.5),ctx());
-  assert.deepEqual([c.state,c.note],['short','Out of ammo · needs 2 Wood + 1 Iron per shot or crafted bolts'],'an empty machine says so instead of reloading')
+  assert.deepEqual([c.state,c.note],['short','Out of ammo · needs 1 Timber + 1 Iron per shot or crafted bolts'],'an empty machine says so instead of reloading')
   c=decideCue(view(),at(24.5),s({operator:'p1'}),look(24.5),ctx());
   assert.deepEqual([c.action,c.control],['Step off','E'],'the operator is told how to step off');
   c=decideCue(view(),at(24.5),s({operator:'p2'}),look(24.5),ctx());

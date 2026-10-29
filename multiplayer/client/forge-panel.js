@@ -1,7 +1,7 @@
 // Brann's Forge — compact settlement/forge drawer (God + Hero). No framework, no deps.
 // Renders only what the root's settlementView provides; every button calls onAction(action, detail).
 // Nothing here starts a raid on its own: forgeEncounter needs a second deliberate press.
-const KINDS = [['wood', 'Wood'], ['stone', 'Stone'], ['gems', 'Gems']];
+const KINDS = [['wood', 'Timber'], ['stone', 'Stone'], ['gems', 'Crystal']];
 const STAGES = [['gather', 'Gather'], ['improve', 'Improve / Defend'], ['raid', 'Raid'], ['reward', 'Rewards']];
 const STAGE_OF = { forgeSupply: 'gather', forgeAssign: 'gather', forgeSummon: 'gather', forgeContribute: 'gather',
   forgeUpgrade: 'improve', forgeDefend: 'improve', forgeRepair: 'improve', forgeEncounter: 'raid' };

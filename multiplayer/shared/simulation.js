@@ -14,6 +14,8 @@ import {MAX_PLAYERS} from './multiplayer-limits.js';
 export {MAX_PLAYERS} from './multiplayer-limits.js';
 import {STRUCTURES,createInventions,inventionAction,stepInventions,restoreInventions,resolveInventions,inventionFloor,damageInvention} from './inventions.js';
 import {MATERIAL_KEYS,emptyMaterials,restoreMaterials,DEPOSIT_CATALOG,depositReward} from './material-catalog.js';
+/** Timber a quick bridge costs (generous economy, 2026-10-29). */
+export const BRIDGE_TIMBER = 2;
 import {baseHeight,terrainHeight,moveOnTerrain,resolveTerrainBoundary,settleTerrainContents,createSunderRupture,validateTerrainRuptures,restoreTerrainEdit,hasActiveTerrain,validateWallSegment,PICK_WALL,RAISE_WALL,makeTerrainRoom,restoreTerrainBake} from './terrain.js';
 import {collapseMinedWall,stepCrystalWalls,WALL_DEPOSITS,RIDGE_KINDS} from './weapon-specials.js';
 import {castEarthLine,earthLineEdits} from './earth-spells.js';
@@ -327,10 +329,10 @@ function instantiate(state) {
         }
         if (message.action === 'buildBridge') {
           if (state.bridges.length >= 32) return fail('world_limit');
-          if (p.resources.wood < 3) return fail('insufficient_resources');
+          if (p.resources.wood < BRIDGE_TIMBER) return fail('insufficient_resources');
           const x = clamp(p.position[0]-Math.sin(p.yaw)*3,-thingLimit(),thingLimit()), z = clamp(p.position[2]-Math.cos(p.yaw)*3,-thingLimit(),thingLimit());
           if(Math.hypot(x,z)<7)return fail('protected_forge');
-          p.resources.wood -= 3; const idNew = nextId(state,'b'); const y = Math.max(...[-2.5,0,2.5].map(d=>terrainHeight(state,clamp(x-Math.sin(p.yaw)*d,-thingLimit(),thingLimit()),clamp(z-Math.cos(p.yaw)*d,-thingLimit(),thingLimit()))))+.12;
+          p.resources.wood -= BRIDGE_TIMBER; const idNew = nextId(state,'b'); const y = Math.max(...[-2.5,0,2.5].map(d=>terrainHeight(state,clamp(x-Math.sin(p.yaw)*d,-thingLimit(),thingLimit()),clamp(z-Math.cos(p.yaw)*d,-thingLimit(),thingLimit()))))+.12;
           state.bridges.push({id:idNew,x,z,y,yaw:p.yaw}); return ok([event('build',[x,y,z],idNew)]);
         }
         if (message.action !== 'strike') return fail('invalid_action');

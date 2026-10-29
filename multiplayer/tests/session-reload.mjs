@@ -3,7 +3,7 @@
 // real applyCommand path and the guest's real receive path are both exercised.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {MATERIAL_KEYS, emptyMaterials} from '../shared/material-catalog.js';
+import {MATERIAL_KEYS, emptyMaterials, restoreMaterials} from '../shared/material-catalog.js';
 import {WorldSession} from '../client/session.js';
 import {createSimulation, loadSimulation} from '../shared/simulation.js';
 import {worldTrees} from '../shared/world-content.js';
@@ -242,12 +242,13 @@ test('full pickup cap preserves every new metal and ore across reconnect', () =>
   const {r, hostLink, host} = room(), guest = join(r, 'two');
   const world = host.simulation.adventureWorld();
   while (world.pickups.length < 256) world.pickups.push({id:`cap${world.pickups.length}`,kind:'wood',x:0,z:0,y:0,amount:1});
-  const pack = Object.fromEntries(MATERIAL_KEYS.map((key,i)=>[key,i+11]));
+  // Every material survives; ore folds into its metal when the pack is restored (2026-10-29 economy pass).
+  const pack = Object.fromEntries(MATERIAL_KEYS.map((key,i)=>[key,i+11])), banked = restoreMaterials(pack);
   hostPlayer(host,'two').resources = {...pack};
   r.roster.get('two').online=false; hostLink.emit('peer_left',{peerId:'two'});
   assert.deepEqual(host.parked.get('two').record.resources,pack);
   r.roster.get('two').online=true; hostLink.emit('peer_joined',{id:'two'});
-  assert.deepEqual(hostPlayer(host,'two').resources,pack);
+  assert.deepEqual(hostPlayer(host,'two').resources,banked);
   assert.equal(world.pickups.length,256);
   host.dispose(); guest.s.dispose();
 });

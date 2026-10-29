@@ -61,7 +61,7 @@
 .ip-tab[aria-selected="true"] { color: var(--ip-brass-hi); background: linear-gradient(180deg, rgba(74,51,34,.75), rgba(42,29,20,.95)); border-color: var(--ip-line); }
 
 /* purse: compact carried + stored strip */
-.ip-purse { grid-area: purse; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 2px; padding: 6px 10px; background: rgba(0,0,0,.18); border-bottom: 1px solid var(--ip-line-2); }
+.ip-purse { grid-area: purse; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 2px; padding: 6px 10px; background: rgba(0,0,0,.18); border-bottom: 1px solid var(--ip-line-2); }
 .ip-p { display: flex; align-items: center; justify-content: center; gap: 3px; min-width: 0; font: 600 13px/1 ui-monospace, Consolas, monospace; font-variant-numeric: tabular-nums; }
 .ip-p .ip-ico { width: 15px; height: 15px; }
 .ip-p i { font-style: normal; font-weight: 400; color: var(--ip-mute); font-size: 11px; }
