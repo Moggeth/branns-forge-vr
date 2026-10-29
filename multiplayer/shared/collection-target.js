@@ -1,5 +1,5 @@
 import {isTestingGift,giftContents} from './testing-supplies.js';
-import {MATERIAL_KEYS,materialLabel} from './material-catalog.js';
+import {MATERIAL_KEYS,materialLabel,bankKey} from './material-catalog.js';
 import {capsuleDistance, TREE_LIMITS} from './trees.js';
 import {partPosition} from './combat.js';
 import {rotateVector} from './trees.js';
@@ -47,7 +47,7 @@ function candidateFor(p,q,log,ctx,state) {
  const kind=log?'wood':q.kind, amount=log?1:q.amount;
  if(![...MATERIAL_KEYS,'apple'].includes(kind))return null;
  const target={id:q.id,type:log?'log':q.embedded?'embed':'pickup',kind,amount,position,distance,held,
-  full:isTestingGift(q)?giftContents(state).some(item=>(p.resources?.[item.kind]||0)+item.amount>INVENTORY_CAP):kind!=='apple'&&(p.resources?.[kind]||0)+amount>INVENTORY_CAP,
+  full:isTestingGift(q)?giftContents(state).some(item=>(p.resources?.[bankKey(item.kind)]||0)+item.amount>INVENTORY_CAP):kind!=='apple'&&(p.resources?.[bankKey(kind)]||0)+amount>INVENTORY_CAP, // ore fills the pack as its metal
   unnecessary:false}; // an apple is always worth picking up: it's a snack you eat in three bites
  // Terrain occlusion remains deterministic on host and clients. Stop above the resource surface.
  if(!held){

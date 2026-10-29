@@ -9,7 +9,7 @@ import {materialLabel,materialInfo,DEPOSIT_CATALOG,bankKey} from '../shared/mate
 import {nearestCollectible, collectibleCandidate} from '../shared/collection-target.js';
 import {HOME, HOME_LAYOUT, HOME_MANNED, bellPostAt, homePoint} from '../shared/home-bases.js';
 import {SHOP, counterAt, draughtCap} from '../shared/home-shop.js';
-import {MILL, millAt} from '../shared/home-mill.js';
+import {MILL, millAt, millWorth} from '../shared/home-mill.js';
 import {STORES, WORKSHOP, backTownSpot} from '../shared/home-workshop.js';
 import {ORE_RECIPES} from '../shared/material-catalog.js';
 import {TAVERN, TAVERN_NAMES, taverns, tavernBar} from '../shared/taverns.js';
@@ -189,9 +189,9 @@ function homeCue(self, snapshot, keys, make) {
   const mill = base.mill, owed = mill?.queue?.find(q => q.id === self.id)?.gold || 0;
   if (at(millAt(base.side, MILL.crank), MILL.crankReach)) return mill?.queue?.length ? make('home', 'ready', 'mill-crank', 'Mill capstan', 'Crank', keys.crank || keys.collect, 'hold to grind three times as fast') : make('home', 'full', 'mill-crank', 'Mill capstan', 'Nothing grinding', '');
   if (at(millAt(base.side, MILL.hopper), MILL.reach)) {
-    const r = self.resources || {}, worth = (r.goldOre || 0) * 2 + (r.copperOre || 0) + Math.floor((r.stone || 0) / 4);
+    const worth = Math.floor(millWorth(self.resources));
     return worth ? make('home', 'ready', 'mill', 'Gold mill', 'Tip it in', keys.collect, `about ${worth} Gold${owed ? ` · ${owed} still grinding` : ''}`)
-      : make('home', 'full', 'mill', 'Gold mill', owed ? `${owed} Gold grinding` : 'Bring ore', '', 'gold ore, copper ore or stone');
+      : make('home', 'full', 'mill', 'Gold mill', owed ? `${owed} Gold grinding` : 'Bring copper', '', 'copper, or stone in fours');
   }
   // Back town (shared/home-workshop.js): the Workshop smelts ore from your pack on its own; the Stores banks your haul.
   if (at(backTownSpot(base.side, 'workshop', WORKSHOP.anvil), WORKSHOP.reach)) {

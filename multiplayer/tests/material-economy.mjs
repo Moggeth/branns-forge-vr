@@ -45,4 +45,9 @@ s=world();const golem=createEnemy('golem',[0,0,0],'golem');s.enemies.push(golem)
 hitEnemyPart(s,golem,'torso',400,{ownerId:'hero'},ctx,[]);assert.deepEqual(s.pickups.map(p=>[p.kind,p.amount]),[['iron',1]],'a slain golem drops its iron bracers; its stone stays in the remains');assert.ok(s.detachedParts.length,'golem retains physical remains to mine');
 const d=s.detachedParts.find(d=>d.part==='torso'),p=s.players[0];p.position=[0,0,1];p.yaw=0;p.tool='pick';d.position=[0,0,0];
 const strike={targetId:d.id,point:[0,0,0],normal:[0,1,0]};assert.ok(mineGolemRemains(s,p,strike,ctx).ok);assert.ok(mineGolemRemains(s,p,strike,ctx).ok);const stone=s.pickups.find(p=>p.kind==='stone');assert.equal(stone.amount,2);
+// Ore fills the pack as its metal: a full Iron pack makes iron ore uncollectable in the preview too, and the mill takes Copper.
+{const {collectibleCandidate}=await import('../shared/collection-target.js');const {millWorth}=await import('../shared/home-mill.js');
+ const hero={role:'hero',hp:100,position:[0,0,0],resources:{...emptyMaterials(),iron:999}},st={pickups:[{id:'ore1',kind:'ironOre',amount:2,x:.5,y:0,z:0}]};
+ assert.equal(collectibleCandidate(st,hero,'ore1').full,true,'ore preview checks the banked metal');hero.resources.iron=0;assert.equal(collectibleCandidate(st,hero,'ore1').full,false);
+ assert.equal(millWorth({copper:3,stone:9}),5,'banked Copper mills, Stone in fours');}
 console.log('material-economy: catalog, old inventory upgrade, useful seeded veins, visible deterministic renewal, one-time scrap and mineable remains pass');
