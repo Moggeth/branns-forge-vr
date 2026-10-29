@@ -18,12 +18,12 @@ export const MINING_FEEL = Object.freeze({
   frequency: 8.5,   // Hz of the settle
   damping: 11,      // 1/s decay of the settle
   burstCap: 48,     // flying shells at once across every breaking rock
-  burstLife: [1.5, 2.2],
+  burstLife: [1.2, 1.8],
 });
 // Inner light of minerals that glow on their own (mechanical coherence: crystal and star ore carry light; iron does not).
 export const MINERAL_GLOW = Object.freeze({crystal: 0x9a6be8, mithril: 0x6fe0f0, meteor: 0xff8a12, star: 0xff8a12});
 // The ember of a fresh fracture after a steel blow.
-export const STRIKE_HEAT = 0xff9a3c;
+export const STRIKE_HEAT = 0xd8601e;
 
 const UP = new T.Vector3(0, 1, 0);
 
@@ -85,10 +85,10 @@ export function createMiningFeel({scene, height = () => 0, emit = () => null, re
       if (i >= room) { s.mesh.removeFromParent(); continue; }
       const pivot = new T.Group(); pivot.position.copy(s.centroid); scene.add(pivot); pivot.updateMatrixWorld(true); pivot.attach(s.mesh);
       const out = s.out.clone(); out.y = Math.max(out.y, 0) * .6 + .25; out.normalize();
-      const speed = 2.2 + rnd() * 1.8;
+      const speed = 1.1 + rnd() * 1.1;
       const [lo, hi] = MINING_FEEL.burstLife;
-      debris.push({pivot, owner, t: 0, life: lo + rnd() * (hi - lo), v: out.multiplyScalar(speed).add(new T.Vector3(0, 2.6 + rnd() * 1.6, 0)),
-        spin: new T.Vector3(rnd() * 12 - 6, rnd() * 12 - 6, rnd() * 12 - 6), rest: false, bounces: 0,
+      debris.push({pivot, owner, t: 0, life: lo + rnd() * (hi - lo), v: out.multiplyScalar(speed).add(new T.Vector3(0, 1.7 + rnd() * 1.1, 0)),
+        spin: new T.Vector3(rnd() * 8 - 4, rnd() * 8 - 4, rnd() * 8 - 4), rest: false, bounces: 0,
         radius: Math.max(.06, (s.mesh.geometry.boundingSphere?.radius || .3) * .3)});
       owner.pending++;
     }
@@ -128,8 +128,9 @@ export function createMiningFeel({scene, height = () => 0, emit = () => null, re
         }
       }
       // Sink into the grass and shrink away over the last half second.
+      // Broken pieces read smaller than the rock they came from; they also sink and shrink away over the last half second.
       const k = Math.min(1, Math.max(0, (d.life - d.t) / .5)), e = k * k * (3 - 2 * k);
-      p.scale.setScalar(Math.max(.001, e));
+      p.scale.setScalar(Math.max(.001, e * (1 - .3 * Math.min(1, d.t / .25))));
       if (d.rest) p.position.y -= dt * .08;
       if (d.t >= d.life) {
         p.removeFromParent(); debris.splice(i, 1);

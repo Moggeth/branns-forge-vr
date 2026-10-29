@@ -53,7 +53,7 @@ export function attachFracture(T,root,id,{chunks=CHUNKS,ground=null}={}){
     const floor=ground?ground(c.position.x,c.position.z)+f.radius:-Infinity;
     if(c.position.y<floor){c.position.y=floor;if(f.v.y<-1.2){f.v.y*=-.3;f.v.x*=.55;f.v.z*=.55;f.spin.multiplyScalar(.5);}else f.rest=true;}}
    const k=Math.min(1,Math.max(0,(f.life-f.t)/.35));c.scale.setScalar(f.s0*k*k*(3-2*k));if(f.t>f.life){c.removeFromParent();chips.splice(i,1);}}
-  if(heatLevel>0||glowLevel>0){heatLevel=Math.max(0,heatLevel-dt*2.6);const h=heatLevel*heatLevel;interior.emissive.copy(glowColor).multiplyScalar(glowLevel).lerp(heatColor,Math.min(1,h/(h+glowLevel+1e-4)));interior.emissiveIntensity=Math.max(glowLevel,h*1.6);}}
+  if(heatLevel>0||glowLevel>0){heatLevel=Math.max(0,heatLevel-dt*3.2);const h=heatLevel*heatLevel;interior.emissive.copy(glowColor).multiplyScalar(glowLevel).lerp(heatColor,Math.min(1,h/(h+glowLevel+1e-4)));interior.emissiveIntensity=Math.max(glowLevel*.45,h*.38);}}
  const heatColor=new T.Color(),glowColor=new T.Color();let heatLevel=0,glowLevel=0;
  function heat(amount=1,hex=0xff9a3c){heatColor.setHex(hex);heatLevel=Math.min(1.2,Math.max(heatLevel,amount));}
  function glow(hex,level){glowColor.setHex(hex);glowLevel=Math.max(0,Math.min(1,level));if(!glowLevel&&heatLevel<=0){interior.emissive.setRGB(0,0,0);interior.emissiveIntensity=0;}}
