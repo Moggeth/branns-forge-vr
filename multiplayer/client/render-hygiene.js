@@ -26,15 +26,28 @@ installSinglePassDefault();
 // marks matrixWorldNeedsUpdate itself still updates. Objects that manage their own matrix already set
 // matrixAutoUpdate = false and are untouched.
 export const MATRIX_CACHE = {installed: false};
+// Composing used to imply "world matrix dirty" too, and three.js relies on that when it walks UP a parent chain
+// (getWorldPosition and friends do not push the parent's change down). So when the local compose is skipped, the
+// world matrix is still marked dirty if the parent's world matrix differs from the one last multiplied against.
 export function installMatrixDirtyCheck(Object3D = THREE.Object3D) {
   if (MATRIX_CACHE.installed) return; MATRIX_CACHE.installed = true;
   const compose = Object3D.prototype.updateMatrix;
+  const parentMoved = o => {
+    const pw = o.parent?.matrixWorld.elements; if (!pw) return false;
+    let seen = o._bfParentWorld; if (seen === undefined) { seen = o._bfParentWorld = new Float64Array(16); for (let i = 0; i < 16; i++) seen[i] = pw[i]; return true; }
+    let moved = false; for (let i = 0; i < 16; i++) if (seen[i] !== pw[i]) { seen[i] = pw[i]; moved = true; }
+    return moved;
+  };
   Object3D.prototype.updateMatrix = function updateMatrix() {
     const p = this.position, q = this.quaternion, s = this.scale;
     let c = this._bfTRS;
     if (c === undefined) c = this._bfTRS = new Float64Array(10).fill(NaN);
-    else if (this.pivot == null && c[0] === p.x && c[1] === p.y && c[2] === p.z && c[3] === q._x && c[4] === q._y && c[5] === q._z && c[6] === q._w && c[7] === s.x && c[8] === s.y && c[9] === s.z) return;
+    else if (this.pivot == null && c[0] === p.x && c[1] === p.y && c[2] === p.z && c[3] === q._x && c[4] === q._y && c[5] === q._z && c[6] === q._w && c[7] === s.x && c[8] === s.y && c[9] === s.z) {
+      if (parentMoved(this)) this.matrixWorldNeedsUpdate = true;
+      return;
+    }
     c[0] = p.x; c[1] = p.y; c[2] = p.z; c[3] = q._x; c[4] = q._y; c[5] = q._z; c[6] = q._w; c[7] = s.x; c[8] = s.y; c[9] = s.z;
+    parentMoved(this); // record the parent world this compose will be multiplied against
     compose.call(this);
   };
 }

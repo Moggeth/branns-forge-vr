@@ -65,7 +65,7 @@ await page.keyboard.press('Escape').catch(() => {});
 
 // Fixed camera path: a slow 360° look-around at the spawn, then a long glide forward and a climb for an overview.
 const path = await page.evaluate(() => { const s = window.brannHarness.snapshot(), id = window.brannHarness.state().playerId, me = s.players.find(p => p.id === id); return me?.position || [0, 0, 0]; });
-await page.evaluate(({path, seconds}) => {
+if (!arg('shots', null) && !arg('nopath', false)) await page.evaluate(({path, seconds}) => {
   const [x0, y0, z0] = path, T = seconds * 1000; let start = null;
   const step = ts => {
     start ??= ts; const k = Math.min(1, (ts - start) / T);
@@ -78,16 +78,27 @@ await page.evaluate(({path, seconds}) => {
   };
   requestAnimationFrame(step);
 }, {path, seconds: seconds + 3});
+const shots = arg('shots', null);
+if (shots) { // fixed views for before/after visual comparison, then exit
+  const {mkdirSync} = await import('node:fs'); mkdirSync(shots, {recursive: true});
+  const views = [[0, 1.65, 0, 0, -.08], [0, 1.65, 0, Math.PI * .75, -.08], [0, 1.65, 0, Math.PI * 1.5, -.08], [0, 36, 0, Math.PI * .25, -.35]];
+  for (let i = 0; i < views.length; i++) { const v = views[i].slice(); v[0] += 4; v[1] += +arg('shotY', path[1]); v[2] += 12;
+    await page.evaluate(v => { window.__brannShotCam = v; }, v); await page.waitForTimeout(+arg('shotWait', 4000)); await page.screenshot({path: `${shots}/${label}-${i}.png`}); }
+  await browser.close(); process.exit(0);
+}
 const breakdown = arg('breakdown', null);
 if (breakdown) { await page.waitForTimeout(2500); const {readFileSync} = await import('node:fs'); writeFileSync(arg("breakdownOut","/tmp/bench/breakdown.json"), JSON.stringify(await page.evaluate(readFileSync(breakdown, "utf8")))); }
 await page.waitForTimeout(2500); // warm-up: first seconds of the path are not scored
-const heap = arg('heap', null);
+const heap = arg('heap', null), trace = arg('trace', null);
+if (trace) { const cdp = await context.newCDPSession(page); page.__trace = {cdp, chunks: []}; cdp.on('Tracing.dataCollected', e => page.__trace.chunks.push(...e.value));
+  await cdp.send('Tracing.start', {transferMode: 'ReportEvents', traceConfig: {includedCategories: ['devtools.timeline', 'disabled-by-default-devtools.timeline', 'v8', 'v8.execute', 'blink.user_timing', 'gpu', 'toplevel', 'disabled-by-default-devtools.timeline.frame']}}); }
 if (heap) { const cdp = await context.newCDPSession(page); await cdp.send('HeapProfiler.enable'); await cdp.send('HeapProfiler.startSampling', {samplingInterval: 4096, includeObjectsCollectedByMajorGC: true, includeObjectsCollectedByMinorGC: true}); page.__heap = cdp; }
 if (profile) { const cdp = await context.newCDPSession(page); await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', {interval: 200}); await cdp.send('Profiler.start'); page.__cdp = cdp; }
 await page.evaluate(() => { const r = globalThis.__brannDebug?.renderer; window.__benchPrograms = new Set(r ? r.info.programs : []); });
 await page.evaluate(() => { const f = window.__benchFrames; f.t.length = f.cpu.length = f.heap.length = f.gl.length = 0; f.on = true; });
 await page.waitForTimeout(seconds * 1000);
 const raw = await page.evaluate(() => { const f = window.__benchFrames; f.on = false; return {t: f.t, cpu: f.cpu, heap: f.heap, gl: f.gl}; });
+if (trace) { const done = new Promise(r => page.__trace.cdp.once('Tracing.tracingComplete', r)); await page.__trace.cdp.send('Tracing.end'); await done; writeFileSync(trace, JSON.stringify({traceEvents: page.__trace.chunks})); }
 if (heap) { const {profile: h} = await page.__heap.send('HeapProfiler.stopSampling'); writeFileSync(heap, JSON.stringify(h)); }
 if (profile) { const {profile: p} = await page.__cdp.send('Profiler.stop'); writeFileSync(profile, JSON.stringify(p)); }
 const newPrograms = await page.evaluate(() => { const r = globalThis.__brannDebug?.renderer; if (!r) return []; return r.info.programs.filter(p => !window.__benchPrograms.has(p)).map(p => p.name + ' :: ' + p.cacheKey.slice(0, 160)); });
