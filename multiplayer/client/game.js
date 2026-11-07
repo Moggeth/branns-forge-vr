@@ -290,6 +290,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   const groundHit = () => wildsView.active() ? wildsView.nearMesh() : ground;
   let wildsKey = '';
   const shotProbe = new URLSearchParams(globalThis.location?.search || '').has('acceptanceProbe');
+  if(shotProbe)globalThis.__brannDebug={scene,renderer,camera}; // QA probe only: performance benchmark breakdowns
   function syncWorld() {
     const key = snapshot.world ? JSON.stringify(snapshot.world) : '';
     if (key === wildsKey) return; wildsKey = key;
