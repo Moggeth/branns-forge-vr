@@ -103,7 +103,7 @@ if (heap) { const {profile: h} = await page.__heap.send('HeapProfiler.stopSampli
 if (profile) { const {profile: p} = await page.__cdp.send('Profiler.stop'); writeFileSync(profile, JSON.stringify(p)); }
 const newPrograms = await page.evaluate(() => { const r = globalThis.__brannDebug?.renderer; if (!r) return []; return r.info.programs.filter(p => !window.__benchPrograms.has(p)).map(p => p.name + ' :: ' + p.cacheKey.slice(0, 160)); });
 const diagnostics = await page.evaluate(() => { const d = document.querySelector('#world').brannDiagnostics(); const c = document.createElement('canvas').getContext('webgl2'), x = c?.getExtension('WEBGL_debug_renderer_info');
-  return {graphics: d.graphics, programs: d.programs, cpuTimings: d.cpuTimings, gpu: x ? c.getParameter(x.UNMASKED_RENDERER_WEBGL) : 'unknown'}; });
+  return {graphics: d.graphics, programs: d.programs, compileGate: d.compileGate, lights: d.lights, cpuTimings: d.cpuTimings, gpu: x ? c.getParameter(x.UNMASKED_RENDERER_WEBGL) : 'unknown'}; });
 await browser.close();
 
 // Frame interval stats. "1% low" = average FPS of the slowest 1% of frames (the common benchmark definition).
@@ -117,7 +117,7 @@ const out = {label, scene, device, seconds, loadSeconds: +loadSeconds.toFixed(1)
   hitchesOver50ms: intervals.filter(v => v > 50).length, hitchesOver100ms: intervals.filter(v => v > 100).length,
   cpu: {avgMs: +(cpuSorted.reduce((a, b) => a + b, 0) / cpuSorted.length).toFixed(2), p50Ms: +q(cpuSorted, .5).toFixed(2), p99Ms: +q(cpuSorted, .99).toFixed(2), p999Ms: +q(cpuSorted, .999).toFixed(2), maxMs: +cpuSorted.at(-1).toFixed(1)},
   cpuBoundFps: +(1000 / (cpuSorted.reduce((a, b) => a + b, 0) / cpuSorted.length)).toFixed(1),
-  allocMBps: +(allocated / 1048576 / seconds).toFixed(2), majorHeapDrops: gcs, gpu: diagnostics.gpu, buffer: diagnostics.graphics, programs: diagnostics.programs, errors: errors.slice(0, 5), newPrograms};
+  allocMBps: +(allocated / 1048576 / seconds).toFixed(2), majorHeapDrops: gcs, gpu: diagnostics.gpu, buffer: diagnostics.graphics, programs: diagnostics.programs, compileGate: diagnostics.compileGate, errors: errors.slice(0, 5), newPrograms};
 if (gl && raw.gl.length) { const sum = {}; for (const f of raw.gl) for (const k in f) sum[k] = (sum[k] || 0) + f[k]; out.glPerFrame = Object.fromEntries(Object.entries(sum).map(([k, v]) => [k, +(v / raw.gl.length).toFixed(1)])); out.glMidPlay = {compile: sum.compile, link: sum.link, texUpload: sum.texUpload}; }
 console.log(JSON.stringify(out));
 const file = arg('out', null); if (file) writeFileSync(file, JSON.stringify({...out, intervals, cpu: raw.cpu}, null, 0));
