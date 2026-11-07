@@ -81,10 +81,13 @@ await page.evaluate(({path, seconds}) => {
 const breakdown = arg('breakdown', null);
 if (breakdown) { await page.waitForTimeout(2500); const {readFileSync} = await import('node:fs'); writeFileSync(arg("breakdownOut","/tmp/bench/breakdown.json"), JSON.stringify(await page.evaluate(readFileSync(breakdown, "utf8")))); }
 await page.waitForTimeout(2500); // warm-up: first seconds of the path are not scored
+const heap = arg('heap', null);
+if (heap) { const cdp = await context.newCDPSession(page); await cdp.send('HeapProfiler.enable'); await cdp.send('HeapProfiler.startSampling', {samplingInterval: 4096, includeObjectsCollectedByMajorGC: true, includeObjectsCollectedByMinorGC: true}); page.__heap = cdp; }
 if (profile) { const cdp = await context.newCDPSession(page); await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', {interval: 200}); await cdp.send('Profiler.start'); page.__cdp = cdp; }
 await page.evaluate(() => { const f = window.__benchFrames; f.t.length = f.cpu.length = f.heap.length = f.gl.length = 0; f.on = true; });
 await page.waitForTimeout(seconds * 1000);
 const raw = await page.evaluate(() => { const f = window.__benchFrames; f.on = false; return {t: f.t, cpu: f.cpu, heap: f.heap, gl: f.gl}; });
+if (heap) { const {profile: h} = await page.__heap.send('HeapProfiler.stopSampling'); writeFileSync(heap, JSON.stringify(h)); }
 if (profile) { const {profile: p} = await page.__cdp.send('Profiler.stop'); writeFileSync(profile, JSON.stringify(p)); }
 const diagnostics = await page.evaluate(() => { const d = document.querySelector('#world').brannDiagnostics(); const c = document.createElement('canvas').getContext('webgl2'), x = c?.getExtension('WEBGL_debug_renderer_info');
   return {graphics: d.graphics, programs: d.programs, cpuTimings: d.cpuTimings, gpu: x ? c.getParameter(x.UNMASKED_RENDERER_WEBGL) : 'unknown'}; });
