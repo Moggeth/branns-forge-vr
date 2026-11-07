@@ -227,9 +227,12 @@ export function createSpellbook({ root, spells = [], icons = {}, schools = [] } 
   }
 
   // ---- update: render only what the root reports
-  let lastSelected = null;
+  let lastSelected = null, lastEnabled = null;
   function update({ mana = 0, tick = 0, spellTicks = {}, selected, enabled = true, blocked = {} } = {}) {
-    shell.classList.toggle('sb-off', !enabled);
+    // Runs on every snapshot (20 Hz): write only what changed, and never read layout here unless the row itself
+    // changed. Reading scrollWidth after the writes below forced a full page re-layout 20 times a second.
+    const reflow = enabled !== lastEnabled; lastEnabled = enabled;
+    if (reflow) shell.classList.toggle('sb-off', !enabled);
     for (const [id, c] of cards) {
       const s = spellState(c.spec, { mana, tick, lastCast: spellTicks?.[id] });
       const secText = s.cooling ? formatRemaining(s.remaining) : '';
@@ -253,7 +256,7 @@ export function createSpellbook({ root, spells = [], icons = {}, schools = [] } 
       scrollToSpell(selected, true);
     }
     if (quickLabel && quickLabel.classList.contains('sb-qc-on') !== !!quick.checked) syncQuick(false);
-    edges();
+    if (reflow) edges(); // scroll and resize keep the arrows right on their own
   }
   function scrollToSpell(id, onlyIfHidden = false) {
     const c = cards.get(id); if (!c) return;

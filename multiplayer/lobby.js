@@ -1,3 +1,4 @@
+import './client/render-hygiene.js'; // first: three.js render defaults must be in place before any material exists
 import {ProximityVoice} from './client/proximity-voice.js';
 import {createVoiceControls} from './client/voice-controls.js';
 import {mountQuietHud} from './mobile-quiet.js';
@@ -103,6 +104,11 @@ const store = {
 };
 
 const setText = (el, text) => { const value = String(text); if (el.textContent !== value) el.textContent = value; };
+// Snapshot handlers run 20 times a second: unchanged attributes are not rewritten (each write restyles the HUD).
+const setAttr = (el, name, value) => { if (el.getAttribute(name) !== value) el.setAttribute(name, value); };
+const setDisabled = (el, value) => { if (el.disabled !== value) el.disabled = value; };
+// Re-queried once a second at most, so controls added later (new hotbar chips) are still picked up.
+const queryCache = new Map(), all = selector => { const now = performance.now(), hit = queryCache.get(selector); if (hit && now - hit.at < 1000) return hit.list; const list = [...document.querySelectorAll(selector)]; queryCache.set(selector, {list, at: now}); return list; };
 const humanize = code => String(code || '').replaceAll('_', ' ').replace(/^\w/, c => c.toUpperCase());
 
 // Turn whatever the network or simulation reports into a sentence a stranger understands.
@@ -593,12 +599,12 @@ function onSnapshot(snapshot) {
   const self = snapshot.players.find(player => player.id === playerId);
   if (self) {
     setText($('supplyCount'),`Wood ${self.resources?.wood||0} · Stone ${self.resources?.stone||0} · Gems ${self.resources?.gems||0}`);
-    for(const b of document.querySelectorAll('[data-resource-use]')){const kind=b.dataset.resourceUse,r=RESOURCE_RECIPES[kind];setText(b,`${r[self.role]} · ${r.cost} ${kind}`);b.disabled=(self.resources?.[kind]||0)<r.cost;}
+    for(const b of all('[data-resource-use]')){const kind=b.dataset.resourceUse,r=RESOURCE_RECIPES[kind];setText(b,`${r[self.role]} · ${r.cost} ${kind}`);setDisabled(b,(self.resources?.[kind]||0)<r.cost);}
     const waitSeconds = Number.isFinite(self.roleTick) ? Math.max(0, Math.ceil((120 - (snapshot.tick - self.roleTick)) / 60)) : 0;
-    for (const radio of document.querySelectorAll('input[name="menuRole"]')) {
+    for (const radio of all('input[name="menuRole"]')) {
       // Selection reflects the accepted role, including rejected/late commands.
-      radio.checked = radio.value === self.role;
-      radio.disabled = radio.value !== self.role && waitSeconds > 0;
+      if (radio.checked !== (radio.value === self.role)) radio.checked = radio.value === self.role;
+      setDisabled(radio, radio.value !== self.role && waitSeconds > 0);
     }
     setText($('roleSwitchHint'), waitSeconds > 0
       ? `You can switch roles again in ${waitSeconds} second${waitSeconds === 1 ? '' : 's'}.`
@@ -631,7 +637,7 @@ function onSnapshot(snapshot) {
     setText($('resources'), `Wood ${self.resources?.wood||0} · Stone ${self.resources?.stone||0} · Gems ${self.resources?.gems||0}`);
     resourceBar ??= createResourceBar(document.querySelector('.hud-bottom')||$('hud'));
     resourceBar.update(self.resources, snapshot.inventions?.stockpiles?.[self.side==='rivals'?'rivals':'party']);
-    for(const b of document.querySelectorAll('[data-equip]'))b.setAttribute('aria-pressed',String(b.dataset.equip===(self.tool||'axe')));
+    for(const b of all('[data-equip]'))setAttr(b,'aria-pressed',String(b.dataset.equip===(self.tool||'axe')));
     {const chip=document.querySelector('[data-equip="flockwright"]');if(chip&&chip.hidden===!!self.flockwright)chip.hidden=!self.flockwright;}
     const weaponText={flockwright:'Flockwright · click to fire a heavy bolt · right click to aim down the ring sight · the crew reloads',staff:'Sunthread · hold click for a sun-thread · Q Radiant Nova',axe:'Axe · click to chop · Q sundering strike',pick:'Stonewhisper · click to mine · hold Q to aim crystal wall',hammer:'Sunfall · click to strike · Q ground slam',crossbow:`Siegebird · click to fire · songbirds bring each bolt · golden bird ${(siegebirdGoldenChance(self.siegebird?.hits||0,!!self.talents?.crossbow?.includes('flock'))*100).toFixed(1)}%`,bow:'Emberwing · hold attack to draw, release to fire · right click then aim to curve · Q phoenix flare',limb:'Bone · click to strike · G drop · X throw',wyrmspout:`Wyrmspout · hold to spray sticky fire · Q: Gout · Tank ${Math.round((1-(self.heat||0))*100)}%${self.overheatUntil>snapshot.tick?' · Refilling':''}`,stormreel:'Stormreel · hold to charge, release to fire · + and \u2212 bolts in one foe close the circuit · G spikes it · Q reels in',flask:mobile?.enabled?'Emberdew · attack: hurl a lit bottle · Special: Cinder Cluster':'Emberdew · click to toss fuel · hold right click to light and aim · hold Q for Cinder Cluster'}[self.tool||'axe'];if($('weaponHint'))setText($('weaponHint'),weaponText);
     meter('hp', self.hp, self.maxHp ?? self.hpMax ?? self.maxHealth ?? 100);
