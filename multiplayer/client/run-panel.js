@@ -9,6 +9,7 @@ import {enemyMaxHp} from '../shared/combat.js';
 import {worldDescriptor} from '../shared/worldgen/registry.js';
 import {friendlySeed} from '../shared/worldgen/random.js';
 import {loadRunMeta, saveRunMeta, buyHall, hallCost, creditRun, runKey, todayUtc} from './run-meta.js';
+import {setHidden} from './dom-write.js';
 
 const HZ = 60;
 // 24x24 single-path glyphs (evenodd).
@@ -104,7 +105,7 @@ export function runStripModel(run, viewerId = '', enemies = []) {
 export function createRunHud({parent, command, isHost = () => false, newRun = () => {}, leave = () => {}, toast = () => {}, onModal = () => {}}) {
   let meta = loadRunMeta(), lastRun = null, lastSnap = null, viewer = '', sig = '', modalStage = '', hidden = false, hallSent = '', creditNote = null, routeFocus = '';
   // ---- strip ----
-  const strip = el('div', 'rx-strip'); strip.hidden = true; strip.setAttribute('role', 'status');
+  const strip = el('div', 'rx-strip'); setHidden(strip, true); strip.setAttribute('role', 'status');
   const sLeft = el('div', 'rx-strip-id'), sMid = el('div', 'rx-strip-mid'), sRight = el('div', 'rx-strip-score');
   const sKind = el('span', 'rx-strip-kind'), sObj = el('span', 'rx-strip-obj'), sBar = el('span', 'rx-strip-bar'), sFill = el('span', 'rx-strip-fill');
   sBar.append(sFill); sMid.append(sKind, sObj, sBar);
@@ -121,7 +122,7 @@ export function createRunHud({parent, command, isHost = () => false, newRun = ()
   const hallDialog = el('section', 'rx-dialog rx-hall'); hallDialog.setAttribute('role', 'dialog'); hallDialog.setAttribute('aria-modal', 'true'); hallBack.append(hallDialog);
   parent.append(strip, backdrop, hallBack);
 
-  function setModal(open) { const was = !backdrop.hidden || !hallBack.hidden; backdrop.hidden = !open; if (was !== (open || !hallBack.hidden)) onModal(open || !hallBack.hidden); }
+  function setModal(open) { const was = !backdrop.hidden || !hallBack.hidden; setHidden(backdrop, !open); if (was !== (open || !hallBack.hidden)) onModal(open || !hallBack.hidden); }
   const send = (action, payload = {}) => command(action, payload);
 
   function header(title, sub, ico) {
@@ -318,10 +319,10 @@ export function createRunHud({parent, command, isHost = () => false, newRun = ()
   }
   function render() {
     const run = lastRun, players = lastSnap?.players || [], me = players.find(p => p.id === viewer);
-    if (!run) { strip.hidden = true; setModal(false); return; }
+    if (!run) { setHidden(strip, true); setModal(false); return; }
     // Strip
     const m = runStripModel(run, viewer, lastSnap?.enemies || []);
-    strip.hidden = false; strip.dataset.stage = run.stage;
+    setHidden(strip, false); strip.dataset.stage = run.stage;
     setText(sLeft, `${m.format} · ${m.seed}${m.omen ? ` · ${m.omen}` : ''}`);
     sKind.replaceChildren(icon(m.kind === 'camp' ? 'camp' : m.kind, 16));
     setText(sObj, m.objective);

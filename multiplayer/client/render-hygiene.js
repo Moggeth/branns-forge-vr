@@ -51,7 +51,9 @@ export function installMatrixDirtyCheck(Object3D = THREE.Object3D) {
     compose.call(this);
   };
 }
-installMatrixDirtyCheck();
+// Off by default: profiling showed the per-object compare (bones and moving parts change every frame) cost more than
+// the skipped matrix builds saved. ?matrixcheck=1 turns it on for comparison runs.
+if (new URLSearchParams(globalThis.location?.search || '').get('matrixcheck') === '1') installMatrixDirtyCheck();
 
 // Opaque draw order. three.js sorts opaque draws purely front-to-back, so consecutive draws keep switching shader
 // programs and materials, and every material switch re-uploads all of that material's uniforms. Sort by coarse

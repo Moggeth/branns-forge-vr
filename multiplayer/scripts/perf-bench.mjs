@@ -91,7 +91,7 @@ if (breakdown) { await page.waitForTimeout(2500); const {readFileSync} = await i
 await page.waitForTimeout(2500); // warm-up: first seconds of the path are not scored
 const heap = arg('heap', null), trace = arg('trace', null);
 if (trace) { const cdp = await context.newCDPSession(page); page.__trace = {cdp, chunks: []}; cdp.on('Tracing.dataCollected', e => page.__trace.chunks.push(...e.value));
-  await cdp.send('Tracing.start', {transferMode: 'ReportEvents', traceConfig: {includedCategories: ['devtools.timeline', 'disabled-by-default-devtools.timeline', 'v8', 'v8.execute', 'blink.user_timing', 'gpu', 'toplevel', 'disabled-by-default-devtools.timeline.frame']}}); }
+  await cdp.send('Tracing.start', {transferMode: 'ReportEvents', traceConfig: {includedCategories: ['devtools.timeline', 'disabled-by-default-devtools.timeline', 'v8', 'v8.execute', 'blink.user_timing', 'gpu', 'toplevel', 'disabled-by-default-devtools.timeline.frame', ...(arg('invalidations', null) ? ['disabled-by-default-devtools.timeline.invalidationTracking', 'disabled-by-default-devtools.timeline.stack'] : [])]}}); }
 if (heap) { const cdp = await context.newCDPSession(page); await cdp.send('HeapProfiler.enable'); await cdp.send('HeapProfiler.startSampling', {samplingInterval: 4096, includeObjectsCollectedByMajorGC: true, includeObjectsCollectedByMinorGC: true}); page.__heap = cdp; }
 if (profile) { const cdp = await context.newCDPSession(page); await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', {interval: 200}); await cdp.send('Profiler.start'); page.__cdp = cdp; }
 await page.evaluate(() => { const r = globalThis.__brannDebug?.renderer; window.__benchPrograms = new Set(r ? r.info.programs : []); });

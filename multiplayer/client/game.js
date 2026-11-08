@@ -1960,7 +1960,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     }
     mountView.update(dt, snapshot, {camera, riderAt: id => id === playerId ? (initialized && role === 'hero' ? localPosition : null) : actors.get(`p:${id}`)?.root.position || null});
     flockRigs.update(dt);
-    inventionVisual.setViewer(playerId);inventionVisual.update(dt,renderTick,camera,canvas.clientHeight);updatePlacementPreview(dt);
+    inventionVisual.setViewer(playerId);inventionVisual.update(dt,renderTick,camera,canvasHeight);updatePlacementPreview(dt);
     stormWeapon.update(dt);stormView.update(dt,now/1000,camera.getWorldPosition(stormCam));lightning.update(dt,camera);
     if(tool==='stormreel'&&weaponAnchor.visible&&!renderer.xr.isPresenting)weaponAnchor.position.add(stormWeapon.poseOffset(stormKick));
     settlementVisual.update(dt,(renderer.xr.isPresenting?renderer.xr.getCamera():camera).getWorldPosition(heroCamera));
@@ -2014,7 +2014,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     for(const p of snapshot.players||[]){if(p.id===playerId||p.role!=='hero')continue;const at=actors.get('p:'+p.id)?.root.position;if(at)coveHeroes.push({id:p.id,x:at.x,y:at.y,z:at.z});}
     if(scene.fog?.color)coveSky.copy(scene.fog.color);coveSun.copy(sun.position).sub(sun.target.position);
     larimarCove.update(dt,{tick:renderTick,camera:viewCamera,heroes:coveHeroes,night:skyCycle.night?.()??0,sky:coveSky,sunDir:coveSun,detail:touchEnabled?.6:1});
-    voiceBadges.update(dt, now / 1000, voiceActivity?.()?.peers, id => actors.get('p:' + id)?.root.position || null, canvas.clientHeight);
+    voiceBadges.update(dt, now / 1000, voiceActivity?.()?.peers, id => actors.get('p:' + id)?.root.position || null, canvasHeight);
     // Update poses during loading, but don't compile new variants in a play frame.
     if(!startup.ready)return;
     if(!renderer.xr.isPresenting){renderBudget.ratio(dt);resizeBuffer();}

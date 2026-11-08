@@ -1,6 +1,7 @@
 // Contextual thumb action chip. View-only: it never applies damage or mutates gameplay.
 // mountTouchActions({root, onAction}) -> { setContext(ctx), setQuick(list), dispose() }
 // ctx: null | { kind: 'attack'|'mine'|'collect'|'talk', label, targetId, progress? (0..1) }
+import {setText, setAttr, setHidden, setData} from './dom-write.js';
 // onAction({type:'context', kind, targetId}) — host should AIM + start a real swing at targetId
 //   (same path as the existing primary Attack), never instant server damage. Held bow draw is untouched:
 //   host should ignore context taps while a draw is held.
@@ -22,12 +23,13 @@ export function mountTouchActions({ root = document.body, onAction }) {
     ev.preventDefault(); ev.stopPropagation(); onAction && onAction({ type: 'quick', id: b.dataset.id }); });
 
   function setContext(next) {
-    ctx = next || null; chip.hidden = !ctx; if (!ctx) return;
-    chip.dataset.kind = ctx.kind;
-    chip.querySelector('.ta-icon').textContent = ICON[ctx.kind] || '•';
-    chip.querySelector('.ta-label').textContent = ctx.label || ctx.kind;
-    chip.setAttribute('aria-label', (ctx.label || ctx.kind));
-    chip.style.setProperty('--ta-p', String(Math.max(0, Math.min(1, ctx.progress ?? 0))));
+    // Called every frame from the aim cue: write only what changed.
+    ctx = next || null; setHidden(chip, !ctx); if (!ctx) return;
+    setData(chip, 'kind', ctx.kind);
+    setText(chip.querySelector('.ta-icon'), ICON[ctx.kind] || '•');
+    setText(chip.querySelector('.ta-label'), ctx.label || ctx.kind);
+    setAttr(chip, 'aria-label', (ctx.label || ctx.kind));
+    const p = String(Math.max(0, Math.min(1, ctx.progress ?? 0))); if (chip.style.getPropertyValue('--ta-p') !== p) chip.style.setProperty('--ta-p', p);
   }
   function setQuick(list = []) {
     quick.replaceChildren(...list.slice(0, 4).map((q) => { const b = document.createElement('button');

@@ -6,6 +6,7 @@ import {ITEMS, ITEM_IDS, ITEM_SLOTS, sellPrice} from '../shared/hero-items.js';
 import {HOME_NAMES} from '../shared/home-bases.js';
 import {draughtCap} from '../shared/home-shop.js';
 import {TAVERN_NAMES} from '../shared/taverns.js';
+import {setHidden, setText} from './dom-write.js';
 
 // Each item's little shelf picture and accent. The pictures are Blender renders (assets/hero-items-20261009 ->
 // /assets/items/<id>.webp); the glyph shows until (or if) the picture fails to load.
@@ -117,8 +118,8 @@ export function createQuartermasterUI({mount = document.body, hudSelf = null, on
     hero = role === 'hero' && !!self;
     if (!hero && open) close();
     const n = self?.draughts || 0, cap = hero ? draughtCap(self) : 0;
-    draught.hidden = !hero; draughtNum.textContent = `${n}/${cap}`; draught.disabled = !n;
-    draught.classList.toggle('qm-draught-ready', n > 0 && (self?.hp ?? 0) < (self?.maxHp ?? 100));
+    setHidden(draught, !hero); setText(draughtNum, `${n}/${cap}`); if (draught.disabled !== !n) draught.disabled = !n;
+    const ready = n > 0 && (self?.hp ?? 0) < (self?.maxHp ?? 100); if (draught.classList.contains('qm-draught-ready') !== ready) draught.classList.toggle('qm-draught-ready', ready);
     const key = `${self?.resources?.gold || 0}|${(self?.items || []).join(',')}|${self?.side}`;
     if (key !== shownKey) { shownKey = key; model = shopModel(self || {}); render(); }
     const at = hero && inTavern ? inTavern.id : '';
