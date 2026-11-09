@@ -1,7 +1,15 @@
 // Long-frame attribution from a perf-bench --trace file: what the main thread was doing in its longest tasks,
 // and where garbage collection, layout and style time went. Usage: node scripts/perf-trace.mjs <trace.json> [minMs=6]
-import {readFileSync} from 'node:fs';
-const [file, minArg] = process.argv.slice(2), minMs = +(minArg || 6), {traceEvents: ev} = JSON.parse(readFileSync(file, 'utf8'));
+import {createReadStream} from 'node:fs';
+import {createInterface} from 'node:readline';
+const [file, minArg] = process.argv.slice(2), minMs = +(minArg || 6);
+// perf-bench writes one event per line, so big traces (over V8's string limit) are read line by line; only
+// main-thread complete events and thread names are kept.
+const ev = [];
+for await (const line of createInterface({input: createReadStream(file), crlfDelay: Infinity})) {
+  if (line.startsWith('{"traceEvents"')) continue; const t = line.endsWith(']}') ? line.slice(0, -2) : line.replace(/,$/, ''); if (!t.startsWith('{')) continue;
+  let e; try { e = JSON.parse(t); } catch { continue; } if (e.name === 'thread_name' || (e.ph === 'X' && e.dur)) ev.push(e);
+}
 const names = new Map(); for (const e of ev) if (e.name === 'thread_name') names.set(`${e.pid}:${e.tid}`, e.args.name);
 const main = [...names].find(([, n]) => n === 'CrRendererMain')?.[0];
 const onMain = ev.filter(e => `${e.pid}:${e.tid}` === main && e.ph === 'X' && e.dur);

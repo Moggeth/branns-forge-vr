@@ -17,7 +17,9 @@ const [vw, vh] = viewport ? String(viewport).split('x').map(Number) : phone ? [8
 const gpuArgs = arg('gpu', false) ? ['--use-angle=' + (process.platform === 'win32' ? 'd3d11' : 'gl'), '--enable-gpu', '--ignore-gpu-blocklist'] : ['--enable-unsafe-swiftshader'];
 
 const browser = await pw.chromium.launch({headless: !headed, ...(chrome ? {executablePath: chrome} : {}),
-  args: [...gpuArgs, '--disable-features=WebXR', '--enable-precise-memory-info', '--disable-gpu-vsync', '--disable-frame-rate-limit', '--js-flags=--expose-gc']});
+  // --vsync keeps the display's frame pacing (needs --headed for a real display), like a player's browser: then avgFps
+  // tops out at the refresh rate and "missedFrames" (intervals over 1.5x the typical one) is the number that matters.
+  args: [...gpuArgs, '--disable-features=WebXR', '--enable-precise-memory-info', ...(arg('vsync', null) ? [] : ['--disable-gpu-vsync', '--disable-frame-rate-limit']), '--js-flags=--expose-gc']});
 const context = await browser.newContext(phone ? {viewport: {width: vw, height: vh}, hasTouch: true, isMobile: true, deviceScaleFactor: 2} : {viewport: {width: vw, height: vh}});
 await context.addInitScript(() => { window.__brannQuietTurnPrompt = true; Object.defineProperty(navigator, 'xr', {value: undefined, configurable: true}); });
 await context.addInitScript(({gl}) => {
@@ -98,7 +100,9 @@ await page.evaluate(() => { const r = globalThis.__brannDebug?.renderer; window.
 await page.evaluate(() => { const f = window.__benchFrames; f.t.length = f.cpu.length = f.heap.length = f.gl.length = 0; f.on = true; });
 await page.waitForTimeout(seconds * 1000);
 const raw = await page.evaluate(() => { const f = window.__benchFrames; f.on = false; return {t: f.t, cpu: f.cpu, heap: f.heap, gl: f.gl}; });
-if (trace) { const done = new Promise(r => page.__trace.cdp.once('Tracing.tracingComplete', r)); await page.__trace.cdp.send('Tracing.end'); await done; writeFileSync(trace, JSON.stringify({traceEvents: page.__trace.chunks})); }
+if (trace) { const done = new Promise(r => page.__trace.cdp.once('Tracing.tracingComplete', r)); await page.__trace.cdp.send('Tracing.end'); await done; // Stream the events: a whole trace is longer than V8's maximum string length.
+  const {openSync, writeSync, closeSync} = await import('node:fs'); const fd = openSync(trace, 'w'); writeSync(fd, '{"traceEvents":[');
+  page.__trace.chunks.forEach((e, i) => writeSync(fd, (i ? ',\n' : '\n') + JSON.stringify(e))); writeSync(fd, ']}'); closeSync(fd); }
 if (heap) { const {profile: h} = await page.__heap.send('HeapProfiler.stopSampling'); writeFileSync(heap, JSON.stringify(h)); }
 if (profile) { const {profile: p} = await page.__cdp.send('Profiler.stop'); writeFileSync(profile, JSON.stringify(p)); }
 const newPrograms = await page.evaluate(() => { const r = globalThis.__brannDebug?.renderer; if (!r) return []; return r.info.programs.filter(p => !window.__benchPrograms.has(p)).map(p => p.name + ' :: ' + p.cacheKey.slice(0, 160)); });
@@ -114,6 +118,7 @@ const cpuSorted = [...raw.cpu.slice(1)].sort((a, b) => a - b), q = (a, p) => a[M
 let allocated = 0, gcs = 0; for (let i = 1; i < raw.heap.length; i++) { const d = raw.heap[i] - raw.heap[i - 1]; if (d > 0) allocated += d; else if (d < -256 * 1024) gcs++; }
 const out = {label, scene, device, seconds, loadSeconds: +loadSeconds.toFixed(1), frames: n,
   avgFps: +(1000 * n / total).toFixed(1), low1Fps: +low(.01).toFixed(1), low01Fps: +low(.001).toFixed(1), worstMs: +sorted[0].toFixed(1),
+  missedFrames: (() => { const med = [...intervals].sort((a, b) => a - b)[n >> 1] || 0; return {typicalMs: +med.toFixed(2), over1_5x: intervals.filter(v => v > med * 1.5).length, pct: +(100 * intervals.filter(v => v > med * 1.5).length / n).toFixed(2)}; })(),
   hitchesOver50ms: intervals.filter(v => v > 50).length, hitchesOver100ms: intervals.filter(v => v > 100).length,
   cpu: {avgMs: +(cpuSorted.reduce((a, b) => a + b, 0) / cpuSorted.length).toFixed(2), p50Ms: +q(cpuSorted, .5).toFixed(2), p99Ms: +q(cpuSorted, .99).toFixed(2), p999Ms: +q(cpuSorted, .999).toFixed(2), maxMs: +cpuSorted.at(-1).toFixed(1)},
   cpuBoundFps: +(1000 / (cpuSorted.reduce((a, b) => a + b, 0) / cpuSorted.length)).toFixed(1),
