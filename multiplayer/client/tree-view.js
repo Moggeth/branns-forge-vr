@@ -10,6 +10,7 @@ import {createTreeMaterials} from './tree-materials.js';
 import {tagAppleSlots} from './tree-fruit-mask.js';
 import {APPLE_VARIANT} from '../shared/fruit.js';
 import {worldTrees} from '../shared/world-content.js';
+import {terrainFrameKey, foundationTerrainKey} from '../shared/terrain.js';
 import {VARIANTS, treeScale, notchFor, treeFall, isFelled, treeNotches, TREE_LIMITS, rotateVector, logLength, logRadius} from '../shared/trees.js';
 import {bakeTriangles, carveNotches, buildFelled, buildTimberSection, toGeometry, fitEndcapUV} from './tree-carve.js';
 import {growthProgress, growthPose, growthProfile, growthMatrices, growthSeed} from './tree-growth.js';
@@ -100,13 +101,19 @@ export function createTreeView({scene, templates, height, camera = null, lodDist
   batches.place(r.tree.id, v, r.lod ? 'lod' : 'full', kit, rootM, local); if (g < 1) growing.add(r.tree.id); else growing.delete(r.tree.id);
  }
  function demote(id) { const e = trees.get(id); if (!e) return; destroy(e); trees.delete(id); }
+ const floorCache = new Map(); let floorCacheKey = '';
  function sync(s) {
   last = s; const now = clock, cuts = new Map((s.harvestedTrees || []).map(h => [h.id, h])), ids = new Set();
   const walking = new Set((s.enemies || []).filter(e => e.kind === 'stumpling').map(e => e.treeId)); // stumps that got up (stumpling-view draws them)
   if (!lodValid && camera && !intact.size) { camera.getWorldPosition(lodCam); lodValid = true; } // first build places every tree at its LOD once
+  // Ground height under every tree used to be re-sampled on every snapshot (20 a second, thousands of trees in a
+  // generated world). It only changes when the terrain does, so it is cached against the terrain's own frame key.
+  const floorKey = terrainFrameKey(s.edits, s.tick) + '|' + foundationTerrainKey(s) + '|' + (s.world ? JSON.stringify(s.world) : '');
+  if (floorKey !== floorCacheKey) { floorCacheKey = floorKey; floorCache.clear(); }
   for (const t of worldTrees(s)) {
    const kit = kits.get(VARIANTS[t.variant] || 'tree'); if (!kit) continue; ids.add(t.id);
-   const cut = cuts.get(t.id), floor = height(t.x, t.z, s.edits), sc = treeScale(t);
+   let fc = floorCache.get(t.id); if (!fc || fc.x !== t.x || fc.z !== t.z) floorCache.set(t.id, fc = {x: t.x, z: t.z, floor: height(t.x, t.z, s.edits)});
+   const cut = cuts.get(t.id), floor = fc.floor, sc = treeScale(t);
    let e = trees.get(t.id), r = intact.get(t.id);
    if (r && r.kit !== kit) { batches.remove(t.id); intact.delete(t.id); growing.delete(t.id); r = null; }
    if (!cut) { // intact: instanced; rewritten only when its transform key changes

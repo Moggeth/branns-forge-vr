@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import {STORMREEL,rayEnemy,rayGround,rayWorld,chargeShots,cableStrain,cableLength,packOf} from '../shared/stormreel.js';
 import {POLE,finishCrossbow,glyphTexture,flicker} from './stormreel-look.js';
 import './stormreel-hud.css';
+import {setHidden} from './dom-write.js';
 
 /** A damped spring on the presentation clock: k stiffness, z damping ratio (below 1 overshoots and rings). */
 function spring(k, z) {
@@ -220,7 +221,7 @@ export function createStormreelWeapon(ctx) {
     }
     // HUD
     if (hud) {
-      hud.hidden = !wearing;
+      setHidden(hud, !wearing);
       if (wearing) {
         const me = ctx.localPosition(), pack = packOf(t, ctx.playerId()) || 'red', d = cableLength(t, [me.x, 0, me.z], pack), left = Math.max(0, STORMREEL.cable - d), strain = cableStrain(t, [me.x, 0, me.z], pack);
         const next = nextProbe(t, ctx.playerId()), arc = t.arc ? 'live' : t.probes?.red && t.probes?.blue ? 'open' : t.probes?.red || t.probes?.blue ? 'half' : '';

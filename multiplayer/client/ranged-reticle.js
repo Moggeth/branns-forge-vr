@@ -1,3 +1,4 @@
+import {setHidden} from './dom-write.js';
 // Screen-space DOM reticle for flat first-person and touch. Zero WebGL draws.
 // Hidden whenever role !== 'hero', a menu is open, or renderer.xr.isPresenting
 // (VR keeps the physical weapon/guide only, so no doubled fixed-screen reticle).
@@ -20,7 +21,7 @@ export function createRangedReticle({parent = globalThis.document?.body} = {}) {
   // input: {tool, role, menuOpen, presenting, drawing, draw, curved, recoil, firing}
   function set({tool, role = 'hero', menuOpen = false, presenting = false, drawing = false, draw = 0, curved = false, recoil = 0, firing = false} = {}) {
     const next = role === 'hero' && !menuOpen && !presenting ? RETICLE_TOOLS[tool] || null : null;
-    root.hidden = !next;
+    setHidden(root, !next);
     if (!next) return null;
     if (next !== style) { style = next; svg.innerHTML = SVG[next]; root.dataset.weapon = next; }
     // Feathers close in as the draw builds; brackets kick on recoil.

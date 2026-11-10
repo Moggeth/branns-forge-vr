@@ -1,3 +1,4 @@
+import {setText, setAttr} from './dom-write.js';
 import {mountTouchActions} from './touch-actions.js';
 import './touch-actions.css';
 import './touch-fullscreen.css';
@@ -118,7 +119,7 @@ export function createMobileControls({game, canvas, onMenu, notify, onChange = (
   listen(document,'fullscreenchange',fullscreenChanged);listen(document,'webkitfullscreenchange',fullscreenChanged);
   listen(document,'webkitfullscreenerror',fullscreenFailure);
   render();
-  return {refresh:render,setCue(cue){const ws=game.weaponState(),b=document.getElementById('special'),isAim=ws?.tool==='crossbow';if(b){if(ws?.manned){b.querySelector('.bf-name').textContent='Sight';b.setAttribute('aria-label','Sight along the Timberline range ladder');b.title='Sight (hold right click / Q toggles)';b.setAttribute('aria-pressed',String(!!ws.scoping));}else{const reel=ws?.tool==='stormreel';b.querySelector('.bf-name').textContent=isAim?'Aim':reel?'Reel':'Special';b.setAttribute('aria-label',isAim?'Aim down sights':reel?'Reel your bolt back in':'Weapon special');b.title=isAim?'Aim down sights (hold right click / Q toggles)':reel?'Reel your bolt back in (Q)':'Weapon special (Q)';if(isAim)b.setAttribute('aria-pressed',String(!!ws.aiming));else b.removeAttribute('aria-pressed');}}
+  return {refresh:render,setCue(cue){const ws=game.weaponState(),b=document.getElementById('special'),isAim=ws?.tool==='crossbow';if(b){if(ws?.manned){setText(b.querySelector('.bf-name'),'Sight');setAttr(b,'aria-label','Sight along the Timberline range ladder');setAttr(b,'title','Sight (hold right click / Q toggles)');setAttr(b,'aria-pressed',String(!!ws.scoping));}else{const reel=ws?.tool==='stormreel';setText(b.querySelector('.bf-name'),isAim?'Aim':reel?'Reel':'Special');setAttr(b,'aria-label',isAim?'Aim down sights':reel?'Reel your bolt back in':'Weapon special');setAttr(b,'title',isAim?'Aim down sights (hold right click / Q toggles)':reel?'Reel your bolt back in (Q)':'Weapon special (Q)');setAttr(b,'aria-pressed',isAim?String(!!ws.aiming):null);}}
    // Holding the Stormreel, the Drop button spikes the crossbow into the ground (its bolt stays live).
    const drop=document.querySelector('.ta-q[data-id="drop"]'),spike=ws?.tool==='stormreel';if(drop&&drop.dataset.spike!==String(spike)){drop.dataset.spike=String(spike);drop.querySelector('small').textContent=spike?'Spike':'Drop';drop.setAttribute('aria-label',spike?'Spike the crossbow into the ground (its bolt stays live)':'Drop held item gently');}
    // Seated at the Timberline, Jump becomes Wind (hold to crank) and Attack fires.

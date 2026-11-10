@@ -19,11 +19,14 @@
   font: 800 10px/1.1 var(--sans, system-ui); color: #2a1606; background: #ffe58a;
   box-shadow: 0 0 0 2px rgba(20, 14, 8, .75), 0 0 12px rgba(255, 214, 102, .9);
 }
-.hp-badge.hp-has-points { animation: hp-glow 1.6s ease-in-out infinite; }
-@keyframes hp-glow {
-  50% { box-shadow: 0 0 0 2px rgba(20, 14, 8, .6), 0 0 16px 4px rgba(255, 210, 110, .75); }
-}
-.hp-badge.hp-badge-pop { animation: hp-pop .7s cubic-bezier(.2, 1.6, .4, 1) both, hp-glow 1.6s ease-in-out .7s infinite; }
+/* The unspent-points glow pulses the opacity of a fixed glow layer (runs on the compositor) instead of animating
+   box-shadow, which restyled and repainted the page every frame for as long as you had points to spend. */
+.hp-badge::after { content: ''; position: absolute; inset: 0; border-radius: 50%; pointer-events: none; opacity: 0;
+  box-shadow: 0 0 16px 4px rgba(255, 210, 110, .75); }
+.hp-badge.hp-has-points::after { animation: hp-glow 1.6s ease-in-out infinite; }
+@keyframes hp-glow { 50% { opacity: 1; } }
+.hp-badge.hp-badge-pop { animation: hp-pop .7s cubic-bezier(.2, 1.6, .4, 1) both; }
+.hp-badge.hp-badge-pop::after { animation: hp-glow 1.6s ease-in-out .7s infinite; }
 @keyframes hp-pop { 0% { transform: scale(.6); } 60% { transform: scale(1.35); } 100% { transform: scale(1); } }
 
 /* Desktop vitals grid: badge takes the role icon's column. */
@@ -133,5 +136,5 @@ body[data-role="god"] .meter.hp-xp { display: none; }
 @keyframes hp-rays { 0% { transform: scale(.3) rotate(0deg); opacity: 0; } 12% { opacity: 1; } 100% { transform: scale(1.15) rotate(40deg); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
   .hp-banner.hp-banner-play, .hp-banner.hp-banner-play .hp-banner-level, .hp-banner.hp-banner-play .hp-banner-rays { animation: none; }
-  .hp-badge.hp-has-points, .hp-badge.hp-badge-pop { animation: none; }
+  .hp-badge.hp-has-points, .hp-badge.hp-badge-pop, .hp-badge.hp-has-points::after, .hp-badge.hp-badge-pop::after { animation: none; }
 }

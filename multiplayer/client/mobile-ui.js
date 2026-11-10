@@ -2,6 +2,8 @@
 // Builds DOM; owns no input handling, timers or animation frames.
 // Codex owns pointer identity/capture, gameplay mapping, Fullscreen API and cleanup.
 
+import {setText, setAttr, setHidden, setData, setHTML} from './dom-write.js';
+
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 // Original 24×24 stroke icons; currentColor so CSS controls tint.
@@ -263,62 +265,64 @@ export function createMobileUI({ mount = true } = {}) {
   function render() {
     const { visible, role, fullscreen, fullscreenSupported, standalone, targeting, leftHanded } = state;
     const god = role === 'god';
-    root.hidden = !visible;
-    root.dataset.role = god ? 'god' : 'hero';
-    root.dataset.targeting = String(!!(god && targeting));
-    root.dataset.leftHanded = String(!!leftHanded);
-    document.body.classList.toggle('touch-controls-active', !!visible);
+    // Every write compares first: this runs from the per-frame cue and the page has body-level :has() rules.
+    setHidden(root, !visible);
+    setData(root, 'role', god ? 'god' : 'hero');
+    setData(root, 'targeting', String(!!(god && targeting)));
+    setData(root, 'leftHanded', String(!!leftHanded));
+    if (document.body.classList.contains('touch-controls-active') !== !!visible) document.body.classList.toggle('touch-controls-active', !!visible);
 
-    leftStick.setAttribute('aria-label', god ? 'Pan stick' : 'Move stick');
-    rightStick.setAttribute('aria-label', god ? 'Orbit stick' : 'Look stick');
-    leftStick._caption.textContent = god ? 'Pan' : 'Move';
-    rightStick._caption.textContent = god ? 'Orbit' : 'Look';
+    setAttr(leftStick, 'aria-label', god ? 'Pan stick' : 'Move stick');
+    setAttr(rightStick, 'aria-label', god ? 'Orbit stick' : 'Look stick');
+    setText(leftStick._caption, god ? 'Pan' : 'Move');
+    setText(rightStick._caption, god ? 'Orbit' : 'Look');
 
     const verb=state.strikeVerb||({axe:'Chop',pick:'Mine',hammer:'Smash',bow:'Draw',crossbow:'Shoot',flockwright:'Shoot',wyrmspout:'Fire',stormreel:'Zap',staff:'Shine',flask:'Throw',limb:'Swing'})[state.tool]||'Attack';
-    if(strike._label.textContent!==verb)strike._label.textContent=verb;strike.setAttribute('aria-label',verb+' — hold for bow or stream');
-    cast.hidden = god && state.quickCast;
-    cast._label.textContent = god && targeting ? 'Cast here' : 'Cast';
-    cast.setAttribute('aria-label', god && targeting ? 'Cast at target' : 'Cast at centre aim');
-    cancel.disabled = !god; // cancelAim() also clears a pending line start, which has no 'targeting' flag
-    reticleLabel.textContent = god && targeting ? 'Target set' : '';
+    setText(strike._label, verb); setAttr(strike, 'aria-label', verb+' — hold for bow or stream');
+    setHidden(cast, god && state.quickCast);
+    setText(cast._label, god && targeting ? 'Cast here' : 'Cast');
+    setAttr(cast, 'aria-label', god && targeting ? 'Cast at target' : 'Cast at centre aim');
+    if (cancel.disabled !== !god) cancel.disabled = !god; // cancelAim() also clears a pending line start, which has no 'targeting' flag
+    setText(reticleLabel, god && targeting ? 'Target set' : '');
 
     for (const btn of [fsBtn, settings._fsButton]) {
-      btn.setAttribute('aria-pressed', String(!!fullscreen));
+      setAttr(btn, 'aria-pressed', String(!!fullscreen));
       const label = fullscreen ? 'Exit full screen' : 'Full screen';
-      btn.setAttribute('aria-label', label);
-      btn.querySelector('.mui-icon').innerHTML = ICONS[fullscreen ? 'fullscreen-exit' : 'fullscreen'];
-      const text = btn.querySelector('.mui-btn-label');
-      if (text) text.textContent = label;
+      setHTML(btn.querySelector('.mui-icon'), ICONS[fullscreen ? 'fullscreen-exit' : 'fullscreen']);
+      setText(btn.querySelector('.mui-btn-label'), label);
     }
     // Keep the same button (and pointer identity) on the surface while menus pause input.
-    fullscreenSurface.hidden = visible || !state.fullscreenVisible;
+    setHidden(fullscreenSurface, visible || !state.fullscreenVisible);
     const fsParent = visible ? utilBar : fullscreenSurface;
     if (fsBtn.parentElement !== fsParent) fsParent.append(fsBtn);
     placeFullscreenSurface();
-    document.body.classList.toggle('touch-fullscreen-surface', !fullscreenSurface.hidden);
-    fsBtn.hidden = !state.fullscreenVisible;
-    settings._fsButton.hidden = false;
+    if (document.body.classList.contains('touch-fullscreen-surface') !== !fullscreenSurface.hidden) document.body.classList.toggle('touch-fullscreen-surface', !fullscreenSurface.hidden);
+    setHidden(fsBtn, !state.fullscreenVisible);
+    setHidden(settings._fsButton, false);
     for (const btn of [fsBtn, settings._fsButton]) {
-      btn.dataset.available = String(fullscreenSupported || fullscreen);
-      btn.setAttribute('aria-label', fullscreen ? 'Exit full screen' : fullscreenSupported ? 'Full screen' : 'Full screen unavailable - show display options');
-      btn.title = btn.getAttribute('aria-label');
+      setData(btn, 'available', String(fullscreenSupported || fullscreen));
+      const label = fullscreen ? 'Exit full screen' : fullscreenSupported ? 'Full screen' : 'Full screen unavailable - show display options';
+      setAttr(btn, 'aria-label', label);
+      if (btn.title !== label) btn.title = label;
     }
     const note = settings._fsNote;
     if (standalone) {
-      note.hidden = false;
-      note.textContent = 'Running in app display mode. Fullscreen availability still depends on this browser.';
+      setHidden(note, false);
+      setText(note, 'Running in app display mode. Fullscreen availability still depends on this browser.');
     } else if (!fullscreenSupported) {
-      note.hidden = false;
-      note.textContent = 'Fullscreen is unavailable in this browser or embedded page. Keep playing here, or open the game in its own tab. Add to Home Screen may offer an app-like display on supported devices.';
+      setHidden(note, false);
+      setText(note, 'Fullscreen is unavailable in this browser or embedded page. Keep playing here, or open the game in its own tab. Add to Home Screen may offer an app-like display on supported devices.');
     } else {
-      note.hidden = true;
-      note.textContent = '';
+      setHidden(note, true);
+      setText(note, '');
     }
   }
 
+  let rendered = false;
   function setState(next = {}) {
-    for (const key of Object.keys(state)) if (key in next) state[key] = next[key];
-    render();
+    let changed = !rendered;
+    for (const key of Object.keys(state)) if (key in next && state[key] !== next[key]) { state[key] = next[key]; changed = true; }
+    if (changed) { rendered = true; render(); }
   }
 
   function setStick(side, x = 0, y = 0) {
