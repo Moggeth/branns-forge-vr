@@ -1988,7 +1988,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     heldReadiness?.update({...readiness,time:now/1000,focus:tool==='pick'?pickWallMotion.pose(performance.now()/1000)?.focus||0:0});
     axeReadyCue.update(role==='hero'&&heldReadiness?tool:null,readiness.specialReady);
     {const shown=tool==='pick'&&active&&role==='hero'&&!!axeModel&&weaponAnchor.visible&&axeModel.visible&&!renderer.xr.isPresenting;pickFx.attach(shown?axeModel:null);
-      pickFx.update({time:now/1000,dt,charge:readiness.specialReady??1,shown,swinging:swingLive||!!specialSwing||pickWallMotion.active||inspect.active,moving:move.lengthSq()>.01,sun:pickSun.copy(sun.position).sub(sun.target.position),night:skyCycle.stats().night||0,deposits:snapshot.deposits,player:localPosition,vr:renderer.xr.isPresenting});}
+      pickFx.update({time:now/1000,dt,charge:readiness.specialReady??1,shown,swinging:swingLive||!!specialSwing||pickWallMotion.active||inspect.active(),moving:move.lengthSq()>.01,sun:pickSun.copy(sun.position).sub(sun.target.position),night:skyCycle.stats().night||0,deposits:snapshot.deposits,player:localPosition,vr:renderer.xr.isPresenting});}
     enemyShadows.update(actors,role==='god'?pan:localPosition,now,{maxCasters:touchEnabled?4:8});
     spellVisual.setTarget(targetPreview());
     spellVisual.update(now,dt);cleaveView.update(performance.now());talentFx.update(dt);emberdewFx.update(dt);
