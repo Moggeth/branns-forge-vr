@@ -1,0 +1,86 @@
+{
+ "build_seconds": 1.68,
+ "stones": [
+  [
+   -0.0724,
+   0.8323,
+   0.1244
+  ],
+  [
+   0.0724,
+   0.8323,
+   0.1249
+  ],
+  [
+   0.0,
+   0.4018,
+   0.1344
+  ]
+ ],
+ "clearance": {
+  "unexpected": [],
+  "allowed_contacts": 1036,
+  "states": 43
+ },
+ "stats": {
+  "triangles": 61266,
+  "per_object": {
+   "Body": 21490,
+   "Wings": 17464,
+   "Pinion": 3584,
+   "Reduction": 6956,
+   "Drum": 3708,
+   "Clutch": 960,
+   "Crank": 780,
+   "Latch": 300,
+   "LiveCord_00": 36,
+   "LiveCord_01": 36,
+   "LiveCord_02": 36,
+   "LiveCord_03": 36,
+   "LiveCord_04": 36,
+   "LiveCord_05": 36,
+   "LiveCord_06": 36,
+   "LiveCord_07": 36,
+   "LiveCord_08": 36,
+   "LiveCord_09": 36,
+   "LiveCord_10": 36,
+   "LiveCord_11": 36,
+   "LiveCord_12": 36,
+   "LiveCord_13": 36,
+   "LiveCord_14": 36,
+   "LiveCord_15": 36,
+   "LiveCord_16": 36,
+   "LiveCord_17": 36,
+   "LiveCord_18": 36,
+   "LiveCord_19": 36,
+   "Bolt": 1128,
+   "Sled": 2740,
+   "CrankKnob": 1028,
+   "Trigger": 408
+  },
+  "materials": [
+   "SB_Ash",
+   "SB_Brass",
+   "SB_Bronze",
+   "SB_CallingStone",
+   "SB_Cord",
+   "SB_Crystal",
+   "SB_Ember",
+   "SB_EyeCrystal",
+   "SB_Feather",
+   "SB_Fletch",
+   "SB_Gilt",
+   "SB_Heartwood",
+   "SB_Horn",
+   "SB_Iron",
+   "SB_Ivory",
+   "SB_Kingfisher",
+   "SB_Leather",
+   "SB_MakerPlate",
+   "SB_Steel",
+   "SB_StoneGlass",
+   "SB_Walnut"
+  ],
+  "material_count": 21
+ }
+}

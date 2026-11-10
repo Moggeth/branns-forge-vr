@@ -136,8 +136,9 @@ import {createSpellAudio} from './spell-audio.js';
 import {createMaterialAudio} from './material-audio.js';
 import {createLandmarkAudio} from './landmark-audio.js';
 import {createSiegebirdFlock, SIEGEBIRD_PLUMAGES} from './siegebird-flock.js';
+import {createSiegebirdShowpiece} from './siegebird-showpiece.js';
 import {createSiegebirdAudio} from './siegebird-audio.js';
-import {siegebirdMechanism, siegebirdCues, SIEGEBIRD_RELOAD} from './siegebird-reload.js';
+import {siegebirdMechanism, siegebirdCues, SIEGEBIRD_RELOAD, siegebirdPlumage} from './siegebird-reload.js';
 import {createFlockwrightRigs, FLOCKWRIGHT_POSE} from './flockwright.js';
 import {FLOCKWRIGHT} from '../shared/combat.js';
 import {armouryStand, hasFlockwright, ARMOURY_RULES} from '../shared/armoury.js';
@@ -219,7 +220,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   const aimCamera = new THREE.Matrix4();
   let aimTerrain = null;
   const keys = new Set(), removers = [], actors = new Map(), templates = new Map(), warnings = new Map();
-  const heroView = createHeroView({resolveWeapon: remoteWeapon, onWarning: report, siegebird: () => siegebirdFlockReady(), flockwright: () => flockRigs}), heroCamera = new THREE.Vector3(); // remote Hero bodies only (opus-player-character)
+  const heroView = createHeroView({resolveWeapon: remoteWeapon, onWarning: report, siegebird: () => siegebirdFlockReady(), flockwright: () => flockRigs, showpiece: () => siegebirdShow}), heroCamera = new THREE.Vector3(); // remote Hero bodies only (opus-player-character)
   const enemyThreats = [], threatPoint = [0, 0, 0]; // Hero positions: skeletons raise their shields when one is close in front
   const mixers = new Set(), localPosition = new THREE.Vector3(0, 0, 8), correction = new THREE.Vector3(), meadowPushers = [];
   const pan = new THREE.Vector3(), move = new THREE.Vector3(), forward = new THREE.Vector3();
@@ -451,7 +452,10 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   const enemyGround=(x,z)=>heightAt(x,z,snapshot.edits);
   const enemyShadows=createEnemyShadowBudget({range:18});
   const meteorCreatures=createMeteorCreaturePresentation({THREE,quality:matchMedia('(any-pointer:coarse)').matches?'low':'high'});
-  const combat=createCombatView({scene,templates,actors,camera,beforeContacts:()=>{for(const e of actors.values())if(e.enemy)meteorCreatures.apply(e,renderTick);},height:(x,z)=>heightAt(x,z,snapshot.edits),worldContact,playerPosition:id=>id===playerId&&initialized?localPosition.toArray():null,localSide:()=>snapshot.players?.find(p=>p.id===playerId)?.side||'party', night:()=>skyCycle.night?.()??0, quality:globalThis.matchMedia?.('(pointer: coarse)').matches?'low':'high', onBoneLand:landing=>soundKit?.play('bone_clack',landing.position,listenerPose(),{weight:landing.weight,key:`clack:${landing.id}`,gap:.12}), onContact:hit=>{if(isHost())onAction('projectileHit',hit);}});
+  // Siegebird showpiece (siegebird-showpiece.js): Calling Stones, glints, wisps, the shot's flash and down, bolt trails and feather-burst impacts.
+  const siegebirdShow=createSiegebirdShowpiece({scene,camera,quality:mobileBudget?'low':'high',localId:()=>playerId,sunDirection:v=>v.copy(sun.position).sub(sun.target.position).normalize(),
+    ownerFletch:owner=>{const p=snapshot.players?.find(p=>p.id===owner);return p?.siegebird?.n>0?siegebirdPlumage(owner,p.siegebird.n):-1;}});
+  const combat=createCombatView({scene,templates,actors,camera,beforeContacts:()=>{for(const e of actors.values())if(e.enemy)meteorCreatures.apply(e,renderTick);},height:(x,z)=>heightAt(x,z,snapshot.edits),worldContact,boltFletch:(id,owner)=>siegebirdShow.fletchFor(id,owner),onProjectiles:(list,positionOf,dt)=>siegebirdShow.trails(list,positionOf,dt),playerPosition:id=>id===playerId&&initialized?localPosition.toArray():null,localSide:()=>snapshot.players?.find(p=>p.id===playerId)?.side||'party', night:()=>skyCycle.night?.()??0, quality:globalThis.matchMedia?.('(pointer: coarse)').matches?'low':'high', onBoneLand:landing=>soundKit?.play('bone_clack',landing.position,listenerPose(),{weight:landing.weight,key:`clack:${landing.id}`,gap:.12}), onContact:hit=>{if(isHost())onAction('projectileHit',hit);}});
   // Apple on a stick (client/apple-snack.js, shared/fruit.js): shot apples fall on their shaft; take one, then bite.
   const appleSnack=createAppleSnack({scene,camera,templates,height:(x,z)=>heightAt(x,z,snapshot.edits),audio:()=>audioContext,listener:()=>listenerPose(),reducedMotion:reducedWeaponMotion,send:(action,detail)=>onAction(action,detail),
     haptic:kind=>{if(renderer.xr.isPresenting)feedback.pattern?.(kind==='bite'?[{at:0,amplitude:.55,duration:28},{at:55,amplitude:.3,duration:18}]:[{at:0,amplitude:.25,duration:20}]);else if(touchEnabled)try{navigator.vibrate?.(kind==='bite'?[16,34,10]:[10]);}catch{}}});
@@ -971,7 +975,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     if(name==='stormreel')stormView.installCrossbow(gltf);
     if(name==='flockwright'){flockRigs.setClips(gltf.animations);const shown=instantiate(name,WEAPON_HEIGHTS[name]);flockRigs.rig(shown);inventionVisual.setArmouryCrossbow(shown);}
     if (['axe','pick','hammer','crossbow','bow','wyrmspout','stormreel','staff','flockwright'].includes(name)) {
-      const model = instantiate(name, WEAPON_HEIGHTS[name]);if(name==='flockwright')flockRigs.rig(model);
+      const model = instantiate(name, WEAPON_HEIGHTS[name]);if(name==='flockwright')flockRigs.rig(model);if(name==='crossbow')siegebirdShow.dress(model);
       const readinessAt=performance.now();readinessCache.prepare({root:model,tool:name,reducedMotion:reducedWeaponMotion});
       (startup.weaponPreparation??={})[name]={readinessMs:performance.now()-readinessAt};
       if(startup.ready||startup.phase!=='assets'){updateWeaponPresentation(model,name,{draw:0,recoil:0,time:0,templates});await prepareStreamed(model);if(disposed)return;}
@@ -1085,7 +1089,8 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     // Perfect wind on the reload that just finished makes this one quick: the host's verdict once it has arrived, else ours.
     const sb=me?.siegebird,quick=sb&&sb.n===siegebirdLocal.n&&sb.wind?sb.wind===1:siegebirdWind.verdict()===1;
     siegebirdLocal.n=n;siegebirdLocal.prevT=0;siegebirdWind.fired({quick});
-    const flock=siegebirdFlockReady();if(flock&&axeModel){flock.fired(axeModel,golden);flock.shot(axeModel,{n,golden:null,playerId,time:performance.now()/1000,quick});}
+    const flock=siegebirdFlockReady();if(axeModel)siegebirdShow.fired(axeModel,{golden,fletch:flock?.loadedFletch(axeModel)??-1});
+    if(flock&&axeModel){flock.fired(axeModel,golden);flock.shot(axeModel,{n,golden:null,playerId,time:performance.now()/1000,quick});}
     siegebirdSound()?.fire(golden);
   }
   // Perfect wind verdict (fire pressed on the latch, or a VR hand latched the crank before the bird seats): the host
@@ -1270,6 +1275,8 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     if(event.kind==='axe_cleave'){cleaveView.play(event,performance.now());const mine=event.id===playerId,ear=listenerPose().position;
       playCleaveSound(audioContext,mine?1:Math.max(0,1-Math.hypot(event.position[0]-ear[0],event.position[2]-ear[2])/30));
       if(mine&&touchEnabled&&!renderer.xr.isPresenting)try{navigator.vibrate?.([45,25,20]);}catch{}}
+    // A Siegebird bolt landed: a puff of its bird's feathers, a resonance ring and a flash of light.
+    if((event.kind==='embed'||event.kind==='pierce')&&event.position)siegebirdShow.landed(event);
     const kind=event.kind;if(!['hit','wood_hit','stone_hit','tree_fell','ore_break','pickup','build','death','headshot','shoot','detach','shockwave','embed','hammer_slam','pick_burst','axe_cleave'].includes(kind))return;
     const material=event.material||(kind==='wood_hit'?'wood':kind==='stone_hit'||kind==='ore_break'?'stone':event.id==='shrine'?'metal':'bone');
     const isImpact=['hit','headshot','wood_hit','stone_hit'].includes(kind)||(kind==='embed'&&event.impact);
@@ -1909,6 +1916,8 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     {const wound=siegebirdWind.update(dt,siegebirdGrip());for(const c of wound.cues)siegebirdCue({...c,crank:true});siegebirdWindVerdict(wound.wind);}
     if(axeModel)updateWeaponPresentation(axeModel,tool,{...weapons.state(),hand:tool==='crossbow'?siegebirdWind.hand():null,time:now/1000,templates,ember:bowLayer?.ember??0,stringSnap:bowLayer?.string??0,stringGlow:bowLayer?.stringGlow??0,spray:wyrmFeel.spray(),fill:wyrmFeel.shown(),gout:wyrmFeel.goutKick(),...(tool==='wyrmspout'?wyrmIndicators():null)});
     if(tool==='crossbow'&&axeModel)updateSiegebirdLocal(now,weapons.state().reload);
+    siegebirdShow.update(dt,now/1000,{visual:tool==='crossbow'&&axeModel&&weaponAnchor.visible&&axeModel.visible?axeModel:null,reload:weapons.state().reload,golden:!!(axeModel&&siegebirdFlock?.loadedGolden(axeModel)),
+      night:skyCycle.night?.()??0,aiming:adsAmount>.5,inspecting:inspect.active()});
     siegebirdFlock?.updateWorld(now/1000,{viewer:camera.getWorldPosition(siegebirdViewer)});
     weapons.tick();const weaponState=weapons.state();feedback.draw(weaponState);
     {const me=snapshot.players.find(p=>p.id===playerId),spraying=tool==='wyrmspout'&&weaponState.firing&&!!axeModel&&role==='hero'&&active;

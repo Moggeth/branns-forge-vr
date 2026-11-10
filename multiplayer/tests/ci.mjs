@@ -26,7 +26,7 @@ const suite = [
   'placement-rotation','placement-session','progressive-sunder','quality-performance',
   'ranged-fx','phoenix-aim-continuity','golden-bolt-collection','saved-worlds-chooser.test','session','session-reload','settlement-budget',
   'settlement-view','shield-interception','siegebird-aim','siegebird-ballistics',
-  'siegebird-flock','siegebird-songbird','siegebird-wind','simulation','skeleton-performance','skin-bounds',
+  'siegebird-flock','siegebird-songbird','siegebird-wind','siegebird-showpiece','simulation','skeleton-performance','skin-bounds',
   'skull-surface-regression','solo-session','spell-presentation','spell-spectacle',
   'spell-availability','spell-targeting','starting-world','landmark-performance','waygate','geode-outcrop','watch-beacon','heartstone','sanctuary-kit','state-codec','terrain-presentation','terrain-ray',
   'terrain-specials','terrain-storage-budget','terrain-triangles','testing-supplies',
