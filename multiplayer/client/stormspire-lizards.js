@@ -22,6 +22,7 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {cloneSkinnedAsset} from './clone-skinned-asset.js';
+import {inView} from './view-cull.js';
 
 const MODEL_URL = '/assets/stormspire-lizard.glb';
 // Tower geometry in the glTF frame (assets-source/stormspire-tower build_tower.py keeps these numbers): an octagonal shaft (circumradius .95 ->
@@ -158,6 +159,9 @@ function wiggle(s, t, speed, amount) {
 const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _s = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _m = new THREE.Matrix4();
 const viewer = {pos: new THREE.Vector3(), quat: new THREE.Quaternion(), frame: -1, seen: 0};
 let frameNo = 0;
+// Off-screen or far-off crews keep their routines (the climber still walks its winding) but skip posing: mixers, foot
+// IK and cables are most of a Stormspire's frame cost. Past 40 m a Voltnewt is a few pixels tall.
+export const LIZARD_CULL = Object.freeze({lift: 3, radius: 9, maxDistance: 40});
 function captureViewer(renderer, scene, camera) {
   if (viewer.frame === frameNo) return;
   viewer.frame = frameNo; viewer.seen = frameNo;
@@ -666,11 +670,15 @@ export function createLizardCrew() {
       }
     }
   }
+  const stats = {posed: 0, skipped: 0};
   return {
-    group,
+    group, stats: () => ({...stats}),
     cheer() { for (const l of crew) l.cheerIn = Math.random() * .3; },
-    update(t, dt) {
+    update(t, dt, camera = null) {
       dt = clamp(dt || 0, 0, .1); frameNo++; t += seed;
+      const shown = inView(camera, group, LIZARD_CULL);
+      for (const l of crew) if (l.cable) l.cable.visible = shown;
+      stats.posed += shown; stats.skipped += !shown;
       // cheering: staggered, then back to whatever each was doing
       for (const l of crew) {
         if (l.cheerIn >= 0) { l.cheerIn -= dt; if (l.cheerIn < 0) { l.cheerLeft = 1.6; if (l.m) play(l.m, 'cheer', .15, false, true); } }
@@ -704,17 +712,17 @@ export function createLizardCrew() {
           play(m, climb.mode === 'move' || climb.mode === 'hop' ? 'climb' : climb.mode);
           if (m.clip === 'climb') m.actions.climb.setEffectiveTimeScale(climb.mode === 'hop' ? 2.2 : CLIMB_SPEED * .6 / CLIMB_STRIDE);
         }
-        animateModel(climber, t, dt, watching(climber));
+        if (shown) animateModel(climber, t, dt, watching(climber));
       } else wiggle(climber.stand, t, climb.mode === 'move' ? 11 : 0, 1);
       if (keeper.m) {
         if (!cheering(keeper)) play(keeper.m, keep.mode);
-        animateModel(keeper, t, dt, watching(keeper) || (keep.mode === 'idle' ? climber.holder.getWorldPosition(_p1) : null));
+        if (shown) animateModel(keeper, t, dt, watching(keeper) || (keep.mode === 'idle' ? climber.holder.getWorldPosition(_p1) : null));
       } else wiggle(keeper.stand, t, 2, .3);
       if (lounger.m) {
         if (!cheering(lounger)) play(lounger.m, nap.awake > 0 ? 'idle' : 'nap', .6);
-        animateModel(lounger, t, dt, watching(lounger));
+        if (shown) animateModel(lounger, t, dt, watching(lounger));
       } else { wiggle(lounger.stand, t, 1, .25); lounger.stand.tail.rotation.y += Math.sin(t * .6) * .4; }
-      updateSparks(sparks, dt);
+      if (shown) updateSparks(sparks, dt);
       // stand-in hop when cheering
       for (const l of crew) if (l.stand) { const k = l.cheerLeft > 0 ? Math.abs(Math.sin((1.6 - l.cheerLeft) * Math.PI * 2)) * .15 * l.cheerLeft / 1.6 : 0; l.stand.group.position.y = k; }
     },

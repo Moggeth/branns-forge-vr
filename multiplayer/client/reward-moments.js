@@ -2,6 +2,7 @@
 // Presentation only. It reads broadcast events, never writes shared state, and is safe
 // for late joiners (a missed event simply plays nothing). Quest budget: no lights, no
 // textures, one instanced mote draw plus at most 6 rings and 3 pillars while active.
+import {setLiveInstances} from './instance-upload.js';
 import * as THREE from 'three';
 import {materialInfo} from '../shared/material-catalog.js';
 
@@ -236,7 +237,7 @@ export function createRewardMoments({scene, camera, height = () => 0, audio = ()
         scratch.scale.setScalar(m.size * (.35 + swell * .9) * land * close * close); scratch.rotation.set(m.spin + t * 7, m.spin * .7 + t * 5, 0);
         scratch.updateMatrix(); motes.setMatrixAt(i, scratch.matrix);
       }
-      motes.count = top; motes.instanceMatrix.needsUpdate = true;
+      setLiveInstances(motes, top);
       for (const r of rings) {
         if (!r.alive) continue; r.age += dt; const t = r.age / r.life;
         if (t >= 1) { r.alive = false; r.mesh.visible = false; continue; }
