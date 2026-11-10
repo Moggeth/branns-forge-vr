@@ -1916,7 +1916,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     {const wound=siegebirdWind.update(dt,siegebirdGrip());for(const c of wound.cues)siegebirdCue({...c,crank:true});siegebirdWindVerdict(wound.wind);}
     if(axeModel)updateWeaponPresentation(axeModel,tool,{...weapons.state(),hand:tool==='crossbow'?siegebirdWind.hand():null,time:now/1000,templates,ember:bowLayer?.ember??0,stringSnap:bowLayer?.string??0,stringGlow:bowLayer?.stringGlow??0,spray:wyrmFeel.spray(),fill:wyrmFeel.shown(),gout:wyrmFeel.goutKick(),...(tool==='wyrmspout'?wyrmIndicators():null)});
     if(tool==='crossbow'&&axeModel)updateSiegebirdLocal(now,weapons.state().reload);
-    siegebirdShow.update(dt,now/1000,{visual:tool==='crossbow'&&axeModel&&weaponAnchor.visible&&axeModel.visible?axeModel:null,reload:weapons.state().reload,golden:!!(axeModel&&siegebirdFlock?.loadedGolden(axeModel)),
+    siegebirdShow.update(dt,now/1000,{visual:tool==='crossbow'&&axeModel&&weaponAnchor.visible&&axeModel.visible?axeModel:null,reload:weapons.state().reload,hand:tool==='crossbow'?siegebirdWind.hand():null,golden:!!(axeModel&&siegebirdFlock?.loadedGolden(axeModel)),
       night:skyCycle.night?.()??0,aiming:adsAmount>.5,inspecting:inspect.active()});
     siegebirdFlock?.updateWorld(now/1000,{viewer:camera.getWorldPosition(siegebirdViewer)});
     weapons.tick();const weaponState=weapons.state();feedback.draw(weaponState);

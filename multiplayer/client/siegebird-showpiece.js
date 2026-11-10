@@ -165,7 +165,9 @@ export function createSiegebirdShowpiece({scene, camera, quality = 'high', sunDi
 
   // ------------------------------------------------------------------------------------------- dressing
   function dress(visual) {
-    if (!visual || visual.userData.siegebirdShowpiece) return visual.userData.siegebirdShowpiece;
+    if (!visual) return null;
+    const cached = visual.userData.siegebirdShowpiece;
+    if (cached) { rigs.add(cached); return cached; }   // a re-equipped crossbow rejoins the set it was dropped from
     const body = visual.getObjectByName('Body'); if (!body) return null;
     const uniforms = {ruffle: {value: 0}, time: {value: 0}};
     const rig = {visual, uniforms, stones: [], stoneMats: [], glassMats: [], charge: 1, shown: 1, flare: 0, lastWound: null, lastClicks: 0, lastHeld: -9,
@@ -334,9 +336,10 @@ export function createSiegebirdShowpiece({scene, camera, quality = 'high', sunDi
   }
 
   // ------------------------------------------------------------------------------------------- per frame
-  function updateRig(rig, dt, {reload = Infinity, golden = false, night = 0, aiming = false, inspecting = false} = {}) {
+  function updateRig(rig, dt, {reload = Infinity, hand = null, golden = false, night = 0, aiming = false, inspecting = false} = {}) {
     rig.uniforms.time.value = clock; rig.uniforms.ruffle.value *= Math.exp(-dt * 5.5);
-    const m = siegebirdMechanism(reload), wound = THREE.MathUtils.clamp(m.wound - SIEGEBIRD_WINCH.baseWraps, 0, 1);
+    // hand: VR manual crank progress, so the stones follow the real crank rather than the reload clock.
+    const m = siegebirdMechanism(reload, hand), wound = THREE.MathUtils.clamp(m.wound - SIEGEBIRD_WINCH.baseWraps, 0, 1);
     const since = clock - rig.fired;
     // Charge: drained by the shot, rings up click by click with the wind, flares at the latch.
     const clicks = Math.floor(wound * SIEGEBIRD_WINCH.ratchetTeeth);

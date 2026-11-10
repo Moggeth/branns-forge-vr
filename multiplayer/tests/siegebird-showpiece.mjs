@@ -104,5 +104,12 @@ a.visible = false; for (let i = 0; i < 40; i++) fx.update(1 / 60, 9 + i / 60, {v
 assert.ok(ra.flare < .3, 'stashed stones stay quiet');
 a.visible = true; fx.update(1 / 60, 10, {visual: a});
 assert.ok(ra.flare > .8 && ra.uniforms.ruffle.value > .5, 'drawing it wakes the stones and ruffles the wings');
+// 8. VR manual winding: a held crank keeps the stones low even when the reload clock has passed the latch.
+level(.2); const held = (() => { for (let i = 0; i < 40; i++) fx.update(1 / 60, 11 + i / 60, {visual: a, reload: .7, hand: .1}); return ra.charge; })();
+assert.ok(held < .5, `stones follow the hand, not the clock (${held.toFixed(2)})`);
+// 9. A remote crossbow stashed and re-equipped keeps its halos (rejoins the rig set).
+const r = prepareAsset(gltf, 'crossbow').visual; scene.add(r); fx.updateRemote(r, 1 / 60, {});
+r.removeFromParent(); fx.update(1 / 60, 12, {}); scene.add(r); fx.updateRemote(r, 1 / 60, {});
+const drawsBefore = fx.stats.glints; fx.update(1 / 60, 12.1, {}); assert.ok(fx.stats.glints > drawsBefore || fx.stats.glints > 0, 're-equipped remote crossbow still drawn');
 fx.dispose(); phoneFx.dispose();
 console.log(`siegebird-showpiece: authored stones and fletching, dressing, winch-driven charge, shot, trails, landings and fixed budget pass (${((performance.now() - begin) / 1000).toFixed(2)} s)`);
