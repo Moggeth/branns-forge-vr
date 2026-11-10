@@ -241,21 +241,32 @@ const BUILD = {
     const luminance = createAxeLuminance(owner, host, find); if (luminance) owner.cleanup.push(luminance.dispose);
     return {special: strip, luminance};
   },
-  // Blue crystal nodes in brass settings: three tiers on four faces under the head, filling up toward it.
+  // Blue crystal nodes in gold settings: three tiers on four faces under the head, filling up toward it. The Pick of
+  // Riches authors its twelve seats (Gauge0..11, +Y = face normal, tier = index / 4) with their gold collets; older
+  // picks get measured seats and runtime brass rings.
   pick(owner, host, find) {
-    const pts = collectPoints(host, ['Shaft', 'BrassTrim', 'Embellish_Gold_Bands', 'Embellish_Darkmetal_Spine', 'GripWrap'].map(find));
-    const top = boundsIn(host, find('HeadSocket')).min.y - .022, gems = [], settings = [], steps = [];
-    [top - .064, top - .032, top].forEach((y, tier) => {
-      for (let k = 0; k < 4; k++) {
-        const a = k * Math.PI / 2 + Math.PI / 4, n = new THREE.Vector3(Math.cos(a), 0, Math.sin(a));
-        const r = surface(pts, _v.set(0, y, 0), n, .006, .026), q = basis(n, new THREE.Vector3(0, 1, 0)); // per-face: the trim is not round
-        gems.push([n.clone().multiplyScalar(r + .0042).setY(y), q]); settings.push([n.clone().multiplyScalar(r + .0009).setY(y), q]); steps.push(tier);
-      }
-    });
-    const setting = new THREE.InstancedMesh(named(new THREE.TorusGeometry(.0072, .0017, 5, 12), 'pick-setting'), new THREE.MeshStandardMaterial({color: 0x8a6a34, metalness: .9, roughness: .38}), settings.length);
-    settings.forEach(([p, q], i) => setting.setMatrixAt(i, _m.compose(p, q, _s))); setting.computeBoundingSphere();
-    owner.add(setting, setting.geometry, setting.material);
-    const gem = named(new THREE.OctahedronGeometry(.0058, 0).scale(.85, 1.45, .7), 'pick-node');
+    const gems = [], steps = [], up = new THREE.Vector3(0, 1, 0);
+    const seats = Array.from({length: 12}, (_, i) => find(`Gauge${i}`));
+    if (seats.every(Boolean)) {
+      seats.forEach((seat, i) => {
+        const n = up.clone().applyQuaternion(hostQuaternion(host, seat)).normalize();
+        gems.push([hostPosition(host, seat).addScaledVector(n, .0022), basis(n, up)]); steps.push(Math.floor(i / 4));
+      });
+    } else {
+      const pts = collectPoints(host, ['Shaft', 'BrassTrim', 'Embellish_Gold_Bands', 'Embellish_Darkmetal_Spine', 'GripWrap'].map(find));
+      const top = boundsIn(host, find('HeadSocket')).min.y - .022, settings = [];
+      [top - .064, top - .032, top].forEach((y, tier) => {
+        for (let k = 0; k < 4; k++) {
+          const a = k * Math.PI / 2 + Math.PI / 4, n = new THREE.Vector3(Math.cos(a), 0, Math.sin(a));
+          const r = surface(pts, _v.set(0, y, 0), n, .006, .026), q = basis(n, up); // per-face: the trim is not round
+          gems.push([n.clone().multiplyScalar(r + .0042).setY(y), q]); settings.push([n.clone().multiplyScalar(r + .0009).setY(y), q]); steps.push(tier);
+        }
+      });
+      const setting = new THREE.InstancedMesh(named(new THREE.TorusGeometry(.0072, .0017, 5, 12), 'pick-setting'), new THREE.MeshStandardMaterial({color: 0x8a6a34, metalness: .9, roughness: .38}), settings.length);
+      settings.forEach(([p, q], i) => setting.setMatrixAt(i, _m.compose(p, q, _s))); setting.computeBoundingSphere();
+      owner.add(setting, setting.geometry, setting.material);
+    }
+    const gem = named(new THREE.OctahedronGeometry(.0052, 0).scale(.82, 1.4, .7), 'pick-node');
     // The head's own Resonance gems carry the charge too: drain on use, re-ignite heart → arm tips → crown.
     const luminance = createPickLuminance(owner, host, find); if (luminance) owner.cleanup.push(luminance.dispose);
     return {special: new Strip(owner, gem, glowMaterial({color: 0x24435e, metalness: .1, roughness: .18}), gems, steps, PALETTES.crystal), luminance};
