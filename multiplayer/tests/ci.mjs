@@ -22,7 +22,7 @@ const suite = [
   'impact-presentation','import-performance','interaction-cue-view.test','interaction-cue.test',
   'inventions-review','legacy-trees','lobby-ui.test','lumber-collection','lumber-session',
   'material-audio','material-economy','meteor-creature','mining-geometry',
-  'orchard-presentation','phoenix-bank','pick-luminance','placement-preview',
+  'orchard-presentation','phoenix-bank','pick-luminance','pick-riches','placement-preview',
   'placement-rotation','placement-session','progressive-sunder','quality-performance',
   'ranged-fx','phoenix-aim-continuity','golden-bolt-collection','saved-worlds-chooser.test','session','session-reload','settlement-budget',
   'settlement-view','shield-interception','siegebird-aim','siegebird-ballistics',
