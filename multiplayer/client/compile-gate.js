@@ -30,6 +30,9 @@ export function createCompileGate({renderer, scene, compile}) {
   // (each call walks the whole scene for lights, so batching matters).
   const batch = {isObject3D: true, traverse(cb) { for (const o of queued) cb(o); }, traverseVisible() {}};
   function flush(camera) {
+    // A material whose object was culled or removed after its first skip is never drawn again to release it, so drop
+    // stale entries here rather than keeping disposed effect materials alive for the whole session.
+    if (waiting.size) { const now = performance.now(); for (const [m, since] of waiting) if (now - since > COMPILE_GATE.maxWaitMs) waiting.delete(m); }
     if (!queued.size) return;
     try { compile(batch, camera, scene); stats.compiled += queued.size; }
     catch { for (const o of queued) { const m = o.material; for (const x of Array.isArray(m) ? m : [m]) if (x) { ready.add(x); waiting.delete(x); } } }

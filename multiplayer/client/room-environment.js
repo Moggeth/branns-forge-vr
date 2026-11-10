@@ -20,6 +20,8 @@ export function createRoomEnvironment({renderer,scene,size,stats={},cancelled=()
       const {RoomEnvironment}=await import('three/addons/environments/RoomEnvironment.js');
       if(released||cancelled())return;
       const room=new RoomEnvironment(),pmrem=new T.PMREMGenerator(renderer);
+      // The light budget starts new point lights on a hidden layer; this private scene has no budget, so show them.
+      room.traverse(o=>{if(o.isPointLight)o.layers.set(0);});
       try{resource=pmrem.fromScene(room,.04,.1,100,{size});scene.environment=resource.texture;stats.source='generated';}
       finally{room.dispose();pmrem.dispose();}
     }finally{stats.readyMs=performance.now()-started;}
