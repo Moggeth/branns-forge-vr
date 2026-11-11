@@ -205,7 +205,8 @@ export function hitEnemyPart(state,enemy,part,amount,hit,ctx,events,{projectile=
   if(!state.enemies.includes(enemy)||!PARTS.includes(part)||enemy.missingParts.includes(part))return false;
   const armored=enemy.kind==='golem'&&(enemy.armor??3)>0;
   const owner=state.players.find(p=>p.id===hit?.ownerId);
-  if(owner&&tavernSafe(state,owner))return false; // nobody fights from inside a tavern
+  const warband=hit?.by==='warband'; // a God's Forgeling striking for its owner (shared/warband.js)
+  if(owner&&!warband&&tavernSafe(state,owner))return false; // nobody fights from inside a tavern
   amount*=damageScale(owner); // +20% per hero level
   // Limbsplitter (axe talent): a swing that lands on a limb or head takes it clean off (armour still turns it).
   if(!projectile&&!armored&&hit?.tool==='axe'&&part!=='torso'&&enemy.kind!=='stumpling'&&hasTalent(owner,'axe','limbsplitter'))amount=Math.max(amount,enemy.parts[part]);
@@ -220,13 +221,13 @@ export function hitEnemyPart(state,enemy,part,amount,hit,ctx,events,{projectile=
   // repeated body shots must not leave it immortal at one HP.
   const creditedDamage=Math.min(enemy.hp,headshot?enemy.hp:amount);
   if(owner?.stats)owner.stats.contribution=Math.min(1e9,owner.stats.contribution+creditedDamage);
-  if(owner?.role==='hero'&&owner.hp>0&&itemBonus(owner,'lifesteal')>0)owner.hp=Math.min(heroMaxHp(owner),owner.hp+creditedDamage*itemBonus(owner,'lifesteal')); // Leech in a Jar
+  if(!warband&&owner?.role==='hero'&&owner.hp>0&&itemBonus(owner,'lifesteal')>0)owner.hp=Math.min(heroMaxHp(owner),owner.hp+creditedDamage*itemBonus(owner,'lifesteal')); // Leech in a Jar
   enemy.hp-=headshot?enemy.hp:amount;
   events.push({kind:headshot?'headshot':'hit',position:[...(hit?.point||enemy.position)],id:enemy.id,part,material:enemy.kind==='golem'?'stone':enemy.kind==='ent'||enemy.kind==='stumpling'?'wood':'bone',normal:unit(hit?.normal)?[...hit.normal]:[0,1,0],energy:hit?.tool==='hammer'?1.8:1,damage:creditedDamage,resisted:armored});
   // Melee takes any limb off; an arrow or bolt snaps a skeleton's arm or leg off too (a skull shot is a headshot).
   if(part!=='torso'&&enemy.parts[part]===0&&(!projectile||enemy.kind==='skeleton'&&part!=='head'))detach(state,enemy,part,hit,ctx,events);
   if(part==='head'&&enemy.missingParts.includes('head'))enemy.hp=0;
-  if(enemy.hp<=0){if(owner?.stats)owner.stats.kills=Math.min(1e9,owner.stats.kills+1);grantXp(state,owner,killXp(enemy),events,enemy.position);payKillGold(state,owner,enemy,events);noteKill(state,owner,enemy,hit,events);if(owner?.role==='hero'&&!enemy.battleRun)addBloom(state,enemy.kind==='golem'?BLOOM.golem:BLOOM.skeleton,events,enemy.position);if(enemy.meteorBorn)queueMeteorReward(state,enemy,ctx,events);else if(enemy.kind==='ent')dropEntTimber(state,enemy,entContext(state,ctx),events,entSpec(enemy).trunkLogs);else if(enemy.kind==='stumpling')dropStumplingLoot(state,enemy,entContext(state,ctx),events);else if(!enemy.battleRun)dropSkeletonSalvage(state,enemy,ctx,events,owner);const fallen=[];for(const limb of PARTS){const d=detach(state,enemy,limb,hit,ctx,events,true);if(d)fallen.push(d);}
+  if(enemy.hp<=0){if(owner?.stats)owner.stats.kills=Math.min(1e9,owner.stats.kills+1);grantXp(state,owner,killXp(enemy),events,enemy.position);payKillGold(state,owner,enemy,events);if(!warband)noteKill(state,owner,enemy,hit,events);if(owner?.role==='hero'&&!enemy.battleRun&&!enemy.warband)addBloom(state,enemy.kind==='golem'?BLOOM.golem:BLOOM.skeleton,events,enemy.position);if(enemy.meteorBorn)queueMeteorReward(state,enemy,ctx,events);else if(enemy.kind==='ent')dropEntTimber(state,enemy,entContext(state,ctx),events,entSpec(enemy).trunkLogs);else if(enemy.kind==='stumpling')dropStumplingLoot(state,enemy,entContext(state,ctx),events);else if(!enemy.battleRun&&!enemy.warband)dropSkeletonSalvage(state,enemy,ctx,events,owner);const fallen=[];for(const limb of PARTS){const d=detach(state,enemy,limb,hit,ctx,events,true);if(d)fallen.push(d);}
     // Detachment remaps arrows onto physical remains. Wooden creatures have no torso remains,
     // so discard any contacts still attached to the dead actor before saves validate their targets.
     state.embeds=state.embeds.filter(e=>e.targetId!==enemy.id);

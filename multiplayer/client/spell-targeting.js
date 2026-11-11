@@ -283,6 +283,14 @@ export function createSpellTargeting({ scene, height, quality = 'high', reducedM
         gS(rot2([[0.75, 0], [0.98, 0]], Math.atan2(z, x), x, z), 0.05, PAL.gold); }
       gS(poly(4, 0.28, Math.PI / 4), 0.05, PAL.purple); cross(R * 0.5); moteField(16, R, PAL.purple, 1, 0.15, 5);
     },
+    muster(R) { // a forge seal: brass cog ring with one anvil seal on each spot a Forgeling will land (shared/warband.js)
+      gS(circ(R), 0.09, PAL.gold, { flow: 0.4 }); gS(circ(R * 1.1), 0.04, PAL.crystal, { dash: 1.1, flow: -0.5, fine: true });
+      for (let i = 0; i < 16; i++) { const a = (i * TAU) / 16; gS(rot2([[R * 1.0, -0.12], [R * 1.14, -0.08], [R * 1.14, 0.08], [R * 1.0, 0.12]], a), 0.045, PAL.gold); }
+      const sp = SPELL_SHAPES.muster.spawns;
+      gS([...sp, sp[0]], 0.04, PAL.amber, { dash: 2, flow: 1 });
+      for (const [x, z] of sp) { gS(circ(0.55, 24, 0, TAU, x, z), 0.07, PAL.gold); gS(poly(4, 0.24, Math.PI / 4, x, z), 0.05, PAL.amber); }
+      cross(R * 0.45); moteField(14, R, PAL.gold, 1.1, 0.15, 11);
+    },
     golem(R) { // heavy masonry: octagon, buttresses, four interlocking L-stones around a keystone
       gS(poly(8, R, Math.PI / 8), 0.17, PAL.stone, { flow: 0.2 }); gS(poly(8, R * 0.9, Math.PI / 8), 0.05, PAL.amber, { fine: true });
       for (let i = 0; i < 8; i++) { const a = Math.PI / 8 + (i * TAU) / 8; gS(radial(a, R * 0.9, R * 1.12), 0.2, PAL.slate); }

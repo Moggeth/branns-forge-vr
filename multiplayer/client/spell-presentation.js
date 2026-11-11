@@ -4,7 +4,7 @@
 // Options beyond the original contract are optional: quality 'high'|'medium'|'low'
 // (default 'high' = original behaviour budget) and reducedMotion (default false).
 import * as THREE from 'three';
-import {createSpellTargeting,createMarkerTerrainSampler} from './spell-targeting.js';
+import {createSpellTargeting,createMarkerTerrainSampler,SPELL_SHAPES} from './spell-targeting.js';
 import {createSunderRupture,sunderDurationTicks,sunderFront,terrainEditScale,terrainDirtyEdits} from '../shared/terrain.js';
 
 const TAU = Math.PI * 2, MAX_EVENTS = 32, MAX_LIFE = 5, LAUNCH = 0.8;
@@ -437,6 +437,22 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
     bloom_level(ev, c) { ev.dur = 3.2; let acc = 0; for (let i = 0; i < 3; i++) pulse(ev, c, ribMat(i % 2 ? PAL.leaf : PAL.teal, PAL.mint, 0, 1), 0.5, 9 + i * 3, i * 0.35, i * 0.35 + 1.6, 0.45);
       ev.fx.push((age, dt) => { if (age > 2.6) return; acc += dt * 40 * Q.n; while (acc >= 1) { acc--; motes(c, c.x, c.z, 7, c.R() < 0.4 ? PAL.leaf : c.R() < 0.5 ? PAL.mint : PAL.teal, 0.24, 2.6); } }); },
     skeleton(ev, c) { ev.dur = 2.3; summon(ev, c, c.x, c.z, 1, 0); },
+    // MUSTER: three shafts of brass forge-light stab down onto the spawn seals (shared/warband.js formation); each Forgeling
+    // drops down its shaft and lands at 0.9 s (WARBAND.landTicks) in a spray of brass sparks, a dust ring and a resonance pulse.
+    muster(ev, c) { ev.dur = 2.2; const sp = SPELL_SHAPES.muster.spawns, land = 0.9;
+      pulse(ev, c, ribMat(PAL.gold, PAL.resonance, 0, 1), 0.3, 3.4, 0, 0.8, 0.35);
+      const shafts = sp.map(() => mk(ev, 12, ribMat(PAL.gold, PAL.resonanceHi, 0, 1.6)));
+      const landed = sp.map(() => false);
+      ev.fx.push((age) => {
+        sp.forEach(([ox, oz], i) => { const x = c.x + ox, z = c.z + oz, gy = H(x, z), rb = shafts[i], t = age - i * 0.04;
+          const reach = easeOut(t / 0.35), fade = 1 - sstep(land, land + 0.7, t);
+          for (let k = 0; k < 12; k++) { const u = k / 11; rb.set(k, x, gy + 9 - 9 * reach * u, z); }
+          rb.mesh.visible = t > 0 && fade > 0; if (rb.mesh.visible) rb.commit(0.6 + 0.5 * sstep(land - 0.15, land, t) * fade, 1, fade);
+          if (!landed[i] && t >= land) { landed[i] = true;
+            sparks(c, x, gy + 0.3, z, 22, 3.2, PAL.gold, 0.2, 0.8); sparks(c, x, gy + 0.4, z, 10, 2.2, PAL.resonanceHi, 0.24, 0.9);
+            puff(c, x, z, 8, 1.6, 0.6, PAL.dust, 0.4, 1.3); pulse(ev, c, ribMat(PAL.resonance, PAL.gold, 0, 1), 0.2, 1.4, t + i * 0.04, t + i * 0.04 + 0.55, 0.22, x, z); }
+        });
+      }); },
     squad(ev, c) { ev.dur = 2.7; for (let i = 0; i < 4; i++) summon(ev, c, c.x + (i % 2 ? 1 : -1) * 1.4, c.z + (i < 2 ? -1 : 1) * 1.4, 0.75, i * 0.2); /* the four graves shared/simulation.js digs */ pulse(ev, c, ribMat(PAL.gold, PAL.purple, 0, 1), 0.5, 3.2, 0, 1, 0.3); },
     // The actual golem kit owns emergence, stone assembly, dust and binding.
     // The former six-box stand-in duplicated that actor and obscured its pieces.

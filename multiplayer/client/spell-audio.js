@@ -30,6 +30,10 @@ export function createSpellAudio(context) {
   const CUES = {
     skeleton: (o, t) => { rattle(o, t, 7); tone(o, t + .05, {type: 'triangle', f0: 330, f1: 196, attack: .05, peak: .025, release: .7, vibrato: 6}); },
     squad: (o, t) => { for (let i = 0; i < 4; i++) rattle(o, t + i * .16, 5); tone(o, t, {type: 'triangle', f0: 262, f1: 147, attack: .08, peak: .03, release: 1, vibrato: 5}); },
+    // Muster: a rising forge-horn, the hiss of three shafts of light, then three brass anvil-clanks as the Forgelings land.
+    muster: (o, t) => { chord(o, t, [196, 294, 392], {type: 'sawtooth', attack: .12, peak: .012, release: .7, bend: 1.06, stagger: .03});
+      for (let i = 0; i < 3; i++) { noise(o, t + i * .04, {type: 'highpass', f0: 2600, f1: 5200, q: .7, attack: .25, peak: .03, release: .5}); const land = t + .9 + i * .04;
+        tone(o, land, {type: 'triangle', f0: 1240 - i * 90, f1: 1180 - i * 90, attack: .002, peak: .05, release: .5}); tone(o, land, {type: 'sine', f0: 2790 - i * 150, attack: .002, peak: .02, release: .3}); noise(o, land, {type: 'lowpass', f0: 320, f1: 120, attack: .005, peak: .07, release: .25}); } },
     golem: (o, t) => { rumble(o, t, 55, 32, 1.4, .16); noise(o, t + .3, {type: 'bandpass', f0: 420, f1: 260, q: 1.5, attack: .2, peak: .05, release: .9}); },
     raise: (o, t) => { rumble(o, t, 38, 92, 1.1); noise(o, t + .45, {type: 'bandpass', f0: 600, f1: 300, q: 1, attack: .05, peak: .06, release: .6}); },
     lower: (o, t) => { rumble(o, t, 95, 34, 1.1); for (let i = 0; i < 5; i++) noise(o, t + .3 + i * .09, {type: 'bandpass', f0: 700, q: 3, attack: .005, peak: .04, release: .12}); },

@@ -13,6 +13,9 @@ export const SPELL_ICONS = Object.freeze({
   squad: `<g fill-rule="evenodd" stroke="var(--sb-icon-ink,#1a140f)" stroke-width="1.6" paint-order="stroke">`
     + `<path transform="translate(-1.2 5) scale(.62)" d="${SKULL}"/><path transform="translate(10.3 5) scale(.62)" d="${SKULL}"/>`
     + `<path transform="translate(3.6 .4) scale(.7)" d="${SKULL}"/></g>`,
+  // Muster: three shafts of forge-light coming down onto an anvil.
+  muster: '<path d="M2.5 13.2h13.2c0 2.2-1.7 3.6-3.8 3.8l1.5 3.2h1.7V22H5.4v-1.8h1.7l1.5-3.2C5 16.6 2.5 15.4 2.5 13.2zM16.2 13.2h5.3l-1.3 2.4h-4.1z"/>'
+    + '<path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" d="M5.5 1.8v7.6M10 1v8.4M14.5 1.8v7.6" opacity=".85"/>',
   golem: '<path fill-rule="evenodd" d="M8 2h8v5h3l2.5 6.5h-3.2L17 10v4l2 8h-4.2l-1.3-5h-3l-1.3 5H5l2-8v-4l-1.3 3.5H2.5L5 7h3zM9.8 3.8v1.8h1.6V3.8zM12.6 3.8v1.8h1.6V3.8z"/>',
   raise: '<path d="M1.5 22l6.5-9.5 3.2 4.2 4.3-7.2L22.5 22z"/><path d="M12 1l4.5 4.6h-2.7v3.2h-3.6V5.6H7.5z"/>',
   lower: '<path d="M1.5 15h6.2l2.2 4.2h4.2l2.2-4.2h6.2V22h-21z"/><path d="M10.2 1.5h3.6v4.8h2.7L12 11.6 7.5 6.3h2.7z"/>',
