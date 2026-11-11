@@ -7,7 +7,7 @@ const tab = await browser.newPage({viewport: {width: +w, height: +h}});
 const errors = [];
 tab.on('console', m => { if (['error', 'warning'].includes(m.type())) errors.push(m.text()); });
 tab.on('pageerror', e => errors.push(String(e)));
-await tab.goto(`http://127.0.0.1:${process.env.PORT || 8823}/assets-source/siegebird-flock-20261003/${page}`);
+await tab.goto(page.startsWith("/") ? `http://127.0.0.1:${process.env.PORT || 8823}${page}` : `http://127.0.0.1:${process.env.PORT || 8823}/assets-source/siegebird-flock-20261003/${page}`);
 try { await tab.waitForFunction(() => window.previewReady === true, null, {timeout: 120000}); } catch (e) { console.log("console:", errors.join("\n")); throw e; }
 await tab.screenshot({path: out});
 if (errors.length) console.log('console:', errors.join('\n'));

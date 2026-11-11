@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {prepareAsset} from '../client/asset-pose.js';
 import {createWeaponReadiness} from '../client/weapon-readiness.js';
-import {enhancePickTemplate, gemLit, PICK_GEM_KINDS} from '../client/pick-luminance.js';
+import {enhancePickTemplate, gemLit, PICK_GEM_KINDS, classifyPickGems, pickGemClusters} from '../client/pick-luminance.js';
 
 const start = performance.now();
 // Node has no image decoder: drop embedded textures, keep meshes, nodes and material factors.
@@ -27,7 +27,13 @@ gltf.scene.traverse(o => { if (o.isMesh) { assert.deepEqual(o.position.toArray()
 
 assert.equal(enhancePickTemplate(gltf.scene), true);
 assert.equal(enhancePickTemplate(gltf.scene), false, 'template patch is idempotent');
-assert.equal(gltf.scene.userData.pickLuminance.gems, 25, 'every authored Resonance crystal found');
+assert.equal(gltf.scene.userData.pickLuminance.gems, 15, 'every authored Resonance crystal found');
+{ // Pick of Riches layout: two heart stones in the cheeks, three crystals per arm, a crown of seven.
+  const gems = classifyPickGems(pickGemClusters(['ResonanceCrystal', 'Embellish_Crystal_Crown'].map(n => gltf.scene.getObjectByName(n)), gltf.scene));
+  const count = kind => gems.filter(g => g.kind === kind).length;
+  assert.deepEqual([count(PICK_GEM_KINDS.heart), count(PICK_GEM_KINDS.arm), count(PICK_GEM_KINDS.crown)], [2, 6, 7]);
+  for (const name of ['Brass_Trim', 'Steel_Blued', 'Gold_Inlay']) { let m; gltf.scene.traverse(o => { if (o.material?.name === name) m = o.material; }); assert.ok(m?.customProgramCacheKey?.().includes('metal-v2'), `${name} patched`); }
+}
 const after = new Set(); gltf.scene.traverse(o => o.isMesh && after.add(o.material));
 assert.deepEqual([...after], [...materialsBefore], 'template keeps the same shared material objects');
 

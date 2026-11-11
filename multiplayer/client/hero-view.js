@@ -78,7 +78,7 @@ export function seatPose(bones, pose = SEAT_POSE) {
   }
 }
 
-export function createHeroView({lodDistance = HERO_LOD_DISTANCE, resolveWeapon = null, onWarning = null, siegebird = null, flockwright = null} = {}) {
+export function createHeroView({lodDistance = HERO_LOD_DISTANCE, resolveWeapon = null, onWarning = null, siegebird = null, flockwright = null, showpiece = null} = {}) {
   let template = null, clips = null, eyeHeight = 1.645;
   const materials = new Map(), live = new Set(), warned = new Set();
 
@@ -314,6 +314,7 @@ export function createHeroView({lodDistance = HERO_LOD_DISTANCE, resolveWeapon =
       // The whole Siegebird cycle replays from the shot event: wind, latch and the songbird seating the bolt.
       const t = (u.clock - (u.reloadAt ?? -Infinity)) * (u.reloadRate ?? 1), flock = siegebird?.();
       if (t <= SIEGEBIRD_RELOAD.gone + .1) updateWeaponPresentation(u.weapon, 'crossbow', {reload: t, time: u.clock});
+      if (u.weapon.visible) showpiece?.()?.updateRemote(u.weapon, dt, {reload: t <= SIEGEBIRD_RELOAD.gone + .1 ? t : Infinity, golden: !!data.siegebird?.golden && t > SIEGEBIRD_RELOAD.seat});   // Calling Stones
       else if (u.reloadAt !== undefined) { updateWeaponPresentation(u.weapon, 'crossbow', {reload: Infinity}); u.reloadAt = undefined; }
       if (flock) {
         const sb = data.siegebird;

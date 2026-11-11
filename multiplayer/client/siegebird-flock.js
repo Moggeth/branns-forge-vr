@@ -123,6 +123,20 @@ export function goldenBoltMaterial(material) {
   return m;
 }
 const goldenBolt = goldenBoltMaterial;
+// Fletching: every bolt is fletched with a moulted feather of the bird that carries it, so the neutral SB_Fletch
+// feathers take that plumage's flight-feather colour (session cache per base material and plumage).
+const fletchCache = new Map();
+export function fletchMaterial(material, plumage) {
+  if (!material || material.name !== 'SB_Fletch' || !(plumage >= 0)) return material;
+  const key = material.uuid + ':' + plumage; let m = fletchCache.get(key);
+  if (!m) {
+    const p = SIEGEBIRD_PLUMAGES[plumage % SIEGEBIRD_PLUMAGES.length].palette;
+    m = material.clone(); m.name = `SB_Fletch_${SIEGEBIRD_PLUMAGES[plumage % SIEGEBIRD_PLUMAGES.length].id}`;
+    m.color = new THREE.Color('#' + p[0]).lerp(new THREE.Color('#' + p[2]), .35).multiplyScalar(1.25);
+    fletchCache.set(key, m);
+  }
+  return m;
+}
 let glow = null, ring = null; // lazily, browser only
 const fxTextures = () => { if (glow === null) { glow = glowTexture(false) || false; ring = glowTexture(true) || false; } return glow ? {glow, ring} : null; };
 const glowSprite = (size, opacity = 1, color = 0xffcf6a) => {
@@ -177,7 +191,7 @@ export function createSiegebirdFlock({birdTemplate, crossbowTemplate, maxDistanc
     bird.plumage = key;
     const material = golden ? goldenMaterial : plumageMaterials[plumage];
     for (const mesh of bird.plumageMeshes) mesh.material = material;
-    for (const [mesh, base] of bird.carryMeshes || []) mesh.material = golden ? goldenBolt(base) : base;
+    for (const [mesh, base] of bird.carryMeshes || []) mesh.material = golden ? goldenBolt(base) : fletchMaterial(base, plumage);
     const fx = golden ? fxTextures() : null;
     if (fx && !bird.halo) {
       bird.halo = new THREE.Sprite(new THREE.SpriteMaterial({map: fx.glow, color: 0xffd986, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false}));
@@ -217,9 +231,9 @@ export function createSiegebirdFlock({birdTemplate, crossbowTemplate, maxDistanc
     burst.position.copy(SEAT).setY(.80); burst.visible = false; burst.userData.ignoreContact = true; rig.group.add(burst); rig.burst = burst;
   }
 
-  function setLoadedBolt(rig, golden) {
-    rig.loadedGolden = !!golden;
-    for (const [mesh, base] of rig.boltMeshes) mesh.material = golden ? goldenBolt(base) : base;
+  function setLoadedBolt(rig, golden, plumage = rig.fletch ?? -1) {
+    rig.loadedGolden = !!golden; rig.fletch = plumage;
+    for (const [mesh, base] of rig.boltMeshes) mesh.material = golden ? goldenBolt(base) : fletchMaterial(base, plumage);
     if (golden) goldenFx(rig);
     if (rig.boltGlow) rig.boltGlow.visible = !!golden;
   }
@@ -289,7 +303,7 @@ export function createSiegebirdFlock({birdTemplate, crossbowTemplate, maxDistanc
       if (t >= R.enter && r.last < R.enter) cues.push({cue: 'enter', n: r.n, side: r.side, plumage: r.plumage, golden: r.golden === true});
       if (t >= R.seat && !r.seated) {
         r.seated = true; cues.push({cue: 'seat', n: r.n, side: r.side, plumage: r.plumage, golden: r.golden === true});
-        if (i === rig.reloads.length - 1) setLoadedBolt(rig, r.golden === true);
+        if (i === rig.reloads.length - 1) setLoadedBolt(rig, r.golden === true, r.plumage);
         if (r.golden === true && rig.burst) { rig.burst.position.copy(SEAT).setY(.80); rig.burst.visible = true; rig.burst.userData.at = time; }
       }
       // Golden trail
@@ -517,6 +531,8 @@ export function createSiegebirdFlock({birdTemplate, crossbowTemplate, maxDistanc
     for (const s of rig.resonance) { s.position.copy(NOCK); s.visible = true; s.userData.at = rig.lastTime ?? 0; s.userData.fresh = true; }
   }
   function loadedGolden(visual) { return !!visual.userData.siegebirdFlock?.loadedGolden; }
+  // Plumage index of the bird that fletched the seated bolt (-1: the plain factory fletching).
+  function loadedFletch(visual) { return visual.userData.siegebirdFlock?.fletch ?? -1; }
   // Equip / respawn with a bolt already on the rail (no bird).
   function rest(visual, golden = false) { const rig = rigFor(visual); rig.reloads = []; for (const b of rig.birds) b.root.visible = false; setLoadedBolt(rig, golden); }
 
@@ -526,5 +542,5 @@ export function createSiegebirdFlock({birdTemplate, crossbowTemplate, maxDistanc
     shimmerMask.dispose();
     goldenMaterial.map.dispose(); goldenMaterial.emissiveMap.dispose(); goldenMaterial.dispose();
   }
-  return {shot, inform, update, updateWorld, attachWorld, rest, stow, fired, perfect, loadedGolden, dispose, stats, roost, materials: {plumage: plumageMaterials, golden: goldenMaterial}};
+  return {shot, inform, update, updateWorld, attachWorld, rest, stow, fired, perfect, loadedGolden, loadedFletch, dispose, stats, roost, materials: {plumage: plumageMaterials, golden: goldenMaterial}};
 }

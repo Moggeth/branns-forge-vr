@@ -11,11 +11,30 @@ import * as THREE from 'three';
 //   the heart crystals outward along both arms as the 4 s special recharges; the crown ignites last with a
 //   flare. One additive billboard halo draw stands in for light; there are no real lights, post or extra passes.
 //   Original materials/geometries are restored on dispose. Inputs are the simulation's readiness fractions.
+//
+// Pick of Riches rework (2026-11-10, assets-source/pick-of-riches): the crystals refract the environment with a little
+// dispersion and throw inner "fire" that slides as they turn; the arms are differentially hardened (blue body, violet,
+// straw, white points, drawn from the arm position); the gold seam and scroll wires (Gold_Inlay) carry the resonance
+// pulse that pick-riches.js sends from a struck point to the heart, and the points glow hot for a moment after biting
+// stone. PICK_FX holds those held-pick-only uniforms; remote picks keep them at rest. setPickLookQuality('low') drops
+// the dispersion to one refraction tap (phones, headsets).
 
 export const PICK_GEM_KINDS = Object.freeze({heart: 0, arm: 1, crown: 2});
 
 const GLOW = new THREE.Color(.07, .42, 1.0), DORMANT = new THREE.Color(.03, .05, .22), FLARE = new THREE.Color(.62, .86, 1.0);
 const SPILL_POINTS = 7; // light sources in the metal spill: 2 hearts, crown, 2×2 arm groups
+let REFRACT_TAPS = 3;
+/** 'high' (3 dispersion taps) or 'low' (1 tap). Call before the pick template is enhanced. */
+export function setPickLookQuality(level) { REFRACT_TAPS = level === 'low' ? 1 : 3; }
+/** Held-pick effect uniforms, driven by pick-riches.js. seam: (right front, right strength, left front, left strength),
+ * front 0 = eye, 1 = the seam's outer end. dowse: (model-space direction to ore xyz, strength). heat: (right, left).
+ * beat: heart pulse 0..1. */
+export const PICK_FX = Object.freeze({
+  uPickSeam: {value: new THREE.Vector4(0, 0, 0, 0)}, uPickDowse: {value: new THREE.Vector4(0, 0, 0, 0)},
+  uPickHeat: {value: new THREE.Vector2(0, 0)}, uPickBeat: {value: 0}, uPickReady: {value: 0}, uPickFxTime: {value: 0},
+});
+const restFx = () => ({uPickSeam: {value: new THREE.Vector4(0, 0, 0, 0)}, uPickDowse: {value: new THREE.Vector4(0, 0, 0, 0)},
+  uPickHeat: {value: new THREE.Vector2(0, 0)}, uPickBeat: {value: 0}, uPickReady: {value: .45}, uPickFxTime: {value: 0}});
 const clamp01 = x => Math.min(1, Math.max(0, Number.isFinite(x) ? x : 0));
 
 // ---------------------------------------------------------------- gem discovery
@@ -87,7 +106,8 @@ float pickGemIgnite(vec3 gem, float charge) {
 }
 `;
 const GEM_COMMON = /* glsl */`
-uniform float uPickCharge, uPickFlare, uPickDrain, uPickTime, uPickMotion;
+uniform float uPickCharge, uPickFlare, uPickDrain, uPickTime, uPickMotion, uPickBeat;
+uniform vec4 uPickDowse;
 uniform vec3 uPickGlow, uPickDormant, uPickFlareColor;
 varying vec3 vPickGem;
 varying vec3 vPickPos;
@@ -107,13 +127,32 @@ const GEM_FRAGMENT = /* glsl */`
   vec3 facet = normalize(cross(dFdx(vPickPos), dFdy(vPickPos)));
   float h = fract(abs(dot(facet, vec3(3.1, 7.7, 5.3))) * 2.3 + vPickGem.y * 7.1);
   float twinkle = pow(max(0., sin(h * 6.2832 + dot(pickV, vec3(7., 5., 9.)) * 2.4 + uPickTime * uPickMotion * (.6 + h))), 16.);
+  // Light bent through the facet: the world seen through sapphire, split a little by colour, and inner "fire" where the
+  // refracted ray meets one of the crystal's back facets (which one depends on the ray, so it slides as the gem turns).
+  vec3 pickFire = vec3(0.), pickSeen = vec3(0.);
+  vec3 pickEta = vec3(1. / 1.72, 1. / 1.77, 1. / 1.84);
+  for (int c = 0; c < PICK_TAPS; c++) {
+    vec3 r = refract(-pickV, normal, PICK_TAPS > 1 ? pickEta[c] : pickEta.y);
+    vec3 cell = floor(r * 4.6 + facet * 2.7 + vPickGem.y * 3.);
+    float spark = smoothstep(.80, .97, fract(sin(dot(cell, vec3(12.9898, 78.233, 37.719))) * 43758.5453));
+    vec3 seen = vec3(0.);
+    #ifdef ENVMAP_TYPE_CUBE_UV
+      seen = textureCubeUV(envMap, envMapRotation * transformDirectionByInverseViewMatrix(r, viewMatrix), .06).rgb;
+    #endif
+    if (PICK_TAPS > 1) { pickFire[c] = spark; pickSeen[c] = seen[c]; } else { pickFire = vec3(spark); pickSeen = seen; }
+  }
   vec3 core = mix(uPickDormant, uPickGlow, lit);
   float facetTone = .55 + .45 * fract(h * 7.31);   // neighbouring facets differ, so the cut reads
   // Slow light rising through the crystal (frozen when motion is reduced or on remote picks).
   float rise = pow(.5 + .5 * sin(vPickPos.y * 140. + dot(vPickPos.xz, vec2(60., 45.)) - uPickTime * uPickMotion * 1.4 + vPickGem.y * 6.3), 3.);
-  totalEmissiveRadiance = core * (.2 + lit * (.36 * facetTone + .28 * pickNdv + .36 * pickRim + .2 * rise))
+  // Dowsing: crystals on the arm that points toward ore answer it, and every gem rides the heart's beat.
+  float toward = uPickDowse.w * clamp(.35 + .65 * sign(vPickPos.x) * uPickDowse.x, 0., 1.);
+  float beat = uPickBeat * (vPickGem.z < .5 ? 1. : .55) + toward * (.25 + .75 * uPickBeat);
+  totalEmissiveRadiance = core * (.2 + lit * (.36 * facetTone + .28 * pickNdv + .36 * pickRim + .2 * rise) + beat * .9)
+    + pickSeen * vec3(.20, .52, 1.) * (.30 + .45 * lit)
+    + mix(uPickFlareColor, vec3(1.), .35) * pickFire * (.18 + .85 * lit) * (.35 + .65 * pickNdv)
     + uPickFlareColor * (twinkle * .4 * lit * lit + ignite * .9 + uPickFlare * (.35 + .2 * lit) + uPickDrain * .6);
-  diffuseColor.rgb *= mix(.55, 1., lit);
+  diffuseColor.rgb *= mix(.45, .9, lit);
 }
 `;
 
@@ -123,7 +162,9 @@ const GEM_FRAGMENT = /* glsl */`
 const METAL_COMMON = /* glsl */`
 uniform vec4 uPickSpill[${SPILL_POINTS}];
 uniform vec3 uPickSpillColor;
-uniform float uPickMetalKind;
+uniform float uPickMetalKind, uPickBeat, uPickReady, uPickFxTime;
+uniform vec4 uPickSeam;
+uniform vec2 uPickHeat;
 varying vec3 vPickPos;
 varying vec3 vPickNormal;
 float pickHash(vec3 p) { p = fract(p * .3183099 + .1); p *= 17.; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
@@ -132,12 +173,18 @@ float pickNoise(vec3 x) {
   return mix(mix(mix(pickHash(i), pickHash(i + vec3(1, 0, 0)), f.x), mix(pickHash(i + vec3(0, 1, 0)), pickHash(i + vec3(1, 1, 0)), f.x), f.y),
              mix(mix(pickHash(i + vec3(0, 0, 1)), pickHash(i + vec3(1, 0, 1)), f.x), mix(pickHash(i + vec3(0, 1, 1)), pickHash(i + vec3(1, 1, 1)), f.x), f.y), f.z);
 }
+// Differential hardening along the arm (|x| in metres from the eye): 0 in the blue body, 1 at the white points.
+// The hamon wanders a few millimetres, like a real clay-line.
+float pickTemper() {
+  float ax = abs(vPickPos.x) + (pickNoise(vPickPos * 95.) - .5) * .012;
+  return smoothstep(.228, .292, ax);
+}
 `;
 const METAL_ROUGHNESS = /* glsl */`
 {
   float wear = pickNoise(vPickPos * 38.) * .65 + pickNoise(vPickPos * 140.) * .35;
-  if (uPickMetalKind < .5) roughnessFactor = clamp(roughnessFactor * (.72 + wear * .75), .12, 1.);
-  else roughnessFactor = clamp(roughnessFactor * (.85 + wear * .3), .12, 1.);
+  if (uPickMetalKind < .5 || uPickMetalKind > 1.5) roughnessFactor = clamp(roughnessFactor * (.72 + wear * .75), .12, 1.);
+  else roughnessFactor = clamp(mix(roughnessFactor * (.85 + wear * .3), .13 + wear * .05, pickTemper()), .1, 1.);
 }
 `;
 const METAL_FRAGMENT = /* glsl */`
@@ -153,12 +200,32 @@ const METAL_FRAGMENT = /* glsl */`
     spill += uPickSpill[i].w * wrap * fall;
   }
   // Metal tints what it reflects: gold turns the blue spill teal instead of bleaching to silver.
-  vec3 tint = uPickMetalKind < .5 ? diffuseColor.rgb * diffuseColor.rgb * .35 : vec3(.8);
+  vec3 tint = uPickMetalKind > .5 && uPickMetalKind < 1.5 ? vec3(.8) : diffuseColor.rgb * diffuseColor.rgb * .35;
   totalEmissiveRadiance += uPickSpillColor * min(spill, 1.2) * tint;
-  if (uPickMetalKind > .5) {
+  if (uPickMetalKind > .5 && uPickMetalKind < 1.5) {
     float graze = pow(1. - pickNdv, 3.);
     float band = pickNoise(vPickPos * 22.);
     totalEmissiveRadiance += mix(vec3(.10, .05, .16), vec3(.16, .11, .04), band) * graze * .5;
+    // Temper colours: blue body -> violet -> straw -> white hardened point.
+    float ax = abs(vPickPos.x) + (pickNoise(vPickPos * 95.) - .5) * .012;
+    vec3 violet = vec3(.62, .46, .98), straw = vec3(1.25, .92, .48), white = vec3(1.55, 1.6, 1.7);
+    vec3 temper = mix(vec3(1.), violet, smoothstep(.222, .242, ax));
+    temper = mix(temper, straw, smoothstep(.242, .262, ax));
+    temper = mix(temper, white, smoothstep(.262, .288, ax));
+    diffuseColor.rgb = min(diffuseColor.rgb * temper, vec3(1.));
+    // A point that has just bitten stone holds a little forge heat at its tip.
+    float heat = vPickPos.x > 0. ? uPickHeat.x : uPickHeat.y;
+    float hot = heat * smoothstep(.262, .318, abs(vPickPos.x));
+    totalEmissiveRadiance += vec3(1., .38, .08) * hot * hot * 2.2 + vec3(1., .8, .5) * hot * hot * hot * 1.5;
+  } else if (uPickMetalKind > 1.5) {
+    // The gold seam carries the resonance: a bright front runs along it from the struck point to the heart, then on
+    // out along the other arm; a slow shimmer walks it whenever the pick is charged.
+    float u = clamp((abs(vPickPos.x) - .036) / (.252 - .036), 0., 1.);
+    vec2 seam = vPickPos.x > 0. ? uPickSeam.xy : uPickSeam.zw;
+    float d = u - seam.x, front = exp(-d * d * 160.) * seam.y, wake = seam.y * .35 * smoothstep(0., .2, d) * exp(-d * 4.);
+    float shimmer = uPickReady * pow(.5 + .5 * sin(u * 34. - uPickFxTime * 2.6 + vPickPos.y * 90.), 10.) * .35;
+    float glow = front * 2.4 + wake + shimmer + uPickBeat * .25;
+    totalEmissiveRadiance += mix(vec3(.25, .62, 1.), vec3(1., .88, .55), clamp(front, 0., 1.)) * glow;
   } else {
     float tarnish = pickNoise(vPickPos * 26. + 3.1);
     diffuseColor.rgb *= mix(.82, 1.06, smoothstep(.2, .8, tarnish));
@@ -174,19 +241,21 @@ function patchVertex(vs, gemAttribute) {
 // uniforms: plain {value} objects shared by reference so the owner can drive them without touching the program.
 function gemMaterial(material, uniforms, gemAttribute) {
   material.emissive.setRGB(0, 0, 0); material.emissiveIntensity = 1;
-  material.roughness = .16; material.envMapIntensity = 1.15;
+  material.roughness = .12; material.envMapIntensity = 1.3;
+  const taps = REFRACT_TAPS;
+  material.defines = {...material.defines, PICK_TAPS: taps};
   material.onBeforeCompile = shader => {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = patchVertex(shader.vertexShader, gemAttribute);
     shader.fragmentShader = shader.fragmentShader.replace('#include <common>', `#include <common>\n${GEM_COMMON}`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\n${GEM_FRAGMENT}`);
   };
-  material.customProgramCacheKey = () => `brann-pick-gem-v1-${gemAttribute ? 'live' : 'static'}`;
+  material.customProgramCacheKey = () => `brann-pick-gem-v2-${taps}-${gemAttribute ? 'live' : 'static'}`;
   material.needsUpdate = true;
   return material;
 }
-function metalMaterial(material, uniforms, kind) {
-  const own = {...uniforms, uPickMetalKind: {value: kind}};
+function metalMaterial(material, uniforms, kind, fx = restFx()) {
+  const own = {...uniforms, ...fx, uPickMetalKind: {value: kind}};
   material.onBeforeCompile = shader => {
     Object.assign(shader.uniforms, own);
     shader.vertexShader = patchVertex(shader.vertexShader, false);
@@ -194,13 +263,13 @@ function metalMaterial(material, uniforms, kind) {
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>\n${METAL_ROUGHNESS}`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\n${METAL_FRAGMENT}`);
   };
-  material.customProgramCacheKey = () => `brann-pick-metal-v1-${kind}`;
+  material.customProgramCacheKey = () => `brann-pick-metal-v2-${kind}`;
   material.needsUpdate = true;
   return material;
 }
 
-function gemUniforms() {
-  return {uPickCharge: {value: 1}, uPickFlare: {value: 0}, uPickDrain: {value: 0}, uPickTime: {value: 0}, uPickMotion: {value: 0},
+function gemUniforms(fx = restFx()) {
+  return {uPickBeat: fx.uPickBeat, uPickDowse: fx.uPickDowse, uPickCharge: {value: 1}, uPickFlare: {value: 0}, uPickDrain: {value: 0}, uPickTime: {value: 0}, uPickMotion: {value: 0},
     uPickGlow: {value: GLOW.clone()}, uPickDormant: {value: DORMANT.clone()}, uPickFlareColor: {value: FLARE.clone()}};
 }
 function spillUniforms() {
@@ -246,8 +315,10 @@ export function enhancePickTemplate(scene) {
   const spill = spillUniforms(); writeSpill(spill.uPickSpill, spillGroups(gems), 1, 0);
   gemMaterial(crystal, gemUniforms(), false);
   const brass = meshesByMaterial(scene, 'Brass_Trim')[0]?.material, steel = meshesByMaterial(scene, 'Steel_Blued')[0]?.material;
+  const inlay = meshesByMaterial(scene, 'Gold_Inlay')[0]?.material;
   if (brass) metalMaterial(brass, spill, 0);
   if (steel) metalMaterial(steel, spill, 1);
+  if (inlay) metalMaterial(inlay, spill, 2);
   scene.userData.pickLuminance = {gems: gems.length};
   return true;
 }
@@ -297,7 +368,7 @@ export function createPickLuminance(owner, host, find) {
   if (!gemMeshes.length) return null;
   const root = gemMeshes[0].parent || host;
   const gems = classifyPickGems(pickGemClusters(gemMeshes, root));
-  const uniforms = gemUniforms(), spill = spillUniforms(), groups = spillGroups(gems);
+  const uniforms = gemUniforms(PICK_FX), spill = spillUniforms(), groups = spillGroups(gems);
   const restore = [];
 
   // Per-instance gem attribute on private geometry copies; shared template geometry is never written.
@@ -312,9 +383,9 @@ export function createPickLuminance(owner, host, find) {
   const metals = new Map();
   host.traverse(o => {
     if (!o.isMesh || o.userData.readinessOwned) return;
-    const kind = o.material?.name === 'Brass_Trim' ? 0 : o.material?.name === 'Steel_Blued' ? 1 : -1;
+    const kind = {Brass_Trim: 0, Steel_Blued: 1, Gold_Inlay: 2}[o.material?.name] ?? -1;
     if (kind < 0) return;
-    if (!metals.has(o.material)) metals.set(o.material, metalMaterial(o.material.clone(), spill, kind));
+    if (!metals.has(o.material)) metals.set(o.material, metalMaterial(o.material.clone(), spill, kind, PICK_FX));
     restore.push([o, o.geometry, o.material]); o.material = metals.get(o.material);
   });
 

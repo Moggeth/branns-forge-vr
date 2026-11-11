@@ -7,7 +7,7 @@ import {createCombatDamageNumbers} from './combat-damage-numbers.js';
 import {createCreatureLifeDeath} from './creature-life-death.js';
 import {createEmbedFractures} from './embed-fractures.js';
 import {createProjectileStreaks} from './projectile-streaks.js';
-import {dressGoldenProjectile, disposeGoldenProjectile} from './siegebird-flock.js';
+import {dressGoldenProjectile, disposeGoldenProjectile, fletchMaterial} from './siegebird-flock.js';
 import {attachEmberdew} from './emberdew-presentation.js';
 import {predictArrow, createPhoenixContrails} from './phoenix-flight.js';
 import {carryPose} from '../shared/phoenix-carry.js';
@@ -335,7 +335,7 @@ function capsuleContact(from, to, base, height, radius) {
   }
   return best;
 }
-export function createCombatView({scene, templates, actors, camera, beforeContacts = () => {}, onContact = () => {}, worldContact = () => null, height = () => 0, playerPosition = () => null, localSide = () => 'party', night = () => 0, onBoneLand = () => {}, quality = 'high'}) {
+export function createCombatView({scene, templates, actors, camera, beforeContacts = () => {}, onContact = () => {}, worldContact = () => null, height = () => 0, playerPosition = () => null, localSide = () => 'party', night = () => 0, onBoneLand = () => {}, quality = 'high', boltFletch = () => -1, onProjectiles = null}) {
   let snapshot = {}, disposed = false, elapsed = 0, contactRevision = 0;
   const damageNumbers = createCombatDamageNumbers(scene);
   // Splinters wear the skeleton's own bone material, so they are made when the first one is needed.
@@ -480,13 +480,14 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
     node.userData.emberdew?.dispose(); node.userData.flareGlow?.material.dispose(); node.traverse(n => { if (n.userData.siegebirdGolden) disposeGoldenProjectile(n); });
     node.removeFromParent(); if (ownsGeometry) node.traverse(n => n.geometry?.dispose()); map.delete(id);
   };
-  function projectile(kind, golden = false, id = '') {
+  function projectile(kind, golden = false, id = '', owner = null) {
     // Flame tongues are pooled by the fire presentation; collision still sweeps
     // the same complete authoritative trail, independently of this empty group.
     if(kind==='flame')return new THREE.Group();
     const visual = kind==='fuel' ? templates.get('flask')?.scene.clone(true) : prepareProjectile(templates, kind);
     if (!visual) return null;
     if (golden && kind === 'bolt') dressGoldenProjectile(visual);
+    else if (kind === 'bolt') { const plumage = boltFletch(id, owner); if (plumage >= 0) visual.traverse(n => { if (n.isMesh) n.material = fletchMaterial(n.material, plumage); }); }  // fletched by its bird
     if (kind === 'arrow') dressArrowVariant(visual, id);
     // Arrow's basis is already canonical; always retain it beneath attachment pose.
     const group = new THREE.Group(); group.userData.ignoreContact = true; group.add(visual);
@@ -531,7 +532,7 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
     }
     for (const data of next.projectiles || []) {
       let node = projectiles.get(data.id);
-      if (!node) { node = projectile(data.kind, data.golden, data.id); if (!node) continue; if (data.cluster) node.userData.emberdewRoot?.scale.setScalar(1.6); projectiles.set(data.id, node); scene.add(node); } // Cinder Cluster's jug: a big bottle
+      if (!node) { node = projectile(data.kind, data.golden, data.id, data.heavy ? null : data.ownerId); if (!node) continue; if (data.cluster) node.userData.emberdewRoot?.scale.setScalar(1.6); projectiles.set(data.id, node); scene.add(node); } // Cinder Cluster's jug: a big bottle
       // A fresh snapshot replaces the prediction; the visible gap closes over ~60 ms instead of popping.
       const rendered = node.userData.flight ? node.position.clone() : null;
       node.position.fromArray(data.position);
@@ -559,7 +560,7 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
     for (const [id] of projectiles) if (!projectileIds.has(id)) { remove(projectiles, id); reported.delete(id); sweptUntil.delete(id); piercedBy.delete(id); }
     for (const data of next.embeds || []) {
       let node = embeds.get(data.id);
-      if (!node) { node = projectile(data.kind, data.golden, data.id); if (!node) continue; embeds.set(data.id, node); }
+      if (!node) { node = projectile(data.kind, data.golden, data.id, data.heavy ? null : data.ownerId); if (!node) continue; embeds.set(data.id, node); }
       node.userData.collectibleId=data.golden&&data.kind==='bolt'?data.id:null;
       const world = data.targetId === 'world' || data.targetId === 'terrain';
       const loose = detached.get(data.targetId), actor = actorFor(data.targetId), target = world ? scene : loose || actor?.visual;
@@ -655,6 +656,7 @@ export function createCombatView({scene, templates, actors, camera, beforeContac
     phoenixLight.update(dt);
     contrails.update(dt, camera);
     streaks.update(snapshot.projectiles, {positionOf: data => projectiles.get(data.id)?.position || streakFallback.fromArray(data.position), hidden: reported});
+    onProjectiles?.(snapshot.projectiles, data => (reported.has(data.id) ? null : projectiles.get(data.id)?.position || null), dt);
     if (camera) fractures.update(camera);
     beforeContacts();
     for (const entry of actors.values()) if (creatureActor(entry)) creatures.sync(entry, renderTick, dt);
