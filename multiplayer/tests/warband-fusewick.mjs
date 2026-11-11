@@ -43,6 +43,13 @@ const team = warbandOf(S, 'g'), plain = team.filter(e => !fusewick(e));
 plain.forEach((e, i) => { e.position = [8 + i * 1.4, e.position[1], 20]; e.warband.order = {kind: 'hold', point: [...e.position]}; });
 for (const e of team.filter(fusewick)) e.warband.order = {kind: 'attack', target: 'wild1'};
 const hpPlain = plain.map(e => e.hp);
+// An arrow stuck in the sapper goes up with it (saves must not keep contacts on a vanished body).
+const sent = team.find(fusewick), other = team.filter(fusewick)[1];
+for (const [k, u] of [sent, other].entries()) S.embeds.push({id: `stuck${k}`, kind: 'arrow', targetId: u.id, part: 'torso', localPoint: [0, 1.1, 0], localQuaternion: [0, 0, 0, 1], point: [u.position[0], 1.1, u.position[2]], normal: [0, 0, 1], penetration: .05});
+assert.doesNotThrow(() => loadSimulation(sim.checkpoint()), 'the stuck arrow is a valid contact');
+// The terrain budget is nearly full with a Starfall still falling: the crater must make room for both.
+for (let i = 0; S.edits.length + 1 < 64; i++) S.edits.push({id: `fill${i}`, kind: 'raise', x: -60 + (i % 8) * 6, z: -60 + Math.floor(i / 8) * 6, radius: 6, height: 2});
+S.pendingStarfalls.push({id: 'sf_pending', x: -40, z: -40, radius: 5, impactTick: S.tick + 6000, side: 'party'});
 let lit = null, blast = null, deaths = new Set();
 for (let i = 0; i < 60 * 30 && !blast; i++) {
  for (const ev of sim.step()) {
@@ -63,6 +70,9 @@ const crater = S.edits.find(t => t.kind === 'keg_crater');
 assert.ok(crater, 'the blast leaves a crater');
 
 // Saves keep the remaining sapper and the crater; bad Fusewick records refuse.
+assert.ok(S.embeds.every(c => c.targetId !== blast.id && (c.targetId !== sent.id || S.enemies.includes(sent))), 'no arrows left on the spent sapper');
+assert.ok(S.edits.length + S.pendingStarfalls.length <= 64, 'the crater kept the terrain budget');
+S.pendingStarfalls.length = 0;
 const saved = sim.checkpoint(), back = loadSimulation(saved).adventureWorld();
 assert.equal(warbandOf(back, 'g').filter(fusewick).length, 1);
 const bad = (mut, why) => { const c = structuredClone(saved); mut(c.enemies.find(e => e.warband?.role === 'fusewick')); assert.throws(() => loadSimulation(c), undefined, why); };

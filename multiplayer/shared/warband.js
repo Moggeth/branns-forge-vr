@@ -201,6 +201,7 @@ export function stepWarbandWork(state, ctx, events) {
    }
    if (w.fuse !== undefined && state.tick - w.fuse >= FUSEWICK.fuseTicks) {
     state.enemies.splice(state.enemies.indexOf(e), 1); // the sapper goes up with its keg (Forgelings are forge-light: no remains)
+    if (state.embeds) state.embeds = state.embeds.filter(c => c.targetId !== e.id); // arrows stuck in it go up too
     fusewickBlast(state, [e.position[0], e.position[1] + .6, e.position[2]], {id: e.id, owner: w.owner, side: e.side}, ctx, events);
    }
    continue;
