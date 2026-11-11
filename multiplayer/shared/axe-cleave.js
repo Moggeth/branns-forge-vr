@@ -7,7 +7,7 @@ import {terrainHeight} from './terrain.js';
 import {worldTrees} from './world-content.js';
 import {chopTree, trunkRadius, treeScale, isFelled, CUT_RANGE} from './trees.js';
 import {specialCooldown} from './special-cooldowns.js';
-import {hasTalent} from './hero-progress.js';
+import {talentRank} from './hero-progress.js';
 
 // Tunable; room for mastery to grow reach, arc and the tree cap later.
 export const AXE_CLEAVE = Object.freeze({
@@ -22,9 +22,10 @@ export const AXE_CLEAVE = Object.freeze({
   cutHeight: .85,      // felling cut, authored metres above the root flare (inside CUT_RANGE)
 });
 
-// Whirlwind (axe talent): a full spin with 30% more reach.
+// Whirlwind (axe talent): a full spin with 30% more reach, 40% at rank II and 50% at rank III.
 export const WHIRLWIND = Object.freeze({reach: AXE_CLEAVE.reach * 1.3, arc: 360});
-export const cleaveSpec = p => hasTalent(p, 'axe', 'whirlwind') ? WHIRLWIND : AXE_CLEAVE;
+export const WHIRLWIND_RANKS = Object.freeze([WHIRLWIND, Object.freeze({reach: AXE_CLEAVE.reach * 1.4, arc: 360}), Object.freeze({reach: AXE_CLEAVE.reach * 1.5, arc: 360})]);
+export const cleaveSpec = p => { const r = talentRank(p, 'axe', 'whirlwind'); return r ? WHIRLWIND_RANKS[Math.min(3, r) - 1] : AXE_CLEAVE; };
 const facingOf = p => [-Math.sin(p.yaw) || 0, -Math.cos(p.yaw) || 0];
 // Inside the sweep: within reach (plus a target radius) and within half the arc of facing, or right at the hero's feet.
 export function inCleave(p, x, z, radius = 0, spec = cleaveSpec(p)) {
