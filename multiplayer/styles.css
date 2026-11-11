@@ -206,6 +206,12 @@ body.xr .hud-bottom { display: none; }   /* VR draws its own controls; free the 
   background: var(--bf-ember-hot); box-shadow: 0 0 6px var(--bf-ember);
 }
 .bf-chip { position: relative; }
+.bf-chip.bf-locked { opacity: .62; filter: grayscale(.6); border-style: dashed; }
+.bf-chip.bf-locked::after {   /* the next weapon to forge: a small brass anvil mark instead of the "new" spark */
+  content: ""; position: absolute; top: 3px; right: 3px; width: 9px; height: 6px; border-radius: 1px 1px 3px 3px;
+  background: var(--bf-brass, #d9b46a); box-shadow: 0 0 5px rgba(217,180,106,.7);
+}
+.bf-chip.bf-locked:hover, .bf-chip.bf-locked:focus-visible { opacity: .9; filter: none; }
 .bf-special { min-width: 56px; min-height: 56px; }
 .bf-hint { min-height: 1.3em; }
 .bf-bloom { position: relative; display: inline-flex; align-items: center; min-width: 7.5em; height: 1.4em; padding: 0 .55em; border-radius: 999px; overflow: hidden; background: rgba(20,40,34,.55); border: 1px solid rgba(143,214,170,.45); font-size: .78rem; color: #dff8e8; }
