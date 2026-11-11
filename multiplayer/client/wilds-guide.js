@@ -4,6 +4,8 @@
 import {worldFor} from '../shared/worldgen/registry.js';
 import {sitesOf} from '../shared/wilds.js';
 import {inUnderway} from '../shared/underways/space.js';
+import {nextWeapon, costShortfall, WEAPON_NAMES} from '../shared/arsenal.js';
+import {materialLabel} from '../shared/material-catalog.js';
 
 const KIND = {settlement: 'village', landmark: 'landmark', discovery: 'find', entrance: 'cave'};
 const SUB = {ruin: 'ruin', shrine: 'shrine', grove: 'grove', camp: 'camp', cache: 'cache', cave: 'cave mouth', peak: 'peak', falls: 'falls', lake: 'lake',
@@ -28,6 +30,7 @@ export function wildsGuideView(snapshot, playerId) {
   const total = sites.length, have = sites.reduce((n, s) => n + found.has(s.id), 0);
   const kind = next ? SUB[next.sub] || KIND[next.kind] : '';
   return {
+    forge: forgeLine(snapshot, me),
     title: region?.name || world.settlements.find(s => s.start)?.name || 'The Great Wilds',
     danger, found: have, total,
     next: next ? {id: next.id, name: next.name, kind, distance: best, way: compassWord(next.x - x, next.z - z)} : null,
@@ -35,6 +38,14 @@ export function wildsGuideView(snapshot, playerId) {
   };
 }
 
+const costText = cost => Object.entries(cost).map(([k, n]) => `${n} ${materialLabel(k)}`).join(', ');
+/** The weapon ladder goal (shared/arsenal.js): what to forge next and what is still missing. Empty when done or off. */
+export function forgeLine(snapshot, me) {
+  const rung = nextWeapon(snapshot, me); if (!rung) return '';
+  const name = WEAPON_NAMES[rung.tool] || rung.tool, short = costShortfall(me.resources, rung.cost);
+  return Object.keys(short).length ? `Forge next: the ${name} (${costText(rung.cost)}). Still need ${costText(short)}.`
+    : `Ready! Take your haul to the village forge and press the ${name} on your hotbar.`;
+}
 const svg = d => `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="${d}"/></svg>`;
 const COMPASS = 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 2a8 8 0 1 1 0 16 8 8 0 0 1 0-16zm3.5 4.5-5 2-2 5 5-2z';
 const TONE = ['#9be38a', '#b5d36b', '#e0c24a', '#e0a64a', '#ff8a4a', '#ff6a5a'];
@@ -44,6 +55,7 @@ export function createWildsGuide(root) {
   box.className = 'expedition-banner xhud wilds-guide'; box.dataset.expanded = 'false'; box.setAttribute('aria-label', 'Wilds guide');
   box.innerHTML = `<button type="button" class="xhud-toggle" aria-expanded="false"><span class="xhud-stage-icon">${svg(COMPASS)}</span><span class="xhud-title"></span></button>
     <p class="xhud-next" aria-live="polite"></p>
+    <p class="xhud-next wg-forge" aria-live="polite" hidden></p>
     <div class="xhud-row"><div class="xhud-chips"><span class="xhud-chip wg-found"><span class="xhud-chip-num"></span></span><span class="xhud-chip wg-way"><span class="xhud-chip-num"></span></span><span class="xhud-chip wg-danger"><span class="xhud-chip-num"></span></span></div></div>`;
   root.append(box);
   const $ = s => box.querySelector(s);
@@ -53,10 +65,11 @@ export function createWildsGuide(root) {
   return {
     update(view) {
       box.hidden = !view; if (!view) return;
-      const key = JSON.stringify([view.title, view.line, view.found, view.danger]); if (key === last) return; last = key;
+      const key = JSON.stringify([view.title, view.line, view.found, view.danger, view.forge]); if (key === last) return; last = key;
       box.style.setProperty('--xhud-tone', TONE[view.danger]);
       $('.xhud-title').textContent = view.title;
       $('.xhud-next').textContent = view.line;
+      $('.wg-forge').hidden = !view.forge; $('.wg-forge').textContent = view.forge || '';
       $('.wg-found .xhud-chip-num').textContent = `Found ${view.found}/${view.total}`;
       $('.wg-way').hidden = !view.next; if (view.next) $('.wg-way .xhud-chip-num').textContent = `${metres(view.next.distance)} ${view.next.way}`;
       $('.wg-danger .xhud-chip-num').textContent = view.danger ? `Danger ${view.danger}` : 'Safe';

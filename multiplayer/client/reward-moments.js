@@ -29,6 +29,9 @@ export function classifyReward(event, ctx = {}) {
       return {kind: event.kind, tier: 2, colour: ours ? COLOURS.gold : COLOURS.dusk, accent: COLOURS.resonance,
         motes: 48, ring: true, pillar: true, flyTo: 'up', chime: ours ? 'victory' : 'warning', spatial: false,
         rumble: ours ? both(.42, 70, 3) : null};
+    case 'weapon_forged': // a new weapon off the Wilds ladder (shared/arsenal.js): the day's big payoff
+      return {kind: event.kind, tier: mine ? 2 : 1, colour: COLOURS.gold, accent: COLOURS.ember, motes: mine ? 40 : 16, ring: true,
+        pillar: mine, flyTo: mine ? 'player' : 'up', chime: mine ? 'victory' : 'craft', spatial: !mine, rumble: mine ? both(.36, 60, 2) : null};
     case 'meteor_reward':
       return {kind: event.kind, tier: 1, colour: COLOURS.gold, accent: materialColour('gems'), motes: 24, ring: true,
         pillar: false, flyTo: 'up', chime: 'discovery', spatial: true, rumble: distance < 12 ? both(.3, 45) : null};
