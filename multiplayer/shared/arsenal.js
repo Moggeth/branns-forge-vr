@@ -17,9 +17,11 @@ export const weaponShelved = (tool, {labs = false} = {}) => !labs && SHELVED_WEA
 // peers have new ids) keeps what was forged. Plain JSON, bounded, validated in restoreArsenal.
 export const STARTING_WEAPONS = Object.freeze(['axe', 'pick']);
 export const WEAPON_LADDER = Object.freeze([
-  Object.freeze({tool: 'crossbow', cost: Object.freeze({wood: 8, iron: 4})}),
-  Object.freeze({tool: 'bow', cost: Object.freeze({wood: 12, gems: 3})}),
-  Object.freeze({tool: 'hammer', cost: Object.freeze({iron: 10, gems: 5})}),
+  // Tuned (2026-11-11) for a ~5 minute first forge: one iron seam (4 ore) and a tree or two buy the Siegebird; the
+  // first shrine's crystal buys the Emberwing. Crystal growths sit far out in most seeds, so early rungs stay light.
+  Object.freeze({tool: 'crossbow', cost: Object.freeze({wood: 6, iron: 4})}),
+  Object.freeze({tool: 'bow', cost: Object.freeze({wood: 10, iron: 4, gems: 2})}),
+  Object.freeze({tool: 'hammer', cost: Object.freeze({iron: 8, gems: 4})}),
   Object.freeze({tool: 'wyrmspout', cost: Object.freeze({wood: 8, iron: 12, gems: 8})}),
 ]);
 export const ARSENAL_RULES = Object.freeze({forgeReach: 10, ledger: 64});
@@ -46,10 +48,19 @@ export function nextWeapon(state, p) {
   return WEAPON_LADDER.find(s => !have.includes(s.tool)) || null;
 }
 /** What is still missing to pay for a rung: {wood: 3, ...}, empty when affordable. */
+// The forge smelts as it forges: carried ore counts toward its metal, so a fresh seam pays straight away.
+const PAID_WITH = Object.freeze({iron: Object.freeze(['iron', 'ironOre'])});
+const held = (resources, k) => (PAID_WITH[k] || [k]).reduce((n, key) => n + (resources?.[key] || 0), 0);
 export function costShortfall(resources, cost) {
   const out = {};
-  for (const [k, n] of Object.entries(cost)) { const have = resources?.[k] || 0; if (have < n) out[k] = n - have; }
+  for (const [k, n] of Object.entries(cost)) { const have = held(resources, k); if (have < n) out[k] = n - have; }
   return out;
+}
+function payCost(resources, cost) {
+  for (const [k, n] of Object.entries(cost)) {
+    let due = n;
+    for (const key of PAID_WITH[k] || [k]) { const take = Math.min(due, resources[key] || 0); resources[key] -= take; due -= take; }
+  }
 }
 export const nearForge = p => Math.hypot(p.position[0], p.position[2]) <= ARSENAL_RULES.forgeReach;
 
@@ -70,7 +81,7 @@ export function craftWeapon(state, p, message) {
     const drop = Object.keys(forged).find(k => !here.has(k)); if (!drop) return fail('ledger_full');
     delete forged[drop];
   }
-  for (const [k, n] of Object.entries(next.cost)) p.resources[k] -= n;
+  payCost(p.resources, next.cost);
   forged[key] = LADDER_TOOLS.filter(t => t === next.tool || entry(forged, key).includes(t));
   const rung = LADDER_TOOLS.indexOf(next.tool) + 1;
   return {ok: true, events: [{kind: 'weapon_forged', id: p.id, by: p.id, tool: next.tool, rung, of: LADDER_TOOLS.length,

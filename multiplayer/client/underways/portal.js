@@ -49,6 +49,16 @@ const mouthMaterial = () => new THREE.ShaderMaterial({
     }`,
 });
 
+const BAKED = ['position', 'normal', 'color', 'aGlow', 'aPropLight'];
+function bakeStatic(meshes) {
+  const parts = meshes.map(m => {
+    m.updateMatrix(); const src = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone(), g = new THREE.BufferGeometry();
+    for (const k of BAKED) g.setAttribute(k, src.attributes[k]);
+    g.applyMatrix4(m.matrix); src.dispose(); return g;
+  });
+  const merged = mergeGeometries(parts); for (const p of parts) p.dispose(); merged.computeBoundingSphere(); return merged;
+}
+
 export function createUnderwayPortal({scene, sites = [], height = null, propMat}) {
   const kit = underwayKit(), group = new THREE.Group(); group.name = 'UnderwayPortals'; scene.add(group);
   const frame = frameGeometry(), mats = [], made = [];
@@ -64,6 +74,11 @@ export function createUnderwayPortal({scene, sites = [], height = null, propMat}
     for (let k = 0; k < 3; k++) { const rl = new THREE.Mesh(lit(kit.rails), propMat); rl.position.set(0, -.02 + (height ? height(s.mouth[0], s.mouth[1] + k * 2 + .7) - y : 0) * .9, k * 2 + .7); g.add(rl); }
     const cart = new THREE.Mesh(lit(kit.cart), propMat); cart.position.set(2.3, height ? height(s.mouth[0] + 2.3, s.mouth[1] + 2.8) - y : 0, 2.8); cart.rotation.y = .35; g.add(cart);
     const sign = new THREE.Mesh(lit(kit.sign), propMat); sign.position.set(-2.6, height ? height(s.mouth[0] - 2.6, s.mouth[1] + 2.2) - y : 0, 2.2); sign.rotation.y = Math.PI + .5; g.add(sign);
+    // Everything but the mouth shares propMat and never moves, so bake it into one mesh per portal: one draw and one
+    // shadow caster instead of nine (the shader reads world position, so the look is unchanged).
+    const solid = new THREE.Mesh(bakeStatic(g.children.filter(o => o.isMesh && o.material === propMat)), propMat);
+    for (const o of [...g.children]) if (o !== mouth) { g.remove(o); if (o.geometry !== frame) o.geometry.dispose(); }
+    g.add(solid);
     g.traverse(o => { if (o.isMesh) { o.raycast = () => {}; o.userData.presentationOnly = true; o.castShadow = true; o.receiveShadow = true; } });
     mouth.castShadow = false;
     group.add(g); made.push({s, g});
