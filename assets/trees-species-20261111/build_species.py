@@ -305,13 +305,20 @@ def fruit_extra(spec, tips, rng, count):
         fruit.add(verts, base_f, None, cols); placed += 1
     return fruit
 
+def to_jpeg_image(name, arr, quality=88):
+    """Opaque maps (bark) ship as JPEG: about 7x smaller than PNG in the startup set, and the exporter keeps JPEG."""
+    h, w = arr.shape[:2]; im = bpy.data.images.new(name, w, h, alpha=False)
+    im.pixels.foreach_set(np.flipud(arr).astype(np.float32).ravel())
+    path = os.path.join(bpy.app.tempdir or '/tmp', name + '.jpg'); im.filepath_raw = path; im.file_format = 'JPEG'
+    im.save(quality=quality); im.pack(); return im
+
 def build(name, spec, lod, leaf_arr, bark_arr):
     tag = name + ('_lod' if lod else '')
     bpy.ops.wm.read_factory_settings(use_empty=True)
     bpy.ops.import_scene.gltf(filepath=os.path.join(TMP, tag + '.glb'))
     half = lambda a: a.reshape(a.shape[0] // 2, 2, a.shape[1] // 2, 2, a.shape[2]).mean(axis=(1, 3))
     if lod: leaf_arr, bark_arr = half(leaf_arr), half(bark_arr)
-    leaf_img = to_image(name + '_leaf', leaf_arr); bark_img = to_image(name + '_bark', bark_arr)
+    leaf_img = to_image(name + '_leaf', leaf_arr); bark_img = to_jpeg_image(name + '_bark', bark_arr)
     tree = bpy.data.objects['Tree']; trunk = bpy.data.objects['Trunk']; H = spec['trunk']['H']
     bark = trunk.active_material
     if bark and bark.use_nodes:  # stage 1 exported a vertex-colour-only bark; give it this species' bark map

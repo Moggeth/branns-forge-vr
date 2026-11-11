@@ -183,7 +183,7 @@
     "Roots": 1200,
     "Trunk": 276
    },
-   "kb": 971
+   "kb": 681
   },
   {
    "file": "tree_fir_lod.glb",
@@ -199,7 +199,7 @@
     "Roots": 390,
     "Trunk": 88
    },
-   "kb": 325
+   "kb": 239
   },
   {
    "file": "tree_maple.glb",
@@ -217,7 +217,7 @@
     "Roots": 1200,
     "Trunk": 276
    },
-   "kb": 804
+   "kb": 556
   },
   {
    "file": "tree_maple_lod.glb",
@@ -233,7 +233,7 @@
     "Roots": 390,
     "Trunk": 88
    },
-   "kb": 226
+   "kb": 152
   },
   {
    "file": "tree_blossom.glb",
@@ -249,7 +249,7 @@
     "Roots": 1000,
     "Trunk": 276
    },
-   "kb": 684
+   "kb": 505
   },
   {
    "file": "tree_blossom_lod.glb",
@@ -265,7 +265,7 @@
     "Roots": 325,
     "Trunk": 88
    },
-   "kb": 197
+   "kb": 137
   }
  ]
 }
