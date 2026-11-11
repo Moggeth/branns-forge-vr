@@ -15,7 +15,7 @@ export const xpForLevel = level => START[Math.max(1, Math.min(HERO_LEVEL.max, le
 export const XP_MAX = xpForLevel(HERO_LEVEL.max);
 
 // What a hero earns. Kills are credited to whoever landed the killing blow; harvest to whoever swung.
-export const XP_REWARD = Object.freeze({skeleton: 20, golem: 60, ent: 45, stumpling: 8, tree: 10, ore: 6, meteor: 15});
+export const XP_REWARD = Object.freeze({skeleton: 20, golem: 60, ent: 45, stumpling: 8, kettlebelly: 30, bramblehog: 25, kegtoter: 18, tree: 10, ore: 6, meteor: 15});
 
 // Two specialties per weapon, each with up to three ranks bought one point at a time. Rank I is the specialty itself;
 // ranks II and III push it further and open at hero levels RANK_LEVEL[1] and RANK_LEVEL[2]. `ranks` holds one short
