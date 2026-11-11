@@ -107,6 +107,8 @@ export function createTalentFx({scene, height = () => 0, heroPosition = () => nu
       start('level', at(p), {life: 2.6, radius: 4.5, follow: event.id, columnColor: GOLD, ringColor: GOLD, sparkColor: WHITE_GOLD, sparkSize: .18});
       return true;
     }
+    // Forge tempering: a quick ring of forge-orange sparks around the hero, like a quench.
+    if (kind === 'weapon_tempered') { start('learn', at(p), {life: 1.1, radius: 1.6, follow: event.id, ringColor: FIRE, sparkColor: EMBER, sparkSize: .12}); return true; }
     if (kind === 'talent_learned') { start('learn', at(p), {life: 1.3, radius: 1.8, follow: event.id, ringColor: GOLD, sparkColor: WHITE_GOLD, sparkSize: .12}); return true; }
     if (kind === 'firebomb') { start('bomb', at(p), {life: .95, radius: event.radius || 2.6, columnColor: FIRE, ringColor: FIRE, sparkColor: EMBER, sparkSize: .2}); return true; }
     if (kind === 'geode_burst') {
@@ -199,6 +201,7 @@ export function playTalentSound(context, event, gain = 1) {
     [1046.5, 1318.5, 1568].forEach(hz => tone(hz, .4, 1.4, .1, 'sine'));
     noise(.38, .9, .05, 'highpass', 5000);
   } else if (kind === 'talent_learned') { tone(880, 0, .3, .16); tone(1318.5, .08, .55, .14, 'sine'); }
+  else if (kind === 'weapon_tempered') { [0, .16, .32].forEach(t => { tone(196, t, .35, .14, 'square'); noise(t, .18, .2, 'highpass', 3200); }); tone(1046.5, .5, .9, .08, 'sine'); }
   else if (kind === 'talent_reset') { tone(659.25, 0, .25, .12); tone(440, .1, .4, .1, 'sine'); }
   else if (kind === 'firebomb') { noise(0, .55, .55, 'lowpass', 700); tone(70, 0, .45, .3, 'sine'); }
   else if (kind === 'geode_burst') { noise(0, .45, .25, 'highpass', 2500); [2093, 2637, 3136].forEach((hz, i) => tone(hz, .02 + i * .04, .5, .07, 'sine')); }

@@ -17,6 +17,7 @@ import {EMBERDEW,cinderLaunch,cinderVelocities} from './emberdew.js';
 export const FLARE=Object.freeze({speed:30,loft:6,fuse:48});
 import {skeletonShield} from './skeleton-kinds.js';
 import {damageScale,grantXp,killXp,hasTalent,talentRank,byRank,heroMaxHp} from './hero-progress.js';
+import {temperScale} from './weapon-temper.js';
 import {itemBonus} from './hero-items.js';
 import {payKillGold} from './home-shop.js';
 import {tavernSafe} from './taverns.js';
@@ -259,7 +260,7 @@ export function hitEnemyPart(state,enemy,part,amount,hit,ctx,events,{projectile=
   const owner=state.players.find(p=>p.id===hit?.ownerId);
   const warband=hit?.by==='warband'; // a God's Forgeling striking for its owner (shared/warband.js)
   if(owner&&!warband&&tavernSafe(state,owner))return false; // nobody fights from inside a tavern
-  amount*=damageScale(owner); // +20% per hero level
+  amount*=damageScale(owner)*temperScale(owner,hit?.tool); // +20% per hero level, +15% per forge temper of that weapon
   // Limbsplitter (axe talent): a swing that lands on a limb or head takes it clean off (armour still turns it).
   const lopping=!projectile&&!armored&&hit?.tool==='axe'&&part!=='torso'&&enemy.kind!=='stumpling'&&hasTalent(owner,'axe','limbsplitter');
   if(lopping)amount=Math.max(amount,enemy.parts[part]);
@@ -320,7 +321,7 @@ export function projectileContact(state,m,ctx){
     const side=shot.side||state.players.find(p=>p.id===shot.ownerId)?.side||'party';
     if(!['arrow','bolt'].includes(shot.kind)||(rival.side||'party')===side||rival.id===shot.ownerId||Math.hypot(m.point[0]-rival.position[0],m.point[2]-rival.position[2])>1.2||m.point[1]<rival.position[1]-.3||m.point[1]>rival.position[1]+2.2)return fail('invalid_contact');
     if(tavernSafe(state,state.players.find(p=>p.id===shot.ownerId)))return fail('tavern_peace');
-    const events=[];state.projectiles.splice(state.projectiles.indexOf(shot),1);ctx.damageHero(state,rival,(shot.kind==='bolt'?(shot.heavy?FLOCKWRIGHT.heroDamage:40):28)*damageScale(state.players.find(p=>p.id===shot.ownerId)),events,shot.trail?.[0]||shot.previousPosition);return ok(events);
+    const events=[];state.projectiles.splice(state.projectiles.indexOf(shot),1);const owner=state.players.find(p=>p.id===shot.ownerId);ctx.damageHero(state,rival,(shot.kind==='bolt'?(shot.heavy?FLOCKWRIGHT.heroDamage:40):28)*damageScale(owner)*temperScale(owner,shot.kind==='arrow'?'bow':shot.heavy?'flockwright':'crossbow'),events,shot.trail?.[0]||shot.previousPosition);return ok(events);
   }
   const home=findHomeTarget(state,m.targetId),base=home?.target||state.battle?.bases.find(b=>b.id===m.targetId);
   if(base){
@@ -391,7 +392,7 @@ function strikeEnemy(state,shot,enemy,m,ctx,events){
   // Siegebird mastery: every bolt that lands on a foe makes the golden bird a little more likely.
   const owner=shot.kind==='bolt'&&!shot.heavy&&state.players.find(p=>p.id===shot.ownerId);if(owner?.siegebird)owner.siegebird.hits=Math.min(SIEGEBIRD.hitCap,owner.siegebird.hits+1);
   const speed=vec(shot.velocity,100)?Math.hypot(...shot.velocity):0,direction=speed>1e-6?shot.velocity.map(v=>v/speed):undefined;
-  hitEnemyPart(state,enemy,m.part,shot.kind==='bolt'?(shot.heavy?FLOCKWRIGHT.damage:SIEGEBIRD.damage*(shot.golden?SIEGEBIRD.goldenMultiplier:1)):38,{...m,ownerId:shot.ownerId,side:shot.side,shot:shot.kind,...(direction?{direction}:{}),...(shot.golden?{golden:true}:{})},ctx,events,{projectile:true});
+  hitEnemyPart(state,enemy,m.part,shot.kind==='bolt'?(shot.heavy?FLOCKWRIGHT.damage:SIEGEBIRD.damage*(shot.golden?SIEGEBIRD.goldenMultiplier:1)):38,{...m,ownerId:shot.ownerId,side:shot.side,shot:shot.kind,tool:shot.kind==='arrow'?'bow':shot.heavy?'flockwright':'crossbow',...(direction?{direction}:{}),...(shot.golden?{golden:true}:{})},ctx,events,{projectile:true});
   // Phoenix headshot: the bird tears the skull off the ragdoll it just dropped and tries to fly away with it (phoenix-carry.js).
   const skull=shot.kind==='arrow'&&Math.hypot(...shot.curve)>.000001&&enemy.kind==='skeleton'&&m.part==='head'&&!state.enemies.includes(enemy)&&state.detachedParts.find(d=>d.sourceId===enemy.id&&d.part==='head'&&!d.heldBy);
   if(skull&&state.detachedParts.filter(d=>d.carry).length<PHOENIX_CARRY.maxActive){

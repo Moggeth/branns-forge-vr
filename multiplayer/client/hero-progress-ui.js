@@ -4,8 +4,10 @@
 //
 // Talents panel (phone first): a rail of weapon tabs, then the chosen weapon's two specialties. Each specialty shows
 // its three ranks as a little ladder (learned, next, or waiting for a level) and one big button that buys the next
-// rank. The rail sits on the left when the screen is wide or a phone is sideways, and along the top on a phone
+// rank. Above them, the forge strip tempers the weapon itself (Timber, Iron, Crystal at the forge, +15% hits per
+// tier). The rail sits on the left when the screen is wide or a phone is sideways, and along the top on a phone
 // held upright. Opening the panel shows the weapon in your hand.
+import {TEMPER, TEMPER_TOOLS, temperLevel, temperCost, shortfall} from '../shared/weapon-temper.js';
 import {HERO_LEVEL, TALENTS, TALENT_WEAPONS, heroLevel, levelProgress, levelSteps, xpForLevel, xpToNext, talentPoints, talentRank, maxRank, rankLevel} from '../shared/hero-progress.js';
 
 export const WEAPON_INFO = Object.freeze({
@@ -35,8 +37,18 @@ const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 /** Default: every talent weapon except lab-only ones you have never put a point into. */
 export const defaultOwns = (player, weapon) => weapon !== 'flask' || talentRank(player, 'flask', 'firebomb') + talentRank(player, 'flask', 'tar') > 0;
 
-/** Pure view model for the panel and HUD (also used by tests). `owns(player, weapon)` limits the rail. */
-export function progressModel(player = {}, {owns = defaultOwns} = {}) {
+const RES = {wood: 'Timber', iron: 'Iron', gems: 'Crystal'};
+export const costText = cost => Object.entries(cost || {}).map(([k, n]) => `${n} ${RES[k] || k}`).join(', ');
+/** Forge strip for one weapon: tier, next cost, and whether it can be paid here and now. */
+function temperView(player, w, atForge) {
+  if (!TEMPER_TOOLS.includes(w)) return null;
+  const tier = temperLevel(player, w), cost = temperCost(player, w), short = cost ? shortfall(player.resources, cost) : {};
+  const state = !cost ? 'max' : Object.keys(short).length ? 'short' : !atForge ? 'away' : 'available';
+  return {tier, max: TEMPER.max, name: TEMPER.names[tier], bonus: Math.round(tier * TEMPER.damagePerTier * 100), cost, short, state};
+}
+/** Pure view model for the panel and HUD (also used by tests). `owns(player, weapon)` limits the rail; `atForge`
+ * says whether the hero stands at a forge where tempering works. */
+export function progressModel(player = {}, {owns = defaultOwns, atForge = false} = {}) {
   const xp = player.xp || 0, level = heroLevel(xp), max = level >= HERO_LEVEL.max, points = talentPoints(player);
   const weapons = ORDER.filter(w => TALENT_WEAPONS.includes(w) && owns(player, w)).map(w => {
     const talents = Object.entries(TALENTS[w]).map(([id, t]) => {
@@ -47,7 +59,8 @@ export function progressModel(player = {}, {owns = defaultOwns} = {}) {
         ranks: (t.ranks || [t.text]).map((line, i) => ({rank: i + 1, line, learned: i < rank, opensAt: rankLevel(i + 1)}))};
     });
     const ranks = talents.reduce((n, t) => n + t.rank, 0), tops = talents.reduce((n, t) => n + t.top, 0);
-    return {id: w, ...WEAPON_INFO[w], talents, ranks, tops, canLearn: talents.some(t => t.state === 'available')};
+    const temper = temperView(player, w, atForge);
+    return {id: w, ...WEAPON_INFO[w], talents, ranks, tops, temper, canLearn: talents.some(t => t.state === 'available') || temper?.state === 'available'};
   });
   // The next level that opens a new rank somewhere (a milestone worth naming in the panel).
   const nextGate = [2, 3].map(rankLevel).find(l => l > level) || 0;
@@ -56,8 +69,8 @@ export function progressModel(player = {}, {owns = defaultOwns} = {}) {
     bonus: Math.round(levelSteps(level) * HERO_LEVEL.damagePerLevel * 100), weapons};
 }
 
-export function createHeroProgressUI({hudSelf, mount = document.body, owns = defaultOwns, onLearn = () => {}, onReset = () => {}, onOpen = () => {}, onClose = () => {}} = {}) {
-  let player = {}, model = progressModel({}, {owns}), open = false, lastFocus = null, hero = true, bannerTimer = 0, shownKey = '', chosen = '';
+export function createHeroProgressUI({hudSelf, mount = document.body, owns = defaultOwns, onLearn = () => {}, onTemper = () => {}, onReset = () => {}, onOpen = () => {}, onClose = () => {}} = {}) {
+  let player = {}, ownsNow = owns, forgeHere = false, model = progressModel({}, {owns}), open = false, lastFocus = null, hero = true, bannerTimer = 0, shownKey = '', chosen = '';
 
   // HUD: level badge (opens the panel) and a gold XP meter under health and mana.
   const badgeNum = el('span', {class: 'hp-badge-num', text: '1'}), pip = el('span', {class: 'hp-pip', hidden: true});
@@ -146,12 +159,28 @@ export function createHeroProgressUI({hudSelf, mount = document.body, owns = def
         'aria-label': `${t.name}: ${label}`, onclick: () => onLearn(w.id, t.id)}, label),
     ]);
   }
+  function forgeStrip(w) {
+    const t = w.temper, next = t.tier + 1;
+    const status = t.tier ? `${t.name} · +${t.bonus}% damage` : 'Untempered';
+    const label = t.state === 'max' ? 'Masterwork' : t.state === 'available' ? `Temper to ${NUMERAL[next]} · ${costText(t.cost)}`
+      : t.state === 'short' ? `Need ${costText(t.short)} more` : `Temper at the forge · ${costText(t.cost)}`;
+    return el('section', {class: 'hp-forge', 'data-state': t.state, 'aria-label': `Forge: ${status}`}, [
+      el('span', {class: 'hp-forge-anvil', html: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 7h14c0 2.5 2 4 4 4v2H15l-1 3h3v3H6v-3h3l-1-3c-3 0-5-2.5-5-6z"/></svg>'}),
+      el('div', {class: 'hp-forge-text'}, [
+        el('span', {class: 'hp-forge-title'}, [el('span', {text: 'Forge'}), el('span', {class: 'hp-pips', 'aria-hidden': 'true'},
+          Array.from({length: t.max}, (_, i) => el('span', {class: 'hp-pip-dot hp-pip-forge', 'data-on': i < t.tier ? '1' : false})))]),
+        el('span', {class: 'hp-forge-status', text: t.state === 'max' ? `${status}. Fully tempered.` : `${status}. Next: +${Math.round(next * TEMPER.damagePerTier * 100)}% damage.`}),
+      ]),
+      el('button', {type: 'button', class: 'hp-temper', 'data-state': t.state, disabled: t.state !== 'available', 'aria-label': `${w.name}: ${label}`, onclick: () => onTemper(w.id)}, label),
+    ]);
+  }
   function renderPage() {
     const focused = dialog.contains(document.activeElement) ? document.activeElement.closest('.hp-talent')?.dataset.talent : null;
     const w = current();
     if (!w) { page.replaceChildren(el('p', {class: 'hp-empty', text: 'Forge a weapon to unlock its talents.'})); return; }
     page.replaceChildren(
       el('header', {class: 'hp-weapon-head'}, [icon(w.icon), el('div', {}, [el('h3', {text: w.name}), el('p', {text: `${w.role} · ${w.ranks} of ${w.tops} ranks`})])]),
+      w.temper ? forgeStrip(w) : null,
       el('div', {class: 'hp-talents'}, w.talents.map(t => talentCard(w, t))),
     );
     if (focused) { const again = page.querySelector(`.hp-talent[data-talent="${focused}"] .hp-learn`); (again && !again.disabled ? again : dialog).focus({preventScroll: true}); }
@@ -159,7 +188,10 @@ export function createHeroProgressUI({hudSelf, mount = document.body, owns = def
   function render() {
     badgeNum.textContent = String(model.level);
     pip.hidden = !model.points; pip.textContent = model.points ? `+${model.points}` : '';
-    badge.classList.toggle('hp-has-points', model.points > 0);
+    // The badge also glows when you stand at the forge with enough to temper something.
+    const temperReady = model.weapons.some(w => w.temper?.state === 'available');
+    badge.classList.toggle('hp-has-points', model.points > 0 || temperReady);
+    badge.title = temperReady && !model.points ? 'Talents and forge: you can temper a weapon here (N)' : 'Talents (N)';
     badge.setAttribute('aria-label', `Level ${model.level}${model.points ? `, ${plural(model.points, 'talent point')} to spend` : ''}. Open talents.`);
     xpFill.style.transform = `scaleX(${model.progress.toFixed(4)})`;
     xpText.textContent = model.max ? 'Max' : `${model.into} / ${model.need}`;
@@ -175,18 +207,20 @@ export function createHeroProgressUI({hudSelf, mount = document.body, owns = def
     resetBtn.disabled = !model.weapons.some(w => w.ranks > 0) && !Object.values(player.talents || {}).some(l => l?.length);
     if (open) { renderRail(); renderPage(); }
   }
-  function update(next, {role = 'hero'} = {}) {
-    hero = role === 'hero';
+  function update(next, {role = 'hero', atForge = false, owns: o} = {}) {
+    hero = role === 'hero'; if (o) ownsNow = o;
     badge.hidden = xpMeter.hidden = !hero;
     if (!hero && open) close();
-    const key = `${next?.xp || 0}|${JSON.stringify(next?.talents || {})}|${open ? next?.tool : ''}`;
-    player = next || {};
+    // Rebuild only when something shown changes.
+    const r = next?.resources || {};
+    const key = `${next?.xp || 0}|${JSON.stringify(next?.talents || {})}|${JSON.stringify(next?.temper || {})}|${open ? next?.tool : ''}|${atForge}|${r.wood}|${r.iron}|${r.gems}|${o ? TEMPER_TOOLS.map(t => +o(next || {}, t)).join('') : ''}`;
+    player = next || {}; forgeHere = atForge;
     if (key === shownKey) return; shownKey = key;
-    model = progressModel(player, {owns}); render();
+    model = progressModel(player, {owns: ownsNow, atForge: forgeHere}); render();
   }
   function show() {
     if (open || !hero) return;
-    open = true; lastFocus = document.activeElement; pickDefault(); renderRail(); renderPage(); backdrop.hidden = false; onOpen();
+    open = true; shownKey = ''; model = progressModel(player, {owns: ownsNow, atForge: forgeHere}); render(); lastFocus = document.activeElement; pickDefault(); renderRail(); renderPage(); backdrop.hidden = false; onOpen();
     requestAnimationFrame(() => (page.querySelector('.hp-learn[data-state="available"]') || rail.querySelector('[aria-selected="true"]') || closeBtn).focus({preventScroll: true}));
   }
   function close() {
