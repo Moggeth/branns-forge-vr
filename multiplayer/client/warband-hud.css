@@ -1,0 +1,38 @@
+/* The Warband button (client/warband-hud.js): bottom-left on desktop, between the move stick and the bar on touch. */
+.bf-warband {
+  position: fixed; left: 16px; bottom: 16px; z-index: 31;
+  display: inline-flex; align-items: center; gap: 9px; min-height: 48px; padding: 6px 12px 6px 8px;
+  font: 600 .86rem/1.1 var(--ui-font, system-ui, sans-serif); color: var(--ui-text, #f6ead0);
+  background: var(--ui-ink, rgba(18, 14, 10, .84)); border: 1px solid var(--ui-edge, rgba(214, 176, 104, .34)); border-radius: 999px;
+  box-shadow: inset 0 1px 0 rgba(255, 225, 170, .12), var(--ui-shadow, 0 6px 18px rgba(0, 0, 0, .38));
+  cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  transition: border-color .15s ease, background-color .15s ease, transform .12s ease;
+}
+.bf-warband[hidden] { display: none; }
+.bf-warband:hover { border-color: var(--ui-edge-hi, rgba(255, 214, 140, .7)); }
+.bf-warband:active { transform: scale(.97); }
+.bf-warband:focus-visible { outline: 2px solid var(--ui-gold, #ffd98a); outline-offset: 2px; }
+.bf-warband-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; color: #ffd98a;
+  background: radial-gradient(circle at 50% 35%, rgba(255, 200, 87, .28), rgba(111, 184, 255, .12) 70%); border: 1px solid rgba(255, 200, 87, .45); }
+.bf-warband-icon svg { width: 21px; height: 21px; }
+.bf-warband-text { display: grid; gap: 2px; text-align: left; }
+.bf-warband-name { letter-spacing: .02em; }
+.bf-warband-count { font-size: .76rem; font-weight: 700; color: var(--ui-muted, #c2b08e); font-variant-numeric: tabular-nums; }
+.bf-warband kbd { font: 700 .7rem/1 ui-monospace, monospace; padding: 3px 5px; border-radius: 5px; color: var(--ui-muted, #c2b08e);
+  background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .12); }
+.bf-warband[data-role="hero"] kbd { display: none; }
+/* Commanding: the button glows brass, matching the rings under the selected Forgelings. */
+.bf-warband[aria-pressed="true"] { border-color: #ffc857; background: linear-gradient(180deg, rgba(92, 64, 22, .92), rgba(40, 28, 12, .92));
+  box-shadow: 0 0 0 1px rgba(255, 200, 87, .35), 0 0 18px rgba(255, 200, 87, .35), var(--ui-shadow, 0 6px 18px rgba(0, 0, 0, .38)); }
+.bf-warband[aria-pressed="true"] .bf-warband-icon { animation: bf-warband-pulse 1.2s ease-in-out infinite; }
+.bf-warband.bf-warband-hurt .bf-warband-count { color: #ff8a6a; }
+@keyframes bf-warband-pulse { 50% { box-shadow: 0 0 12px rgba(255, 200, 87, .7); } }
+@media (prefers-reduced-motion: reduce) { .bf-warband[aria-pressed="true"] .bf-warband-icon { animation: none; } }
+
+/* Touch: compact (icon and count), just right of the move stick. */
+body.touch-controls-active .bf-warband { left: calc(124px + env(safe-area-inset-left, 0px)); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); min-height: 44px; padding: 4px 10px 4px 5px; gap: 6px; }
+body.touch-controls-active .bf-warband kbd, body.touch-controls-active .bf-warband-name { display: none; }
+body.touch-controls-active .bf-warband[aria-pressed="true"] .bf-warband-name { display: inline; }
+body.touch-controls-active .bf-warband-count { font-size: .82rem; color: var(--ui-text, #f6ead0); }
+/* Not over menus, the lobby or VR. */
+body:not([data-phase="game"]) .bf-warband { display: none; }

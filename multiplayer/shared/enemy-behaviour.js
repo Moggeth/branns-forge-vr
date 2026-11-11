@@ -1,4 +1,5 @@
-import {BATTLE,battleBot,battleObjectives,battleWaypoint} from './battle-mode.js';
+import {BATTLE,battleBot,sidedUnit,battleObjectives,battleWaypoint} from './battle-mode.js';
+import {WARBAND,warbandGoal,warbandLanded} from './warband.js';
 // Fixed-tick movement and committed melee. No clocks, rendering or random streams.
 // Strike remains tick 18: the existing authored animations depend on that contract.
 import {PICK_WALL} from './terrain.js';
@@ -25,7 +26,9 @@ const radius=e=>isCritter(e.kind)?CRITTER[e.kind].radius:e.kind==='ent'?entSpec(
 // Home-base Stormspires (b.home) belong to the base, so roaming foes never march across the map for them.
 export function stepEnemies(state,{ground,resolve,damageHero,damageStructure,damageEnemy,damageBase,events}){
  const heroes=state.players.filter(p=>p.role==='hero'),defenders=(state.inventions?.defenders||[]).filter(d=>d.hp>0),buildings=(state.inventions?.structures||[]).filter(b=>b.type!=='forge'&&b.type!=='stormspire'&&!b.home&&b.hp>0),targets=[...heroes,...defenders,...buildings],grid=new Map(),cell=2;
- const battleBots=state.enemies.filter(battleBot),baseTargets=battleObjectives(state),pendingHits=[];
+ const battleBots=state.enemies.filter(sidedUnit),baseTargets=battleObjectives(state),pendingHits=[];
+ // Wild creatures fight a God's Forgelings as readily as Heroes; Forgelings fight every wild creature but the harmless root critters.
+ const warband=battleBots.filter(e=>e.warband&&e.hp>0),wild=state.enemies.filter(e=>!sidedUnit(e)&&e.kind!=='stumpling');
  const originals=state.enemies.map(e=>({id:e.id,position:[...e.position],radius:radius(e),yaw:e.yaw,side:e.side}));
  for(const e of originals){const k=`${Math.floor(e.position[0]/cell)},${Math.floor(e.position[2]/cell)}`;if(!grid.has(k))grid.set(k,[]);grid.get(k).push(e);}
  const blocked=(a,b)=>{const n=Math.ceil(flat(a,b)/.18);for(let i=1;i<n;i++){const t=i/n,p=a.map((v,k)=>v+(b[k]-v)*t);p[1]+=1.05;const q=[...p];resolve(q,0,.04);if(flat(p,q)>.003||ground(p[0],p[2])>p[1])return true;}return false;};
@@ -33,6 +36,7 @@ export function stepEnemies(state,{ground,resolve,damageHero,damageStructure,dam
   if(!state.enemies.includes(e)||e.hp<=0)continue;
   if(e.meteorBorn&&state.tick-e.unfurlTick<90)continue;
   if(e.kind==='skeleton'&&state.tick-(e.emergeTick??-1e9)<EMERGE_TICKS)continue;
+  if(e.warband&&!warbandLanded(e,state.tick))continue; // still dropping out of the forge-light
   // An ent tearing free of the ground, or sinking its roots for good, neither walks nor strikes.
   if(e.kind==='ent'&&(entWaking(e,state.tick)||entRooting(e,state.tick)))continue;
   // Root critters never fight: they wander, flee and burrow (shared/stumplings.js).
@@ -43,10 +47,11 @@ export function stepEnemies(state,{ground,resolve,damageHero,damageStructure,dam
   // Kettlebellies, Bramblehogs and Kegtoters run their own rules (shared/critters.js); they never join battle lanes.
   if(isCritter(e.kind)){stepCritter(state,e,{heroes,foes:state.enemies,buildings,ground,resolve,damageHero,damageEnemy:(f,n,ev,side,ownerId)=>damageEnemy?.(f,n,ev,side,ownerId),damageStructure:(id,n,ev)=>damageStructure?.(id,n,ev),events});continue;}
   // Bodies in the Underways and on the surface never chase each other across the gap (shared/underways/space.js).
-  const foes=(battleBot(e)?[...targets.filter(h=>(h.side||'party')!==e.side),...battleBots.filter(h=>h.side!==e.side&&h.hp>0)]:targets).filter(h=>sameSpace(h.position,e.position));
-  let target=null,best=Infinity;for(const h of foes){const d=flat(e.position,h.position);if(d<best){best=d;target=h;}}
+  const foes=(sidedUnit(e)?[...targets.filter(h=>(h.side||'party')!==e.side),...battleBots.filter(h=>h.side!==e.side&&h.hp>0),...(e.warband?wild.filter(h=>h.hp>0):[])]:[...targets,...warband]).filter(h=>sameSpace(h.position,e.position));
+  let target=null,best=Infinity,patrol=false,pace=0;
+  if(e.warband){const goal=warbandGoal(state,e,foes);target=goal.target;best=goal.dist;patrol=goal.patrol;pace=goal.speed;}
+  else for(const h of foes){const d=flat(e.position,h.position);if(d<best){best=d;target=h;}}
   if(e.uw!==undefined&&best>16)target=null; // dungeon foes hold their room until a Hero comes close (they cannot path round corners from afar)
-  let patrol=false;
   if(battleBot(e)&&(!target||best>BATTLE.aggroRange)){target=battleWaypoint(state,e,ground);best=flat(e.position,target.position);patrol=!!target.battleLane;}
   if(e.id.startsWith('camp_')&&best>14){const n=Number(e.id.replace(/\D/g,''))||0,a=state.tick/360+n;target={id:'patrol',position:[(n%2?-37:37)+Math.sin(a)*2,e.position[1],30+Math.cos(a)*2]};best=flat(e.position,target.position);patrol=true;}
   if(!target)continue;
@@ -58,7 +63,7 @@ export function stepEnemies(state,{ground,resolve,damageHero,damageStructure,dam
   if(!committed&&!staggered){
    const dx=target.position[0]-e.position[0],dz=target.position[2]-e.position[2];
    const legs=e.missingParts.filter(p=>p.endsWith('Leg')).length;
-   const speed=(ent?ent.speed:e.kind==='golem'?1.25*(e.boss?BOSS.speed:1):2*SKELETON_PACE[skeletonKindIndex(e.id)])*(legs===2?.2:legs===1?.55:1)*(e.slowUntil>state.tick?.35:1);
+   const speed=(pace?pace:ent?ent.speed:e.kind==='golem'?1.25*(e.boss?BOSS.speed:1):2*SKELETON_PACE[skeletonKindIndex(e.id)])*(legs===2?.2:legs===1?.55:1)*(e.slowUntil>state.tick?.35:1);
    let vx=best>1.5?dx/Math.max(best,.001)*speed:0,vz=best>1.5?dz/Math.max(best,.001)*speed:0;
    const sx=vx/speed||0,sz=vz/speed||0,self=radius(e);let ax=0,az=0;
    const ci=Math.floor(e.position[0]/cell),cj=Math.floor(e.position[2]/cell);
@@ -109,7 +114,7 @@ export function stepEnemies(state,{ground,resolve,damageHero,damageStructure,dam
    const victim=[...foes,...baseTargets.filter(b=>b.side!==e.side)].find(p=>p.id===e.attackTarget);if(!victim)continue;
    const d=flat(e.position,victim.position),dot=(-Math.sin(e.yaw)*(victim.position[0]-e.position[0])-Math.cos(e.yaw)*(victim.position[2]-e.position[2]))/Math.max(d,.001);
    if(d<((buildings.includes(victim)||baseTargets.includes(victim))?3.5:ent?ent.strike:2*bossScale(e))&&dot>.65&&Math.abs(e.position[1]-victim.position[1])<1.8&&(e.hurtTick??-1000)<e.attackTick&&(e.flinchTick??-1000)<e.attackTick&&((buildings.includes(victim)||baseTargets.includes(victim))||!blocked(e.position,victim.position))){
-    const arms=e.missingParts.filter(p=>p.endsWith('Arm')).length;const amount=(ent?ent.damage:e.kind==='golem'?22*(e.boss?BOSS.damage:1):10)*(arms===2?.25:arms===1?.65:1);if(baseTargets.includes(victim))pendingHits.push(()=>damageBase?.(victim.id,amount,e.side));else if(battleBots.includes(victim))pendingHits.push(()=>damageEnemy?.(victim,amount,events,e.side));else if(buildings.includes(victim))damageStructure?.(victim.id,amount,events,e.side);else if(defenders.includes(victim))victim.hp=Math.max(0,victim.hp-amount);else{const start=events.length;damageHero(state,victim,amount,events,e.position);if(ent)for(let i=start;i<events.length;i++)if(events[i].kind==='hit')events[i].sourceMaterial='wood';}
+    const arms=e.missingParts.filter(p=>p.endsWith('Arm')).length;const amount=(e.warband?WARBAND.damage:ent?ent.damage:e.kind==='golem'?22*(e.boss?BOSS.damage:1):10)*(arms===2?.25:arms===1?.65:1);if(baseTargets.includes(victim))pendingHits.push(()=>damageBase?.(victim.id,amount,e.side));else if(battleBots.includes(victim)||e.warband&&state.enemies.includes(victim))pendingHits.push(()=>damageEnemy?.(victim,amount,events,e.side,e.warband?.owner));else if(buildings.includes(victim))damageStructure?.(victim.id,amount,events,e.side);else if(defenders.includes(victim))victim.hp=Math.max(0,victim.hp-amount);else{const start=events.length;damageHero(state,victim,amount,events,e.position);if(ent)for(let i=start;i<events.length;i++)if(events[i].kind==='hit')events[i].sourceMaterial='wood';}
    }
   }
  }

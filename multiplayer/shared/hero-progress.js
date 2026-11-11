@@ -112,16 +112,17 @@ export function adoptProgress(state, p) {
 }
 
 /** Award XP to a hero. Emits level_up (with the new level) for each level crossed. */
-export function grantXp(state, p, amount, events, position) {
-  if (!p || p.role !== 'hero' || !finite(amount) || amount <= 0) return 0;
+/** anyRole: credit a player's Hero progression even while they play God (their Warband's kills). */
+export function grantXp(state, p, amount, events, position, {anyRole = false} = {}) {
+  if (!p || (p.role !== 'hero' && !(anyRole && p.role === 'god')) || !finite(amount) || amount <= 0) return 0;
   const before = levelOf(p), xp = Math.min(XP_MAX, (p.xp || 0) + Math.round(amount));
   if (xp === (p.xp || 0)) return 0;
   p.xp = xp;
   const after = levelOf(p);
   if (after > before) {
     // Levelling up restores the hero to their new, larger health.
-    p.hp = heroMaxHp(p);
-    events?.push({kind: 'level_up', id: p.id, level: after, points: talentPoints(p), maxHp: p.hp, position: [...(position || p.position)]});
+    if (p.role === 'hero') p.hp = heroMaxHp(p);
+    events?.push({kind: 'level_up', id: p.id, level: after, points: talentPoints(p), maxHp: heroMaxHp(p), position: [...(position || p.position)]});
   }
   remember(state, p);
   return after - before;

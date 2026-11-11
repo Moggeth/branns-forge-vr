@@ -67,6 +67,9 @@ import {createRangedReticle} from './ranged-reticle.js';
 import {createTrajectoryGuide,shouldShowTrajectory} from './ranged-trajectory.js';
 import {attachEmberdew,setEmberdewTime} from './emberdew-presentation.js';
 import './ranged-reticle.css';
+import './warband-hud.css';
+import {createWarbandView} from './warband-view.js';
+import {createWarbandHud} from './warband-hud.js';
 import {createTimberlineSight} from './timberline-sight.js';
 import {createColliderDebug} from './collider-debug.js';
 import {createTimberlineAmmoHud,TIMBERLINE_SCOPE} from './timberline-scope.js';
@@ -217,7 +220,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   const equipment=['axe','pick','hammer','crossbow','bow','limb','wyrmspout','flask','staff','flockwright'];
   // Number keys pick from the hotbar; a held bone (limb) comes only from grabbing one (F), so it has no slot.
   const hotbarSlots=equipment.filter(t=>t!=='limb');
-  const spellKeys={Digit1:'grove',Digit2:'ring',Digit3:'wave',Digit4:'heal',Digit5:'spring',Digit6:'blessing',KeyQ:'raise',KeyE:'lower',KeyR:'wall',KeyT:'sunder',KeyY:'crystal',KeyU:'quake',Digit7:'skeleton',Digit8:'squad',Digit9:'golem',Equal:'rabble',Digit0:'awaken',Minus:'wildwake',KeyZ:'lightning',KeyX:'frost',KeyC:'starfall',KeyV:'rainfall'}; // one keyboard row per school (Grow, Shape, Summon, Sky)
+  const spellKeys={Digit1:'grove',Digit2:'ring',Digit3:'wave',Digit4:'heal',Digit5:'spring',Digit6:'blessing',KeyQ:'raise',KeyE:'lower',KeyR:'wall',KeyT:'sunder',KeyY:'crystal',KeyU:'quake',Digit7:'skeleton',Digit8:'squad',Digit9:'golem',Equal:'rabble',Digit0:'awaken',Minus:'wildwake',KeyF:'muster',KeyZ:'lightning',KeyX:'frost',KeyC:'starfall',KeyV:'rainfall'}; // one keyboard row per school (Grow, Shape, Summon, Sky)
   let tool = 'axe', swingContact = false, swingReach = 2.5, swingRest = null, swingTarget = null;
   const remoteBatches=new Map();
   const weaponModels = new Map(), weaponTip = new THREE.Vector3(0,.5,-.35);
@@ -590,6 +593,40 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   const skeletonFx=createSkeletonFx({scene,height:(x,z)=>heightAt(x,z,snapshot.edits),audio:()=>audioContext});const goldenFlight=[];
   yield;
   const spellVisual=createSpellPresentation({scene,terrainGrid:true,tickSeconds:1/60,getTerrainTick:()=>{const t=terrainShownTick();return Number.isFinite(t)?t:snapshot.tick??0;},height:(x,z)=>heightAt(x,z,snapshot.edits),quality:globalThis.matchMedia?.('(pointer: coarse)').matches?'medium':'high',reducedMotion:!!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches});
+  // The Warband (shared/warband.js): Forgelings the God musters, selects and orders from above, and who escort the Hero.
+  const warbandView=createWarbandView({scene,heightAt:(x,z)=>heightAt(x,z,snapshot.edits)});
+  const warbandSelected=new Set();let warbandCommanding=false,warbandRightDown=null;
+  const warbandHud=createWarbandHud({mount:document.body,onPress:()=>warbandPress()});
+  function myWarband(){return (snapshot.enemies||[]).filter(e=>e.warband?.owner===playerId&&e.hp>0).sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0);}
+  function startCommand(){const units=myWarband();if(!units.length){report('You have no Forgelings yet. Cast Muster (F) from the Command spells.');return false;}
+    warbandCommanding=true;warbandSelected.clear();for(const e of units)warbandSelected.add(e.id);cancelCast();
+    report(touchEnabled?'Commanding: tap the land to march, tap an enemy to attack.':'Commanding: right-click (or click) the land to march, an enemy to attack. Shift-click a Forgeling to pick it out. G or Esc to stop.');return true;}
+  function stopCommand(){warbandCommanding=false;warbandSelected.clear();}
+  function warbandPress(){unlockAudio();if(!active)return;if(role==='god'){if(warbandCommanding)stopCommand();else startCommand();return;}
+    if(!myWarband().length)return;onAction('warband',{order:'follow'});warbandView.ping('move',localPosition.toArray());report('Your Forgelings fall in behind you.');}
+  // The body nearest a point on the land, within reach of a click (rendered roots, so it matches what is seen).
+  function bodyNear(point,test,reach=1.5){let best=null,d=reach;for(const e of snapshot.enemies||[]){if(!(e.hp>0)||!test(e))continue;const at=actors.get(`e:${e.id}`)?.root.position;if(!at)continue;const k=Math.hypot(at.x-point.x,at.z-point.z);if(k<d){d=k;best=e;}}return best;}
+  function warbandOrderAt(point){
+    const units=[...warbandSelected];if(!units.length)return;
+    const foe=bodyNear(point,e=>!e.warband&&e.kind!=='stumpling'&&(e.side===undefined||e.side!==(snapshot.players?.find(p=>p.id===playerId)?.side||'party')),1.8);
+    if(foe){onAction('warband',{order:'attack',target:foe.id,units});warbandView.ping('attack',foe.position,`e:${foe.id}`);}
+    else{const y=heightAt(point.x,point.z,snapshot.edits);onAction('warband',{order:'move',point:[point.x,y,point.z],units});warbandView.ping('move',[point.x,y,point.z]);}
+  }
+  function updateWarband(dt){
+    const units=myWarband(),live=new Set(units.map(e=>e.id));for(const id of warbandSelected)if(!live.has(id))warbandSelected.delete(id);
+    if(warbandCommanding&&!warbandSelected.size)stopCommand();
+    const god=role==='god'&&!renderer.xr.isPresenting;
+    warbandView.update({units:units.map(e=>({data:e,entry:actors.get(`e:${e.id}`),selected:god&&warbandSelected.has(e.id)})).filter(u=>u.entry),god,camera,dt,actorOf:key=>actors.get(key)});
+    warbandHud.update({n:renderer.xr.isPresenting?0:units.length,role,commanding:god&&warbandCommanding,hurt:units.some(e=>e.hp<50)});
+  }
+  /** A God's click on the land: true when the Warband used it (so no spell is cast). */
+  function warbandClick(point,shift=false){
+    const mine=bodyNear(point,e=>e.warband?.owner===playerId,1.2);
+    // Clicking one of yours takes command of the whole warband; Shift-click picks single Forgelings in or out.
+    if(mine){if(!warbandCommanding){startCommand();if(shift){warbandSelected.clear();warbandSelected.add(mine.id);}}else if(shift){if(warbandSelected.has(mine.id)&&warbandSelected.size>1)warbandSelected.delete(mine.id);else warbandSelected.add(mine.id);}return true;}
+    if(warbandCommanding){warbandOrderAt(point);return true;}
+    return false;
+  }
   const cleaveView=createAxeCleaveView({scene,height:(x,z)=>heightAt(x,z,snapshot.edits),reducedMotion:!!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches});
   // Level-ups and weapon-talent effects (client/talent-fx.js): the column rides the hero's presented position.
   const talentFx=createTalentFx({scene,height:(x,z)=>heightAt(x,z,snapshot.edits),reducedMotion:!!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
@@ -768,7 +805,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   }
   function upgradeActor(entry) {
     if (!entry.enemy || !entry.visual.userData.placeholder) return;
-    const forgeling = entry.data.side === 'party' && entry.data.battleRun !== undefined && entry.data.kind === 'skeleton' && templates.has('forgeling'); // Dawnhold's own troops
+    const forgeling = entry.data.side === 'party' && (entry.data.battleRun !== undefined || entry.data.warband) && entry.data.kind === 'skeleton' && templates.has('forgeling'); // Dawnhold's own troops and a God's Warband
     const model = entry.data.kind==='ent'?entView.build(entry.data):entry.data.kind==='stumpling'?stumplingView.build(entry.data):isCritter(entry.data.kind)?critterView.build(entry.data):forgeling?instantiate('forgeling',1.81,entry.data.id):instantiate(entry.data.kind==='golem'?'golem':'skeleton',entry.data.kind==='golem'?2.8*bossScale(entry.data):1.7,entry.data.id);
     if (!model) return;
     if (typeof entry.data.boss === 'string' && entry.data.kind === 'golem') dressBoss(model, entry.data.boss); // the Expedition Heart guardian
@@ -778,7 +815,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     entry.root.add(model);
     if (entry.data.boss === true) underways.dressGuardian(model, 2.8 * BOSS_SCALE); // the Underways' crowned guardian
     if (forgeling) dressForgelingModel(model, entry.data.id);
-    else if (entry.data.side === 'party' && entry.data.battleRun !== undefined && ['skeleton', 'golem'].includes(entry.data.kind)) dressForgeling(model, entry.data.kind);
+    else if (entry.data.side === 'party' && (entry.data.battleRun !== undefined || entry.data.warband) && ['skeleton', 'golem'].includes(entry.data.kind)) dressForgeling(model, entry.data.kind);
   }
   // Remote Heroes swap the placeholder for the shared hero body; Gods and the local player keep their existing visuals.
   function upgradeHero(entry) {
@@ -1042,7 +1079,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   function waveTap(point){const player=snapshot.players.find(p=>p.id===playerId),dx=point[0]-(player?.position[0]??0),dz=point[2]-(player?.position[2]??0),d=Math.hypot(dx,dz),ux=d>.001?dx/d:-Math.sin(player?.yaw??0),uz=d>.001?dz/d:-Math.cos(player?.yaw??0),h=GROWTH.wave.tapLength/2,c=v=>THREE.MathUtils.clamp(v,-55,55);return [[c(point[0]-uz*h),point[1],c(point[2]+ux*h)],[c(point[0]+uz*h),point[1],c(point[2]-ux*h)]];}
   function fitLine(start,end){const dx=end[0]-start[0],dz=end[2]-start[2],d=Math.hypot(dx,dz);return d<=18?end:[start[0]+dx/d*17.99,end[1],start[2]+dz/d*17.99];}
   function targetPreview(){
-    if(!active||role!=='god'||!cursor.visible)return null;
+    if(!active||role!=='god'||!cursor.visible||warbandCommanding)return null; // commanding the Warband: clicks are orders, not casts
     const player=snapshot.players.find(p=>p.id===playerId),hit=hitPoint.toArray();
     let point=isLineSpell()?hit:settledPoint(spell,hit[0],hit[2]),start,end,fallback=false,lineCount=earthLineEdits();
     if(isLineSpell()){
@@ -1290,6 +1327,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     if(!event?.position||event.fire)return;
     const woodSound=!!woodAudio?.handles(event);if(woodSound&&!predictedImpact)woodAudio.play(event,listenerPose());if(event.kind==='ent_wake'||event.kind==='ent_root')rootRumble(event);
     const materialSound=!!materialAudio?.handles(event);if(materialSound&&!predictedImpact)materialAudio.play(event,listenerPose(),snapshot.tick);
+    if(event.kind==='warband_muster'&&event.by===playerId)report(touchEnabled?'Your Forgelings have landed. Tap the Warband button, then tap the land to send them.':'Your Forgelings have landed. Press G (or click one) to command them; right-click to send them.');
     if(event.kind==='spell'){spellVisual.play(event);spellAudio?.play(event,earXZ(),role==='god');if((event.spell==='wall'||event.spell==='sunder')&&event.rupture)earthLineFeel(event);}
     // God spells feed the Heroes (shared/god-boons.js): a blue resonance marks each gift; boons spark on the Hero.
     if(event.kind==='bloom_level'){const at=event.position||[0,0,0];spellVisual.play({spell:'bloom_level',position:at,id:`bloom:${event.level}:${snapshot.tick}`,tick:snapshot.tick});spellAudio?.gift({...event,gift:'bloom_level',position:at},earXZ(),true);if(touchEnabled)try{navigator.vibrate?.([20,40,20,40,40]);}catch{}}
@@ -1704,7 +1742,8 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   listen(window, 'keydown', event => {
     if (!active || /INPUT|TEXTAREA|SELECT/.test(event.target?.tagName) || event.target?.isContentEditable) return;
     unlockAudio();
-    if (role === 'god' && event.code === 'Escape') { cancelCast(); return; }
+    if (role === 'god' && event.code === 'Escape') { cancelCast(); stopCommand(); return; }
+    if (role === 'god' && event.code === 'KeyG' && !event.repeat && !inventionPlacement) { warbandPress(); return; }
     if (role === 'hero' && event.code === 'Escape' && wallAim) { cancelWallAim(); return; }
     if (role === 'hero' && event.code === 'Escape' && cinderAim) { releaseCinderAim(false); return; }
     if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(event.code)) event.preventDefault();
@@ -1739,8 +1778,8 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   listen(canvas, 'pointerdown', event => {
     if (!active || event.pointerType !== 'mouse') return;
     if (role === 'hero') { return;    } else {
-      if (event.button === 2) { cancelCast(); rightDrag = true; }
-      if (event.button === 0 && !quickKey) { const hit = pointerHit(event); if (hit) castAt(hit.point); }
+      if (event.button === 2) { cancelCast(); rightDrag = true; warbandRightDown = {x: event.clientX, y: event.clientY}; }
+      if (event.button === 0 && !quickKey) { const hit = pointerHit(event); if (hit && !warbandClick(hit.point, event.shiftKey)) castAt(hit.point); }
     }
   });
   // Pointerdown fires only for the first pressed mouse button. Native mouse
@@ -1757,6 +1796,8 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   listen(window,'pointerup',event=>{
     if(event.pointerType!=='mouse')return; // touch buttons own their press/release; another finger must not release a held bow
     rightDrag=false;
+    // A right-click that did not orbit orders the selected Forgelings (RTS convention).
+    if(event.button===2&&warbandRightDown&&role==='god'&&active){const moved=Math.hypot(event.clientX-warbandRightDown.x,event.clientY-warbandRightDown.y);warbandRightDown=null;if(moved<6&&warbandSelected.size&&event.target===canvas){const hit=pointerHit(event);if(hit)warbandOrderAt(hit.point);}}
     if(event.button===0){
       if(role!=='hero'&&castStart&&!touchEnabled&&!quickKey){
         const hit=event.target===canvas?pointerHit(event):null;
@@ -1998,7 +2039,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
           animation.motion = motion;
         }
       }
-      if (entry.enemy) presentEnemyRoot(entry, renderTick, dt);
+      if (entry.enemy) { presentEnemyRoot(entry, renderTick, dt); if (entry.data.warband) warbandView.present(entry, renderTick); }
       else {
         entry.root.position.lerp(entry.target, 1 - Math.exp(-dt * 12));
         entry.root.rotation.y = entry.data.head ? 0 : entry.data.yaw || 0;
@@ -2035,7 +2076,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
       pickFx.update({time:now/1000,dt,charge:readiness.specialReady??1,shown,swinging:swingLive||!!specialSwing||pickWallMotion.active||inspect.active(),moving:move.lengthSq()>.01,sun:pickSun.copy(sun.position).sub(sun.target.position),night:skyCycle.stats().night||0,deposits:snapshot.deposits,player:localPosition,vr:renderer.xr.isPresenting});}
     enemyShadows.update(actors,role==='god'?pan:localPosition,now,{maxCasters:touchEnabled?4:8});
     spellVisual.setTarget(targetPreview());
-    spellVisual.update(now,dt);cleaveView.update(performance.now());talentFx.update(dt);emberdewFx.update(dt);
+    updateWarband(dt);    spellVisual.update(now,dt);cleaveView.update(performance.now());talentFx.update(dt);emberdewFx.update(dt);
     const estimatedTick = (snapshot.tick || 0) + Math.min(0.3, (now - snapshotAt) / 1000) * 60;
     for (const warning of warnings.values()) {
       const remaining = Math.max(0, warning.impactTick - estimatedTick);
@@ -2206,7 +2247,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     },
     setRole(next) {
       if (next !== 'hero' && next !== 'god') return;
-      clearInput(); role = next; fixedAim = null; aimTerrain = null; cursor.visible = false; correction.set(0, 0, 0);
+      clearInput(); role = next; fixedAim = null; aimTerrain = null; cursor.visible = false; correction.set(0, 0, 0); if (role !== 'god') stopCommand();
       if (role === 'god') { pan.copy(localPosition); if (document.pointerLockElement === canvas) document.exitPointerLock(); }
       report(role === 'god' ? 'God: WASD pan, right-drag orbit, wheel zoom, click to cast.' : 'Hero: click to look, WASD move, Space jump, click strike.');
     },
@@ -2232,6 +2273,11 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     beginAimLine() { if(active&&role==='god'&&isLineSpell()&&!castStart&&cursor.visible)castStart=hitPoint.clone(); },
     cancelAim() { fixedAim = null; aimTerrain = null; cancelCast(); if (active && role === 'god') updateTouchAim(); },
     castAim() { if (active && role === 'god' && updateTouchAim()) castAt(hitPoint); },
+    commanding() { return active && role === 'god' && warbandCommanding; },
+    // A God's tap on the land: an order while commanding, or picking up command by tapping a Forgeling. True when used.
+    commandTap(x, y) { if (!active || role !== 'god' || inventionPlacement) return false; camera.updateMatrixWorld(); const hit = pointerHit({clientX: x, clientY: y}); return !!hit && warbandClick(hit.point); },
+    warbandState() { return {commanding: warbandCommanding, selected: [...warbandSelected], units: myWarband().map(e => ({id: e.id, order: e.warband.order, position: e.position, hp: e.hp}))}; },
+    warbandPress() { warbandPress(); },
     centerView() { if (active && role === 'god') { pan.copy(localPosition); fixedAim = null; aimTerrain = null; } },
     jump() { if (active && role === 'hero' && !manned) jumpPending = true; },
     // Phones wind the manned Timberline by holding the Wind button (the Jump slot while seated).
@@ -2252,7 +2298,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     // Lobby pushes adventureView() while XR is presenting; null hides. Pointer hand: 'right' (default) or 'left'.
     setExpedition(view, next, id) { if (!disposed) adventurePanel.update(view, next, id); },
     setExpeditionPointerHand(hand) { adventurePanel.setPointerHand(hand); },
-    controlsSnapshot() {return {godPan:[pan.x,pan.z],orbit:[orbitYaw,orbitRadius,orbitTilt],pointerRecovery:{resumeCapture,deliberateRelease,wasCaptured},inventionPlacement,manned:manned?{...manned}:null,timberlineAim:manned?{scoping,scope:scopeAmount,fov:camera.fov,forecast:timberlineSight.forecast?{distance:timberlineSight.forecast.distance,time:timberlineSight.forecast.impact?.t??null,points:timberlineSight.forecast.left.length/3}:null,sight:timberlineSight.object.visible,ammoHud:timberlineAmmoHud.element.hidden?null:timberlineAmmoHud.element.textContent}:null,yaw,pitch,orbitYaw,orbitTilt,orbitRadius,pan:pan.toArray(),swingAt,weapon:{tool,aiming,ads:adsAmount,fov:camera.fov,zeroDistance:30,...weapons.state()},castStart:castStart?.toArray()||null,castPoint:cursor.visible?hitPoint.toArray():null};},
+    controlsSnapshot() {return {warband:{commanding:warbandCommanding,selected:[...warbandSelected]},godPan:[pan.x,pan.z],orbit:[orbitYaw,orbitRadius,orbitTilt],pointerRecovery:{resumeCapture,deliberateRelease,wasCaptured},inventionPlacement,manned:manned?{...manned}:null,timberlineAim:manned?{scoping,scope:scopeAmount,fov:camera.fov,forecast:timberlineSight.forecast?{distance:timberlineSight.forecast.distance,time:timberlineSight.forecast.impact?.t??null,points:timberlineSight.forecast.left.length/3}:null,sight:timberlineSight.object.visible,ammoHud:timberlineAmmoHud.element.hidden?null:timberlineAmmoHud.element.textContent}:null,yaw,pitch,orbitYaw,orbitTilt,orbitRadius,pan:pan.toArray(),swingAt,weapon:{tool,aiming,ads:adsAmount,fov:camera.fov,zeroDistance:30,...weapons.state()},castStart:castStart?.toArray()||null,castPoint:cursor.visible?hitPoint.toArray():null};},
     async canVR() { return !!(navigator.xr && await navigator.xr.isSessionSupported('immersive-vr').catch(() => false)); },
     async enterVR() {
       if (disposed) throw new Error('Renderer has been disposed.');
@@ -2277,7 +2323,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
       renderer.setAnimationLoop(null); resizeObserver.disconnect(); removers.forEach(remove => remove());
       renderer.xr.getSession()?.end().catch(() => {});
       mixers.forEach(mixer => mixer.stopAllAction()); settlementVisual.dispose();inventionVisual.dispose();stormWeapon.dispose();stormView.dispose();stormJolt.el?.remove();lightning.dispose();heroView.dispose();
-      underways.dispose();heldResourceArt.dispose();critterView.dispose();timberlineSight.dispose();colliderDebug?.dispose();timberlineAmmoHud.dispose();document.body.classList.remove('timberline-manned');rewards.dispose();swingTrail.dispose();pickFx.dispose();skeletonFx.dispose();cleaveView.dispose();talentFx.dispose();emberdewFx.dispose();flaskGuide.dispose();cinderMarkers.dispose();appleSnack.dispose();siegebirdSight?.dispose();bottleFx.dispose();rangedReticle.dispose();blueprintHud.dispose();trajectoryGuide.dispose();document.body.classList.remove('ranged-aim-active');startingWorld.dispose();meteorCreatures.dispose();enemyShadows.dispose();feedback.dispose();adventurePanel.dispose();expedition.dispose();combat.dispose();entView.dispose();stumplingView.dispose();spellVisual.dispose();impacts.dispose();golemFx.dispose();fireVisual.dispose();stopFireAudio();woodAudio?.dispose();woodAudio=null;spellAudio?.dispose();spellAudio=null;materialAudio?.dispose();materialAudio=null;skyCycle.dispose();larimarCove.dispose();orchard.dispose();meadow.dispose();oreGlint.dispose();skyline.dispose();
+      underways.dispose();warbandView.dispose();warbandHud.dispose();heldResourceArt.dispose();critterView.dispose();timberlineSight.dispose();colliderDebug?.dispose();timberlineAmmoHud.dispose();document.body.classList.remove('timberline-manned');rewards.dispose();swingTrail.dispose();pickFx.dispose();skeletonFx.dispose();cleaveView.dispose();talentFx.dispose();emberdewFx.dispose();flaskGuide.dispose();cinderMarkers.dispose();appleSnack.dispose();siegebirdSight?.dispose();bottleFx.dispose();rangedReticle.dispose();blueprintHud.dispose();trajectoryGuide.dispose();document.body.classList.remove('ranged-aim-active');startingWorld.dispose();meteorCreatures.dispose();enemyShadows.dispose();feedback.dispose();adventurePanel.dispose();expedition.dispose();combat.dispose();entView.dispose();stumplingView.dispose();spellVisual.dispose();impacts.dispose();golemFx.dispose();fireVisual.dispose();stopFireAudio();woodAudio?.dispose();woodAudio=null;spellAudio?.dispose();spellAudio=null;materialAudio?.dispose();materialAudio=null;skyCycle.dispose();larimarCove.dispose();orchard.dispose();meadow.dispose();oreGlint.dispose();skyline.dispose();
       waygateView.dispose();beaconView.dispose();
       disposeResources(scene);
       for (const template of templates.values()) disposeResources(template.scene);
