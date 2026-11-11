@@ -6,6 +6,7 @@ import {sitesOf} from '../shared/wilds.js';
 import {inUnderway} from '../shared/underways/space.js';
 import {nextWeapon, costShortfall, WEAPON_NAMES} from '../shared/arsenal.js';
 import {materialLabel} from '../shared/material-catalog.js';
+import {chunkContent, CHUNK} from '../shared/worldgen/content.js';
 
 const KIND = {settlement: 'village', landmark: 'landmark', discovery: 'find', entrance: 'cave'};
 const SUB = {ruin: 'ruin', shrine: 'shrine', grove: 'grove', camp: 'camp', cache: 'cache', cave: 'cave mouth', peak: 'peak', falls: 'falls', lake: 'lake',
@@ -40,10 +41,52 @@ export function wildsGuideView(snapshot, playerId) {
 
 const costText = cost => Object.entries(cost).map(([k, n]) => `${n} ${materialLabel(k)}`).join(', ');
 /** The weapon ladder goal (shared/arsenal.js): what to forge next and what is still missing. Empty when done or off. */
+// Where the first missing material can be had, so day one never stalls on "where is iron?". Scans the generated
+// rocks within FIND_CHUNKS of the hero and, for crystal, the shrines and ruins that pay it out. The scan is spread
+// over calls (SCAN_PER_CALL chunks each, so a phone never hitches on chunks the view hasn't generated yet) and
+// memoised on a 24 m grid, so it only reruns when the hero has moved or a rock or site was used up.
+const FIND_CHUNKS = 4, SCAN_PER_CALL = 2, findMemo = new WeakMap();
+function scanRocks(job, world) {
+  const side = 2 * FIND_CHUNKS + 1;
+  for (let n = 0; n < SCAN_PER_CALL && job.next < side * side; n++, job.next++) {
+    const i = job.next % side - FIND_CHUNKS, j = Math.floor(job.next / side) - FIND_CHUNKS;
+    for (const r of chunkContent(world, job.cx + i, job.cz + j).rocks) {
+      if (r.kind !== job.kind || job.spent.has(r.id)) continue;
+      const d = Math.hypot(r.x - job.x, r.z - job.z); if (!job.best || d < job.best.d) job.best = {x: r.x, z: r.z, d};
+    }
+  }
+  return job.next >= side * side;
+}
+function findHint(snapshot, me, key) {
+  if (key === 'wood') return 'Fell any tree: three axe cuts in one spot bring it down.';
+  const world = worldFor(snapshot.world); if (!world) return '';
+  const [x, , z] = me.position, cell = `${key}:${Math.round(x / 24)}:${Math.round(z / 24)}:${snapshot.wilds?.spent?.length || 0}:${snapshot.wilds?.cleared?.length || 0}`;
+  let memo = findMemo.get(world); if (!memo) findMemo.set(world, memo = new Map());
+  let job = memo.get(cell);
+  if (!job) {
+    if (memo.size > 64) memo.clear();
+    job = {kind: key === 'iron' ? 'iron' : 'crystal', x, z, cx: Math.floor(x / CHUNK), cz: Math.floor(z / CHUNK), next: 0, best: null,
+      spent: new Set((snapshot.wilds?.spent || []).map(e => e[0])), line: null};
+    memo.set(cell, job);
+  }
+  if (job.line !== null) return job.line;
+  if (!scanRocks(job, world)) return '';
+  let spot = job.best, what = key === 'iron' ? 'rust-red iron seam' : 'crystal growth';
+  if (key === 'gems') {
+    const cleared = new Set(snapshot.wilds?.cleared || []);
+    for (const s of sitesOf(world)) {
+      const kind = ['shrine', 'ruin'].find(k => s.kind === k || s.sub === k); if (!kind || cleared.has(s.id)) continue;
+      const d = Math.hypot(s.x - x, s.z - z);
+      if (!spot || d < spot.d) { spot = {x: s.x, z: s.z, d}; what = s.name.toLowerCase().includes(kind) ? s.name : `${kind}, ${s.name}`; }
+    }
+  }
+  return job.line = spot ? `Nearest ${what}: ${metres(spot.d)} ${compassWord(spot.x - x, spot.z - z)}.` : '';
+}
 export function forgeLine(snapshot, me) {
   const rung = nextWeapon(snapshot, me); if (!rung) return '';
   const name = WEAPON_NAMES[rung.tool] || rung.tool, short = costShortfall(me.resources, rung.cost);
-  return Object.keys(short).length ? `Forge next: the ${name} (${costText(rung.cost)}). Still need ${costText(short)}.`
+  const first = Object.keys(short)[0];
+  return first ? `Forge next: the ${name} (${costText(rung.cost)}). Still need ${costText(short)}. ${findHint(snapshot, me, first)}`.trim()
     : `Ready! Take your haul to the village forge and press the ${name} on your hotbar.`;
 }
 const svg = d => `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="${d}"/></svg>`;
