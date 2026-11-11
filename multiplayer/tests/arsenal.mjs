@@ -56,6 +56,14 @@ test('forging needs the next rung, the price and the forge, then the weapon is y
   assert.equal(nextWeapon(st, hero).tool, second.tool);
 });
 
+test('carried iron ore pays for iron, metal first', () => {
+  const {hero, cmd, place} = rig();
+  place(hero, 0, 4); hero.resources.wood = 6; hero.resources.iron = 1; hero.resources.ironOre = 5;
+  assert.deepEqual(costShortfall(hero.resources, WEAPON_LADDER[0].cost), {});
+  assert.equal(cmd({action: 'craftWeapon', tool: WEAPON_LADDER[0].tool}).ok, true);
+  assert.equal(hero.resources.iron, 0); assert.equal(hero.resources.ironOre, 2); assert.equal(hero.resources.wood, 0);
+});
+
 test('forged weapons save by hero name and survive a reload with new peer ids', () => {
   const {sim, hero, cmd, place} = rig();
   place(hero, 0, 3);
