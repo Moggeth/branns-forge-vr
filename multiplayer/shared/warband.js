@@ -211,8 +211,9 @@ export function stepWarbandWork(state, ctx, events) {
   // A trunk on its way down: wait for its logs rather than start on another tree.
   const falling = o.job === 'wood' && state.harvestedTrees.some(c => c.cuts >= 3 && !c.landed && ctx.trees?.get(c.id) && flat([ctx.trees.get(c.id).x, 0, ctx.trees.get(c.id).z], o.point) <= WARBAND.area);
   const taken = new Set(state.enemies.filter(u => u !== e && u.warband?.owner === w.owner && u.warband.order?.target).map(u => u.warband.order.target));
-  const list = sources(state, o.job, o.point, WARBAND.area, falling ? null : ctx.trees).filter(c => !(memo.avoid.get(c.id) > state.tick));
-  if (!list.length) { if (!falling) e.warband.order = {kind: 'hold', point: [...o.point]}; continue; } // the area is bare: stand guard there
+  const all = sources(state, o.job, o.point, WARBAND.area, falling ? null : ctx.trees), list = all.filter(c => !(memo.avoid.get(c.id) > state.tick));
+  // Bare: stand guard there. Only sources it has given up on for now: wait at the point and try them again later.
+  if (!list.length) { if (!falling && !all.length) e.warband.order = {kind: 'hold', point: [...o.point]}; continue; }
   // Nearest first, spread out: a source a teammate already works counts as six metres further (trees take a crew).
   const cost = c => flat(c.position, e.position) + (taken.has(c.id) ? (c.type === 'tree' || c.type === 'ore' ? 3 : 12) : 0) + (c.type === 'tree' ? 4 : 0);
   const pick = list.reduce((a, b) => cost(b) < cost(a) || (cost(b) === cost(a) && b.id < a.id) ? b : a);

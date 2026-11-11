@@ -594,7 +594,15 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   yield;
   const spellVisual=createSpellPresentation({scene,terrainGrid:true,tickSeconds:1/60,getTerrainTick:()=>{const t=terrainShownTick();return Number.isFinite(t)?t:snapshot.tick??0;},height:(x,z)=>heightAt(x,z,snapshot.edits),quality:globalThis.matchMedia?.('(pointer: coarse)').matches?'medium':'high',reducedMotion:!!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches});
   // The Warband (shared/warband.js): Forgelings the God musters, selects and orders from above, and who escort the Hero.
-  const warbandView=createWarbandView({scene,heightAt:(x,z)=>heightAt(x,z,snapshot.edits)});
+  // A Forgeling's load uses the same authored art as the world: the tree kit's log, the ore and crystal pickups.
+  function warbandLoad(kind){
+    if(kind==='wood'){const src=templates.get('log')?.scene;if(!src)return null;const log=src.clone(true),drop=[];log.traverse(n=>{if(n.name.toLowerCase().includes('colonly'))drop.push(n);});for(const n of drop)n.removeFromParent();
+      const size=new THREE.Box3().setFromObject(log).getSize(new THREE.Vector3()),long=Math.max(size.x,size.y,size.z)||1,g=new THREE.Group();log.scale.setScalar(1.05/long);
+      if(size.y===long)log.rotation.x=Math.PI/2;else if(size.x===long)log.rotation.y=Math.PI/2; // lie it along the body, front to back
+      g.add(log);return g;}
+    const art=heldResourceArt.pickup(kind==='gems'?'crystal':kind);if(art)art.scale.setScalar(HELD_SCALE*1.4);return art;
+  }
+  const warbandView=createWarbandView({scene,heightAt:(x,z)=>heightAt(x,z,snapshot.edits),makeLoad:warbandLoad});
   const warbandSelected=new Set();let warbandCommanding=false,warbandRightDown=null;
   const warbandHud=createWarbandHud({mount:document.body,onPress:()=>warbandPress()});
   function myWarband(){return (snapshot.enemies||[]).filter(e=>e.warband?.owner===playerId&&e.hp>0).sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0);}

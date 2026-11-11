@@ -12,7 +12,7 @@ const DROP = 4; // metres: what a 0.9 s fall from rest covers
 function ringGeometry(inner, outer, segments = 40) { const g = new THREE.RingGeometry(inner, outer, segments); g.rotateX(-Math.PI / 2); return g; }
 const glow = color => new THREE.MeshBasicMaterial({color, transparent: true, opacity: .9, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, toneMapped: false});
 
-export function createWarbandView({scene, heightAt}) {
+export function createWarbandView({scene, heightAt, makeLoad}) {
  const root = new THREE.Group(); root.name = 'WarbandView'; scene.add(root);
  const selRing = ringGeometry(.62, .78), selTicks = ringGeometry(.86, .94, 12), pinRing = ringGeometry(.16, .3, 16), ripple = ringGeometry(.86, 1, 48);
  const barBack = new THREE.PlaneGeometry(.9, .1), barFill = new THREE.PlaneGeometry(1, .07); barFill.translate(.5, 0, 0);
@@ -28,14 +28,10 @@ export function createWarbandView({scene, heightAt}) {
   ring.name = `WarbandSelect${i}`; return {ring, ticks, pin, bar, fill};
  });
  const ripples = Array.from({length: 4}, () => { const move = mats.move.clone(), attack = mats.attack.clone(), m = new THREE.Mesh(ripple, move); fills.push(move, attack); m.visible = false; m.renderOrder = 6; root.add(m); return {mesh: m, move, attack, age: 9, target: null, at: new THREE.Vector3()}; });
- // Loads: one pooled mesh per kind per carrier (every player's Forgelings, so a haul is never invisible).
- const CARRY_MAX = 12;
- const loadGeo = {wood: new THREE.CylinderGeometry(.13, .15, 1.05, 7), ironOre: new THREE.DodecahedronGeometry(.2, 0), gems: new THREE.OctahedronGeometry(.18, 0)};
- loadGeo.wood.rotateX(Math.PI / 2); loadGeo.gems.scale(.8, 1.5, .8);
- const loadMat = {wood: new THREE.MeshStandardMaterial({color: 0x8a5a32, roughness: .85}),
-  ironOre: new THREE.MeshStandardMaterial({color: 0x8c5a44, roughness: .7, metalness: .35, flatShading: true}),
-  gems: new THREE.MeshStandardMaterial({color: 0xb68cff, emissive: 0x6a3ccf, emissiveIntensity: .9, roughness: .25, flatShading: true})};
- const loads = Object.fromEntries(Object.keys(loadGeo).map(k => [k, Array.from({length: CARRY_MAX}, () => { const m = new THREE.Mesh(loadGeo[k], loadMat[k]); m.visible = false; m.castShadow = false; root.add(m); return m; })]));
+ // Loads: authored resource art (makeLoad(kind) -> Object3D or null while assets stream in), pooled per kind for
+ // every player's carriers, so a haul is never invisible and never a stand-in primitive.
+ const CARRY_MAX = 12, loads = {wood: [], ironOre: [], gems: []};
+ const loadAt = (kind, i) => { const pool = loads[kind]; if (!pool[i]) { const m = makeLoad?.(kind); if (!m) return null; m.visible = false; root.add(m); pool[i] = m; } return pool[i]; };
  const offset = new THREE.Vector3();
  let next = 0, time = 0;
 
@@ -58,13 +54,13 @@ export function createWarbandView({scene, heightAt}) {
   time += dt;
   const used = {wood: 0, ironOre: 0, gems: 0};
   for (const c of carriers) {
-   const kind = c.data.warband?.cargo?.kind, pool = loads[kind]; if (!pool || used[kind] >= CARRY_MAX || c.entry?.root.visible === false) continue;
-   const m = pool[used[kind]++], r = c.entry.root;
+   const kind = c.data.warband?.cargo?.kind; if (!loads[kind] || used[kind] >= CARRY_MAX || c.entry?.root.visible === false) continue;
+   const m = loadAt(kind, used[kind]); if (!m) continue; used[kind]++; const r = c.entry.root;
    // Wood rides the right shoulder along the body; ore and crystal are hugged in front of the chest.
    offset.set(kind === 'wood' ? .24 : 0, kind === 'wood' ? 1.5 : 1.05, kind === 'wood' ? .05 : -.32).applyQuaternion(r.quaternion);
    m.position.copy(r.position).add(offset); m.quaternion.copy(r.quaternion); m.visible = true;
   }
-  for (const k of Object.keys(loads)) for (let i = used[k]; i < CARRY_MAX; i++) loads[k][i].visible = false;
+  for (const k of Object.keys(loads)) for (let i = used[k]; i < loads[k].length; i++) loads[k][i].visible = false;
   const pulse = .82 + .18 * Math.sin(time * 5);
   slots.forEach((s, i) => {
    const u = units[i];
@@ -94,7 +90,7 @@ export function createWarbandView({scene, heightAt}) {
  }
  return {present, ping, update, dispose() {
   scene.remove(root);
-  for (const g of [selRing, selTicks, pinRing, ripple, barBack, barFill, ...Object.values(loadGeo)]) g.dispose();
-  for (const m of [...Object.values(mats), ...fills, ...Object.values(loadMat)]) m.dispose();
+  for (const g of [selRing, selTicks, pinRing, ripple, barBack, barFill]) g.dispose();
+  for (const m of [...Object.values(mats), ...fills]) m.dispose(); // loads share the world's resource art and templates: not ours to dispose
  }};
 }

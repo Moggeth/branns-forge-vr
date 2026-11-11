@@ -74,4 +74,18 @@ const units = warbandOf(S, 'g'), at = units[0].position;
 const raider = createEnemy('wildG', [at[0] + 2.5, at[1], at[2]], 'skeleton'); S.enemies.push(raider);
 run(60 * 25, () => !S.enemies.includes(raider));
 assert.ok(!S.enemies.includes(raider), 'gatherers defend themselves');
+// A Forgeling that cannot reach the last seam leaves it for a while but keeps the order, and comes back to it.
+{
+ const sim2 = createSimulation({seed: 7}); sim2.addPlayer({id: 'g', role: 'god'}); const S2 = sim2.adventureWorld(), g2 = S2.players[0];
+ S2.enemies.length = 0; S2.battle = createBattle(); g2.mana = 100;
+ sim2.command('g', {type: 'cast', seq: 1, spell: 'muster', point: [30, 0, -30]}); for (let i = 0; i < WARBAND.landTicks + 2; i++) sim2.step();
+ const lone = S2.deposits.find(d => d.id === 'ore12'); for (const d of S2.deposits) if (d !== lone) d.depleted = true, d.hits = d.maxHits;
+ sim2.command('g', {type: 'action', seq: 2, action: 'warband', order: 'move', point: [lone.x, 0, lone.z]});
+ const crew = warbandOf(S2, 'g'), pinned = crew.map(e => [...e.position]);
+ for (let i = 0; i < 60 * 10; i++) { sim2.step(); crew.forEach((e, k) => { e.position = [...pinned[k]]; }); } // walled off: no headway at all
+ assert.ok(crew.every(e => e.warband.order.kind === 'gather'), 'a source given up on for now does not end the order');
+ for (let i = 0; i < 60 * 30 && !lone.hits; i++) sim2.step(); // the wall is gone: once the wait is over they come back to it
+ assert.ok(lone.hits > 0, 'they return to the seam');
+}
+
 console.log(JSON.stringify({status: 'pass', iron: god.resources.ironOre - ironBefore, wood: god.resources.wood - woodBefore, units: units.length}));
