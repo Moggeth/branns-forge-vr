@@ -7,14 +7,15 @@ import * as THREE from 'three';
 //   smoke   the same shape in soot and grey, rising and swelling for ~2 s, alpha-blended and soft-edged
 //   ring    a dust-and-heat band racing out along the ground to the blast radius
 //   scorch  a dark burnt disc on the ground under it, fading over a few seconds
-// Style: 'keg' (black powder: orange fire, black smoke) or 'kettle' (a boiler: steam-white flash and white cloud).
+// Style: 'keg' (black powder: orange fire, black smoke), 'kettle' (a boiler: steam-white flash and white cloud) or
+// 'crystal' (a golem's heart: blue-white flash and resonance ring only).
 // Budget: POOL blasts at once (the oldest recycles), four draws each while alive, zero when idle; phones get a lower
 // sphere detail. No lights: the fire is emissive, so it never changes the scene's light count (no shader rebuilds).
 //
 //   const fx = createBlastFx({scene, height, quality});
 //   fx.blast([x,y,z], 'keg', radius); fx.update(dt); fx.stats(); fx.dispose();
 
-export const BLAST_FX = Object.freeze({pool: 4, fire: .55, smoke: 2.2, ring: .6, scorch: 7});
+export const BLAST_FX = Object.freeze({pool: 4, fire: .55, smoke: 2.2, ring: .6, scorch: 7, shards: 96, shardLife: 1.8});
 
 const NOISE = `
 float h3(vec3 p){p=fract(p*.3183099+.1);p*=17.;return fract(p.x*p.y*p.z*(p.x+p.y+p.z));}
@@ -46,6 +47,8 @@ void main(){vec2 p=vUv*2.-1.;float r=length(p),a=atan(p.y,p.x);float edge=.7+.12
 
 const STYLES = {
   keg: {hot: [1, .86, .55], warm: [1, .42, .06], smoke: [.2, .18, .16], ring: [1, .7, .35], scorch: true, size: .32, smokeSize: .3, rise: 2.6},
+  // A golem's crystal heart giving way: a cold blue-white flash and a resonance ring, no smoke and no scorch.
+  crystal: {hot: [.62, .88, 1], warm: [.18, .5, 1], smoke: [0, 0, 0], ring: [.45, .8, 1], scorch: false, smokeless: true, overlay: true, shards: 28, size: .2, smokeSize: 0, rise: 0},
   kettle: {hot: [1, .97, .88], warm: [.9, .62, .35], smoke: [.9, .92, .94], ring: [.95, .97, 1], scorch: false, size: .18, smokeSize: .3, rise: 1.8},
 };
 const smooth = t => { t = Math.min(1, Math.max(0, t)); return t * t * (3 - 2 * t); };
@@ -68,6 +71,39 @@ export function createBlastFx({scene, height = () => 0, quality = 'high'} = {}) 
     return {...parts, age: Infinity, alive: false, radius: 3, style: STYLES.keg, seed: 0, x: 0, y: 0, z: 0, gy: 0};
   };
   const pool = Array.from({length: BLAST_FX.pool}, make);
+  // Glowing crystal shards (crystal style): one instanced draw, a ring buffer that recycles the oldest shard.
+  const shardMesh = new THREE.InstancedMesh(new THREE.OctahedronGeometry(1, 0).scale(.45, 1, .45), new THREE.MeshBasicMaterial({color: 0xbfe6ff, toneMapped: false}), BLAST_FX.shards);
+  shardMesh.name = 'blast-shards'; shardMesh.frustumCulled = false; shardMesh.count = 0; shardMesh.visible = false; shardMesh.userData.ignoreContact = true;
+  shardMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene?.add(shardMesh);
+  const SH = BLAST_FX.shards, sp = new Float32Array(SH * 3), sv = new Float32Array(SH * 3), sw = new Float32Array(SH * 3), sa = new Float32Array(SH).fill(Infinity), ss = new Float32Array(SH), srot = new Float32Array(SH * 3);
+  let shardNext = 0, shardsLive = 0;
+  const r = (seed, n) => { const x = Math.sin(seed * 12.9898 + n * 78.233) * 43758.5453; return x - Math.floor(x); };
+  function shards(b, count) {
+    for (let i = 0; i < count; i++) {
+      const k = shardNext; shardNext = (shardNext + 1) % SH; if (!(sa[k] < BLAST_FX.shardLife)) shardsLive++;
+      const a = r(b.seed, i) * 6.283, e = .2 + r(b.seed, i + 40) * 1.1, v = 2.5 + r(b.seed, i + 80) * 4.5;
+      sp.set([b.x, b.y, b.z], k * 3); sv.set([Math.cos(a) * Math.cos(e) * v, Math.sin(e) * v + 1.5, Math.sin(a) * Math.cos(e) * v], k * 3);
+      sw.set([(r(b.seed, i + 120) - .5) * 20, (r(b.seed, i + 160) - .5) * 20, (r(b.seed, i + 200) - .5) * 20], k * 3); srot.set([0, 0, 0], k * 3);
+      sa[k] = 0; ss[k] = .05 + r(b.seed, i + 240) * .07;
+    }
+  }
+  const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _p = new THREE.Vector3(), _s = new THREE.Vector3();
+  function stepShards(dt) {
+    if (!shardsLive) return;
+    let n = 0;
+    for (let k = 0; k < SH; k++) {
+      if (!(sa[k] < BLAST_FX.shardLife)) continue;
+      sa[k] += dt; if (sa[k] >= BLAST_FX.shardLife) { shardsLive--; continue; }
+      const i = k * 3; sv[i + 1] -= 12 * dt;
+      for (let j = 0; j < 3; j++) { sp[i + j] += sv[i + j] * dt; srot[i + j] += sw[i + j] * dt; }
+      const g = height(sp[i], sp[i + 2]) + ss[k];
+      if (sp[i + 1] < g) { sp[i + 1] = g; sv[i + 1] *= -.3; sv[i] *= .55; sv[i + 2] *= .55; sw[i] *= .5; sw[i + 1] *= .5; sw[i + 2] *= .5; }
+      const fade = 1 - smooth((sa[k] - BLAST_FX.shardLife * .6) / (BLAST_FX.shardLife * .4));
+      _m.compose(_p.set(sp[i], sp[i + 1], sp[i + 2]), _q.setFromEuler(_e.set(srot[i], srot[i + 1], srot[i + 2])), _s.setScalar(ss[k] * fade));
+      shardMesh.setMatrixAt(n++, _m);
+    }
+    shardMesh.count = n; shardMesh.visible = n > 0; shardMesh.instanceMatrix.needsUpdate = true;
+  }
   let next = 0, live = 0;
   const stats = {blasts: 0, recycled: 0};
 
@@ -82,6 +118,8 @@ export function createBlastFx({scene, height = () => 0, quality = 'high'} = {}) 
     b.scorch.material.uniforms.uSeed.value = b.seed;
     b.fire.position.set(b.x, b.y + .45, b.z); b.ring.position.set(b.x, b.gy + .12, b.z); b.scorch.position.set(b.x, b.gy + .03, b.z);
     b.scorch.rotation.y = b.seed;
+    b.fire.material.depthTest = !S.overlay; // a flash inside a body still reads
+    if (S.shards) shards(b, low ? Math.ceil(S.shards / 2) : S.shards);
     stats.blasts++;
     pose(b);
   }
@@ -97,7 +135,7 @@ export function createBlastFx({scene, height = () => 0, quality = 'high'} = {}) 
     }
     // Smoke: takes over from the fire, rolls up and out, then thins.
     const su = a / BLAST_FX.smoke, smoke = b.smoke.material.uniforms;
-    b.smoke.visible = a > .06 && su < 1;
+    b.smoke.visible = !S.smokeless && a > .06 && su < 1;
     if (b.smoke.visible) {
       const k = 1 - (1 - su) ** 2;
       b.smoke.position.set(b.x, b.y + .5 + S.rise * k, b.z);
@@ -115,13 +153,14 @@ export function createBlastFx({scene, height = () => 0, quality = 'high'} = {}) 
     if (!b.fire.visible && !b.smoke.visible && !b.ring.visible && !b.scorch.visible) { b.alive = false; live--; }
   }
   function update(dt) {
-    if (!live) return;
     dt = Math.min(Math.max(dt || 0, 0), 1 / 15);
+    stepShards(dt);
+    if (!live) return;
     for (const b of pool) if (b.alive) { b.age += dt; pose(b); }
   }
   function dispose() {
     for (const b of pool) for (const k of ['fire', 'smoke', 'ring', 'scorch']) { b[k].removeFromParent(); b[k].material.dispose(); }
-    ballGeo.dispose(); discGeo.dispose();
+    ballGeo.dispose(); discGeo.dispose(); shardMesh.removeFromParent(); shardMesh.geometry.dispose(); shardMesh.material.dispose();
   }
-  return {blast, update, dispose, stats: () => ({...stats, live, pool: pool.length}), pool};
+  return {blast, update, dispose, stats: () => ({...stats, live, shards: shardsLive, pool: pool.length}), pool};
 }

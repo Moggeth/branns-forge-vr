@@ -12,7 +12,7 @@
 //   cling: globs stuck to a foe burn twice as long; a clinging foe that dies splashes sticky fire on its neighbours.
 import {addFuel,applyHeat} from './fire.js';
 import {applyEnemyScorch,partPosition} from './combat.js';
-import {hasTalent} from './hero-progress.js';
+import {hasTalent, talentRank, byRank} from './hero-progress.js';
 
 export const WYRMSPOUT = Object.freeze({
   burstTicks: 105,        // a full tank sprays for 1.75 s
@@ -28,6 +28,9 @@ export const WYRMSPOUT = Object.freeze({
   gout: Object.freeze({cooldown: 360, cost: .35, speed: 11.5, loft: 2.2, lifeTicks: 130, radius: 2.4, fuelRadius: 2.1, fuel: .75, damage: 22, burn: 180, goo: 3}),
   flood: Object.freeze({duration: 1.5, volume: 1.3, reach: 1.3}),
   cling: Object.freeze({burn: 2, splashRadius: 2.5, splashFuel: .5}),
+  // Talent ranks II and III: Wyrmflood's extra globs per tank; Clinging Fire's splash radius and fuel.
+  floodRanks: Object.freeze([1, 1, 1.15, 1.3]),
+  clingRanks: Object.freeze([null, [2.5, .5], [3, .5], [3.5, .7]]),
 });
 
 export {hasTalent};
@@ -35,7 +38,7 @@ export {hasTalent};
 /** Per-player spray tuning: the base table with the player's specialties applied. */
 export function sprayTuning(p) {
   const W = WYRMSPOUT, flood = hasTalent(p, 'wyrmspout', 'flood'), cling = hasTalent(p, 'wyrmspout', 'cling');
-  const burstTicks = Math.round(W.burstTicks * (flood ? W.flood.duration : 1)), globs = Math.round(W.globs * (flood ? W.flood.volume : 1));
+  const burstTicks = Math.round(W.burstTicks * (flood ? W.flood.duration : 1)), globs = Math.round(W.globs * (flood ? W.flood.volume * byRank(talentRank(p, 'wyrmspout', 'flood'), W.floodRanks) : 1));
   const reach = flood ? W.flood.reach : 1;
   return {flood, cling, burstTicks, globs, cost: 1 / globs, intervalMs: burstTicks / globs / 60 * 1000,
     speed: W.speed * Math.sqrt(reach), lifeTicks: Math.round(W.lifeTicks * reach), gravity: W.gravity,
@@ -88,14 +91,15 @@ export function goutBurst(state, shot, point, ctx, events) {
 /** Clinging Fire: a foe dying with clinging fire on it bursts and splashes its neighbours. */
 export function clingSplash(state, enemy, ctx, events) {
   if (!enemy.cling || !((enemy.burnUntil || 0) > state.tick) || !ctx?.terrainHeight) return;
-  const C = WYRMSPOUT.cling, at = partPosition(enemy, 'torso'), ground = ctx.terrainHeight(state, at[0], at[2]);
-  addFuel(state, [at[0], ground, at[2]], 1.2, C.splashFuel, true);
-  const burn = sprayTuning(state.players.find(p => p.id === enemy.gooBy)).burnTicks;
+  const owner = state.players.find(p => p.id === enemy.gooBy), [splashRadius, splashFuel] = byRank(Math.max(1, talentRank(owner, 'wyrmspout', 'cling')), WYRMSPOUT.clingRanks);
+  const at = partPosition(enemy, 'torso'), ground = ctx.terrainHeight(state, at[0], at[2]);
+  addFuel(state, [at[0], ground, at[2]], 1.2, splashFuel, true);
+  const burn = sprayTuning(owner).burnTicks;
   for (const e of state.enemies) {
     if (e === enemy || e.hp <= 0) continue;
     const t = partPosition(e, 'torso');
-    if (Math.hypot(t[0] - at[0], t[1] - at[1], t[2] - at[2]) > C.splashRadius) continue;
+    if (Math.hypot(t[0] - at[0], t[1] - at[1], t[2] - at[2]) > splashRadius) continue;
     stickGlob(state, e, 'torso', enemy.gooBy, burn); e.splashedTick = state.tick;
   }
-  events.push({kind: 'cling_splash', id: enemy.id, by: enemy.gooBy, position: at, radius: C.splashRadius});
+  events.push({kind: 'cling_splash', id: enemy.id, by: enemy.gooBy, position: at, radius: splashRadius});
 }

@@ -16,7 +16,7 @@ import {EMBERDEW,cinderLaunch,cinderVelocities} from './emberdew.js';
 // Phoenix Flare: launch speed and extra upward loft (m/s), and the fuse before it bursts (ticks).
 export const FLARE=Object.freeze({speed:30,loft:6,fuse:48});
 import {skeletonShield} from './skeleton-kinds.js';
-import {damageScale,grantXp,killXp,hasTalent,heroMaxHp} from './hero-progress.js';
+import {damageScale,grantXp,killXp,hasTalent,talentRank,byRank,heroMaxHp} from './hero-progress.js';
 import {itemBonus} from './hero-items.js';
 import {payKillGold} from './home-shop.js';
 import {tavernSafe} from './taverns.js';
@@ -53,8 +53,10 @@ export function siegebirdPerfect(elapsed,{quick=false,hand=false,window=SIEGEBIR
   return hand?elapsed>=Math.round(SIEGEBIRD.handMin*d)&&elapsed<=Math.round(SIEGEBIRD.handLatch*d)+window:Math.abs(elapsed-Math.round(SIEGEBIRD.latch*d))<=window;
 }
 // Golden Flock (Siegebird talent) triples the chance and raises its ceiling.
-export const GOLDEN_FLOCK=Object.freeze({multiplier:3,max:.35});
-export function siegebirdGoldenChance(hits=0,flock=false){const c=SIEGEBIRD.goldenBase+Math.max(0,hits)*SIEGEBIRD.goldenPerHit;return flock?Math.min(GOLDEN_FLOCK.max,c*GOLDEN_FLOCK.multiplier):Math.min(SIEGEBIRD.goldenMax,c);}
+// Golden Flock (Siegebird talent) by rank I, II, III: how much more often the golden bird comes, and its ceiling.
+export const GOLDEN_FLOCK=Object.freeze({multiplier:3,max:.35,ranks:Object.freeze([[3,.35],[4,.42],[5,.5]])});
+/** `flock` is the Golden Flock rank (0..3; true counts as rank I). */
+export function siegebirdGoldenChance(hits=0,flock=0){const c=SIEGEBIRD.goldenBase+Math.max(0,hits)*SIEGEBIRD.goldenPerHit,r=flock===true?1:Math.max(0,Math.min(3,flock|0));if(!r)return Math.min(SIEGEBIRD.goldenMax,c);const [mult,max]=GOLDEN_FLOCK.ranks[r-1];return Math.min(max,c*mult);}
 // Deterministic per-reload roll (FNV-1a of player, reload index and tick): every peer replays it identically.
 export function siegebirdRoll(id,n,tick){let h=0x811c9dc5;for(const c of `${id}:${n}:${tick}`){h^=c.charCodeAt(0);h=Math.imul(h,0x01000193);}return (h>>>0)/4294967296;}
 // quick/wind are optional together (saves from before perfect wind carry only n, golden and hits).
@@ -211,6 +213,22 @@ function blastApart(state,enemy,parts,at,energy,skeleton){
     wake(d);
   });
 }
+// A golem that loses its binding goes over like a felled tower: it pivots on its feet away from the killing blow,
+// so the higher a stone sits the faster it swings out, and each block tumbles on its own once it hits the ground.
+// The legs kick back the other way. Seeded per body, so every peer sees the same fall.
+export const GOLEM_TOPPLE=Object.freeze({swing:2.1,lift:.9,spin:3.2,legKick:.7});
+function toppleGolem(state,enemy,parts,hit){
+  const T=GOLEM_TOPPLE,normal=unit(hit?.normal)?hit.normal:null,yaw=enemy.yaw;
+  let dir=normal?[-normal[0],-normal[2]]:[-Math.sin(yaw),-Math.cos(yaw)];const l=Math.hypot(...dir);dir=l>1e-3?[dir[0]/l,dir[1]/l]:[-Math.sin(yaw),-Math.cos(yaw)];
+  const axis=[dir[1],0,-dir[0]],base=enemy.position[1],scale=1.45*bossScale(enemy);
+  parts.forEach((d,i)=>{
+    const h=clamp((d.position[1]-base)/(2.6*scale),0,1.2),r=seeded(enemy.id,120+i),leg=d.part.endsWith('Leg');
+    const out=leg?-T.legKick*(.6+.8*r):T.swing*h*(.8+.4*r)*scale,side=(seeded(enemy.id,130+i)-.5)*.9;
+    d.velocity=[dir[0]*out+dir[1]*side,T.lift*(leg?.4:.6+.6*h),dir[1]*out-dir[0]*side].map(v=>clamp(v,-30,30));
+    d.angularVelocity=axis.map((a,k)=>a*T.spin*(leg?-.5:.6+h)*(.8+.4*r)+(seeded(enemy.id,140+i*3+k)-.5)*1.4);
+    wake(d);
+  });
+}
 // The same bang shoves whatever already lies about: old bones skitter, held pieces stay put. Deterministic.
 export function blastRemains(state,at,radius,power=1){
   if(!vec(at))return;
@@ -242,11 +260,16 @@ export function hitEnemyPart(state,enemy,part,amount,hit,ctx,events,{projectile=
   if(owner&&tavernSafe(state,owner))return false; // nobody fights from inside a tavern
   amount*=damageScale(owner); // +20% per hero level
   // Limbsplitter (axe talent): a swing that lands on a limb or head takes it clean off (armour still turns it).
-  if(!projectile&&!armored&&hit?.tool==='axe'&&part!=='torso'&&enemy.kind!=='stumpling'&&hasTalent(owner,'axe','limbsplitter'))amount=Math.max(amount,enemy.parts[part]);
+  const lopping=!projectile&&!armored&&hit?.tool==='axe'&&part!=='torso'&&enemy.kind!=='stumpling'&&hasTalent(owner,'axe','limbsplitter');
+  if(lopping)amount=Math.max(amount,enemy.parts[part]);
+  // Bonebreaker (hammer talent): the hammer cracks golem armour like a pick, and golems take more from it.
+  const breaker=!projectile&&hit?.tool==='hammer'&&enemy.kind==='golem'?talentRank(owner,'hammer','bonebreaker'):0;
+  if(breaker)amount*=byRank(breaker,BONEBREAKER);
   if((enemy.kind==='ent'||enemy.kind==='stumpling')&&hit?.tool==='axe')amount*=2; // the axe was made for wood
   if(isCritter(enemy.kind))amount*=critterDamageScale(enemy,state.tick); // a curled Bramblehog turns blows; a dizzy one is soft
-  if(armored){if(hit?.tool==='pick'){enemy.armor=Math.max(0,(enemy.armor??3)-1);events.push({kind:'armor_break',position:[...(hit.point||enemy.position)],id:enemy.id});}amount*=.45;}
+  if(armored){if(hit?.tool==='pick'||breaker){enemy.armor=Math.max(0,(enemy.armor??3)-1);events.push({kind:'armor_break',position:[...(hit.point||enemy.position)],id:enemy.id});}amount*=.45;}
   enemy.hurtTick=state.tick;enemy.parts[part]=Math.max(0,enemy.parts[part]-amount);
+  if(lopping&&enemy.parts[part]<=0&&owner.hp>0){const heal=byRank(talentRank(owner,'axe','limbsplitter'),LIMBSPLITTER_HEAL);if(heal)owner.hp=Math.min(heroMaxHp(owner),owner.hp+heal);}
   // A cracked skeleton arm or leg gives way before it is worn right down, so bones come off while it still fights.
   // Bolts, arrows and blunt blows crack bone; a clean one-swing cut with the axe stays the Limbsplitter talent's.
   if(enemy.kind==='skeleton'&&part.match(/Arm|Leg/)&&hit?.tool!=='axe'&&enemy.parts[part]<=BONE_DEATH.snapAt)enemy.parts[part]=0;
@@ -268,7 +291,7 @@ export function hitEnemyPart(state,enemy,part,amount,hit,ctx,events,{projectile=
     // so discard any contacts still attached to the dead actor before saves validate their targets.
     state.embeds=state.embeds.filter(e=>e.targetId!==enemy.id);
     clingSplash(state,enemy,ctx,events);
-    const style=deathStyle(enemy,part,hit,projectile);if(enemy.kind==='skeleton')ragdoll(state,enemy,fallen,hit,style);else if(enemy.kind==='golem'&&vec(hit?.blastFrom)&&fallen.length)blastApart(state,enemy,fallen,hit.blastFrom,clamp(Number(hit?.energy)||1,.5,2),false);events.push({kind:'death',position:[...enemy.position],id:enemy.id,creature:enemy.kind,part,normal:unit(hit?.normal)?[...hit.normal]:[0,1,0],energy:hit?.tool==='hammer'?1.8:1,...(style?{style}:{}),...(style&&vec(hit?.point)?{point:[...hit.point]}:{}),...(style==='headshot'&&unit(hit?.direction)?{direction:[...hit.direction],shot:hit.shot}:style==='shatter'&&unit(hit?.direction)?{direction:[...hit.direction]}:style==='blast'?{from:[...hit.blastFrom]}:{})});state.enemies.splice(state.enemies.indexOf(enemy),1);
+    const style=deathStyle(enemy,part,hit,projectile);if(enemy.kind==='skeleton')ragdoll(state,enemy,fallen,hit,style);else if(enemy.kind==='golem'&&fallen.length){if(vec(hit?.blastFrom))blastApart(state,enemy,fallen,hit.blastFrom,clamp(Number(hit?.energy)||1,.5,2),false);else toppleGolem(state,enemy,fallen,hit);}events.push({kind:'death',position:[...enemy.position],id:enemy.id,creature:enemy.kind,part,normal:unit(hit?.normal)?[...hit.normal]:[0,1,0],energy:hit?.tool==='hammer'?1.8:1,...(style?{style}:{}),...(style&&vec(hit?.point)?{point:[...hit.point]}:{}),...(style==='headshot'&&unit(hit?.direction)?{direction:[...hit.direction],shot:hit.shot}:style==='shatter'&&unit(hit?.direction)?{direction:[...hit.direction]}:style==='blast'?{from:[...hit.blastFrom]}:{})});state.enemies.splice(state.enemies.indexOf(enemy),1);
     if(critterDying)critterDeath(state,enemy,hit,{...ctx,hitEnemyPart},events,owner);}
   return true;
 }
@@ -324,7 +347,7 @@ export function projectileContact(state,m,ctx){
   // A golden bolt is radiant: it bursts through shields, bodies and remains (each once) and only a
   // world surface stops it. Every other projectile ends at its first contact.
   // Skewer (Siegebird talent): an ordinary bolt passes through up to SKEWER.max bodies, without the radiant burst.
-  const pierceKey=m.targetId+(shield?'#shield':''),piercing=(shot.golden||shot.skewer)&&(enemy||detached)&&(shot.pierced?.length||0)<(shot.golden?GOLDEN_PIERCE.max:SKEWER.max);
+  const pierceKey=m.targetId+(shield?'#shield':''),piercing=(shot.golden||shot.skewer)&&(enemy||detached)&&(shot.pierced?.length||0)<(shot.golden?GOLDEN_PIERCE.max:skewerMax(state,shot));
   if((shot.golden||shot.skewer)&&shot.pierced?.includes(pierceKey))return fail('already_pierced');
   if(piercing){(shot.pierced??=[]).push(pierceKey);if(vec(shot.velocity,100))shot.velocity=shot.velocity.map(v=>v*GOLDEN_PIERCE.keep);}
   else state.projectiles.splice(state.projectiles.indexOf(shot),1);
@@ -351,9 +374,18 @@ export function projectileContact(state,m,ctx){
   return ok(events);
 }
 export const GOLDEN_PIERCE=Object.freeze({max:6,keep:.85,radius:1.8,damage:24,push:2.2});
-export const SKEWER=Object.freeze({max:3});
+// Skewer (Siegebird talent): bodies an ordinary bolt passes through at rank I, II, III.
+export const SKEWER=Object.freeze({max:3,ranks:Object.freeze([3,4,5])});
+const skewerMax=(state,shot)=>byRank(talentRank(state.players.find(q=>q.id===shot.ownerId),'crossbow','skewer'),[SKEWER.max,...SKEWER.ranks]);
 // Ember Volley: minimum draw for the extra arrows and their yaw either side of the aim (radians, about 7 degrees).
-export const VOLLEY=Object.freeze({draw:.95,spread:.12});
+// Ember Volley (Emberwing talent): the draw needed and the arrows either side of the aim, by rank I, II, III.
+// Hammer ground slam: shockwave radius without Earthshaker, then at its rank I, II, III.
+export const HAMMER_SLAM=Object.freeze({radius:Object.freeze([5,6.5,7.5,8.5])});
+// Bonebreaker (hammer talent): hammer blows crack golem armour like a pick; golems take this much more by rank.
+export const BONEBREAKER=Object.freeze([1,1.5,1.75,2]);
+// Limbsplitter (axe talent): health back for every limb lopped, by rank (rank I lops; II and III heal).
+export const LIMBSPLITTER_HEAL=Object.freeze([0,0,4,8]);
+export const VOLLEY=Object.freeze({draw:.95,spread:.12,ranks:Object.freeze([{draw:.95,pairs:1},{draw:.8,pairs:1},{draw:.8,pairs:2}])});
 function strikeEnemy(state,shot,enemy,m,ctx,events){
   // Siegebird mastery: every bolt that lands on a foe makes the golden bird a little more likely.
   const owner=shot.kind==='bolt'&&!shot.heavy&&state.players.find(p=>p.id===shot.ownerId);if(owner?.siegebird)owner.siegebird.hits=Math.min(SIEGEBIRD.hitCap,owner.siegebird.hits+1);
@@ -447,14 +479,15 @@ export function combatAction(state,p,m,ctx){
     p.attackTick=state.tick;const id=ctx.nextId(state,'q'),speed=p.tool==='bow'?18+18*Math.max(.2,m.draw??.67):42;
     // The bolt on the rail was decided when the previous bird was sent; roll the next bird now.
     let golden=false,reload;
-    if(p.tool==='crossbow'){const sb=p.siegebird??={n:0,golden:false,hits:0};golden=sb.golden;sb.n=Math.min(1e9,sb.n+1);sb.golden=siegebirdRoll(p.id,sb.n,state.tick)<siegebirdGoldenChance(sb.hits,hasTalent(p,'crossbow','flock'));sb.quick=sb.wind===1;sb.wind=0;reload={n:sb.n,golden:sb.golden,...(sb.quick?{quick:true}:{})};}
+    if(p.tool==='crossbow'){const sb=p.siegebird??={n:0,golden:false,hits:0};golden=sb.golden;sb.n=Math.min(1e9,sb.n+1);sb.golden=siegebirdRoll(p.id,sb.n,state.tick)<siegebirdGoldenChance(sb.hits,talentRank(p,'crossbow','flock'));sb.quick=sb.wind===1;sb.wind=0;reload={n:sb.n,golden:sb.golden,...(sb.quick?{quick:true}:{})};}
     const skewer=p.tool==='crossbow'&&!golden&&hasTalent(p,'crossbow','skewer');
     state.projectiles.push({id,ownerId:p.id,side:p.side||'party',kind:p.tool==='bow'?'arrow':'bolt',position:[...m.origin],previousPosition:[...m.origin],velocity:m.direction.map(n=>n*speed),curve:p.tool==='bow'?[...curve]:[0,0,0],bornTick:state.tick,trail:[[...m.origin]],...(golden?{golden:true}:{}),...(skewer?{skewer:true}:{})});
     // Ember Volley (Emberwing talent): a full draw looses two more arrows fanned either side of the aim.
     const volley=[];
-    if(p.tool==='bow'&&(m.draw??.67)>=VOLLEY.draw&&hasTalent(p,'bow','volley'))for(const sign of [-1,1]){
+    const vr=p.tool==='bow'?talentRank(p,'bow','volley'):0,vspec=vr?VOLLEY.ranks[Math.min(3,vr)-1]:null;
+    if(vspec&&(m.draw??.67)>=vspec.draw)for(let k=1;k<=vspec.pairs;k++)for(const sign of [-1,1]){
       if(state.projectiles.length>=COMBAT_LIMITS.projectiles)break;
-      const a=sign*VOLLEY.spread,c=Math.cos(a),sn=Math.sin(a),[dx,dy,dz]=m.direction,extra=ctx.nextId(state,'q');
+      const a=sign*VOLLEY.spread*k,c=Math.cos(a),sn=Math.sin(a),[dx,dy,dz]=m.direction,extra=ctx.nextId(state,'q');
       state.projectiles.push({id:extra,ownerId:p.id,side:p.side||'party',kind:'arrow',position:[...m.origin],previousPosition:[...m.origin],velocity:[dx*c+dz*sn,dy,-dx*sn+dz*c].map(n=>n*speed),curve:[...curve],bornTick:state.tick,trail:[[...m.origin]]});
       volley.push(extra);
     }
@@ -473,15 +506,15 @@ export function combatAction(state,p,m,ctx){
   if(m.action==='special'&&['axe','pick'].includes(p.tool))return terrainSpecial(state,p,ctx,hitEnemyPart,m);
   if(m.action==='special'){
     if(p.tool!=='hammer')return fail('invalid_action');
-    if(state.tick-(p.specialTick??-1000)<specialCooldown('hammer'))return fail('cooldown');
-    const at=[p.position[0]-Math.sin(p.yaw)*1.5,p.position[1],p.position[2]-Math.cos(p.yaw)*1.5],events=[];
+    if(state.tick-(p.specialTick??-1000)<specialCooldown('hammer',p))return fail('cooldown');
+    const at=[p.position[0]-Math.sin(p.yaw)*1.5,p.position[1],p.position[2]-Math.cos(p.yaw)*1.5],events=[],radius=byRank(talentRank(p,'hammer','earthshaker'),HAMMER_SLAM.radius);
     p.specialTick=state.tick;
     // Each foe is struck by the shockwave from the slam's centre outward, so shattered bones fly away from it.
-    for(const e of [...state.enemies])if(dist(e.position,at)<5){
+    for(const e of [...state.enemies])if(dist(e.position,at)<radius){
       const dx=e.position[0]-at[0],dz=e.position[2]-at[2],r=Math.hypot(dx,dz),direction=r>.05?[dx/r,0,dz/r]:[-Math.sin(p.yaw),0,-Math.cos(p.yaw)],torso=partPosition(e,'torso');
       hitEnemyPart(state,e,'torso',65,{tool:p.tool,point:[torso[0]-direction[0]*.2,torso[1],torso[2]-direction[2]*.2],direction,ownerId:p.id},ctx,events);
     }
-    events.push({kind:'hammer_slam',id:p.id,position:at});return ok(events);
+    events.push({kind:'hammer_slam',id:p.id,position:at,...(radius>HAMMER_SLAM.radius[0]?{radius}:{})});return ok(events);
   }
   return null;
 }
@@ -545,7 +578,7 @@ export function validateCombat(saved,ids){
   const unique=id=>typeof id==='string'&&/^[A-Za-z0-9_-]{1,64}$/.test(id)&&!ids.has(id)&&(ids.add(id),true);
   const tick=n=>Number.isSafeInteger(n)&&n>=0&&n<=saved.tick;
   for(const [key,cap]of Object.entries(COMBAT_LIMITS))if(saved[key]!==undefined&&(!Array.isArray(saved[key])||saved[key].length>cap))throw Error('Invalid combat limit');
-  for(const p of saved.projectiles||[])if(!p||!unique(p.id)||typeof p.ownerId!=='string'||(p.side!==undefined&&!['party','rivals'].includes(p.side))||!['arrow','bolt','flame','fuel'].includes(p.kind)||(p.lit!==undefined&&typeof p.lit!=='boolean')||(p.golden!==undefined&&(p.golden!==true||p.kind!=='bolt'))||(p.skewer!==undefined&&(p.skewer!==true||p.kind!=='bolt'||p.golden))||(p.heavy!==undefined&&(p.heavy!==true||p.kind!=='bolt'||p.golden||p.skewer))||(p.flare!==undefined&&(p.flare!==true||p.kind!=='arrow'))||(p.gout!==undefined&&(p.gout!==true||p.kind!=='flame'))||(p.cluster!==undefined&&(p.cluster!==true||p.kind!=='fuel'))||(p.pierced!==undefined&&(!(p.golden||p.skewer)||!Array.isArray(p.pierced)||p.pierced.length>(p.golden?GOLDEN_PIERCE.max:SKEWER.max)||!p.pierced.every(k=>typeof k==='string'&&k.length<=72)))||!vec(p.position)||!vec(p.previousPosition)||!vec(p.velocity,p.kind==='fuel'?120:80)||!vec(p.curve,1.31)||Math.hypot(...p.curve)>1.31||!tick(p.bornTick)||!Array.isArray(p.trail)||p.trail.length<1||p.trail.length>16||!p.trail.every(q=>vec(q)))throw Error('Invalid projectile');
+  for(const p of saved.projectiles||[])if(!p||!unique(p.id)||typeof p.ownerId!=='string'||(p.side!==undefined&&!['party','rivals'].includes(p.side))||!['arrow','bolt','flame','fuel'].includes(p.kind)||(p.lit!==undefined&&typeof p.lit!=='boolean')||(p.golden!==undefined&&(p.golden!==true||p.kind!=='bolt'))||(p.skewer!==undefined&&(p.skewer!==true||p.kind!=='bolt'||p.golden))||(p.heavy!==undefined&&(p.heavy!==true||p.kind!=='bolt'||p.golden||p.skewer))||(p.flare!==undefined&&(p.flare!==true||p.kind!=='arrow'))||(p.gout!==undefined&&(p.gout!==true||p.kind!=='flame'))||(p.cluster!==undefined&&(p.cluster!==true||p.kind!=='fuel'))||(p.pierced!==undefined&&(!(p.golden||p.skewer)||!Array.isArray(p.pierced)||p.pierced.length>(p.golden?GOLDEN_PIERCE.max:SKEWER.ranks.at(-1))||!p.pierced.every(k=>typeof k==='string'&&k.length<=72)))||!vec(p.position)||!vec(p.previousPosition)||!vec(p.velocity,p.kind==='fuel'?120:80)||!vec(p.curve,1.31)||Math.hypot(...p.curve)>1.31||!tick(p.bornTick)||!Array.isArray(p.trail)||p.trail.length<1||p.trail.length>16||!p.trail.every(q=>vec(q)))throw Error('Invalid projectile');
   for(const e of [...saved.enemies,...(saved.detachedParts||[])])if(e.burnUntil!==undefined&&(!Number.isSafeInteger(e.burnUntil)||e.burnUntil<0||e.burnUntil>saved.tick+240||!PARTS.includes(e.burnPart))||e.burnPart!==undefined&&!PARTS.includes(e.burnPart))throw Error('Invalid burning part');
   for(const d of saved.detachedParts||[])if(d.scorch!==undefined&&(!Number.isFinite(d.scorch)||d.scorch<0||d.scorch>1))throw Error('Invalid detached scorch');
   for(const d of saved.detachedParts||[])if(d.rest!==undefined&&(!Number.isInteger(d.rest)||d.rest<0||d.rest>64)||d.joint!==undefined&&(!d.joint||typeof d.joint!=='object'||Object.keys(d.joint).length!==3||!vec(d.joint.a,4)||!vec(d.joint.b,4)||d.joint.to===d.id||(saved.detachedParts.find(o=>o.id===d.joint.to)?.sourceId)!==d.sourceId))throw Error('Invalid remains joint');
