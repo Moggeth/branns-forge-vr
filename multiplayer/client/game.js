@@ -149,7 +149,8 @@ import {siegebirdMechanism, siegebirdCues, SIEGEBIRD_RELOAD, siegebirdPlumage} f
 import {createFlockwrightRigs, FLOCKWRIGHT_POSE} from './flockwright.js';
 import {FLOCKWRIGHT} from '../shared/combat.js';
 import {armouryStand, hasFlockwright, ARMOURY_RULES} from '../shared/armoury.js';
-import {weaponShelved, WEAPON_NAMES} from '../shared/arsenal.js';
+import {weaponShelved, WEAPON_NAMES, weaponOwned, nextWeapon, costShortfall, nearForge, WEAPON_LADDER} from '../shared/arsenal.js';
+import {materialLabel} from '../shared/material-catalog.js';
 import {labsOn} from './labs.js';
 import {createSiegebirdWind, SIEGEBIRD_WIND} from './siegebird-wind.js';
 import {specialCooldown} from '../shared/special-cooldowns.js';
@@ -771,7 +772,21 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   const WEAPON_HEIGHTS = {axe:.7,pick:.75,hammer:.95,crossbow:.48,bow:1.25,wyrmspout:.4,stormreel:.5,staff:1.6,flockwright:.25};
   // The Armoury's Flockwright (client/flockwright.js): every copy plays the model's own Idle/Fire/Reload clips.
   const flockRigs=createFlockwrightRigs();let flockTaken=false,flockAds=0;const flockAim=new THREE.Vector3();
-  const toolAllowed=t=>!weaponShelved(t,{labs:labsOn()}); // scope: shelved weapons stay off the hotbar (shared/arsenal.js)
+  const selfNow=()=>snapshot?.players?.find(p=>p.id===playerId);
+  // Scope: shelved weapons stay off the hotbar, and in a Wilds world only forged ones can be drawn (shared/arsenal.js).
+  const toolAllowed=t=>!weaponShelved(t,{labs:labsOn()})&&weaponOwned(snapshot,selfNow(),t);
+  const costText=cost=>Object.entries(cost).map(([k,n])=>`${n} ${materialLabel(k)}`).join(', ');
+  // Pressing a weapon you haven't forged: forge it if you can, otherwise say exactly what it takes and where.
+  const say=m=>{if(!disposed)onNotice(m);}; // player-facing toast (report() only reaches the status line)
+  function tryForge(next){
+    const me=selfNow(),rung=nextWeapon(snapshot,me),name=WEAPON_NAMES[next]||next;
+    if(!me||!rung){say(`${name} isn't available here.`);return;}
+    if(rung.tool!==next){say(`Forge the ${WEAPON_NAMES[rung.tool]} first. ${name} comes later on the ladder.`);return;}
+    const short=costShortfall(me.resources,rung.cost);
+    if(Object.keys(short).length){say(`To forge the ${name} you need ${costText(rung.cost)}. Still missing: ${costText(short)}.`);return;}
+    if(!nearForge(me)){say(`You have everything for the ${name}. Take it to the village forge to forge it.`);return;}
+    onAction('craftWeapon',{tool:next});
+  }
   let shelvedPutAway=false;
   const ownsFlockwright=()=>flockTaken||hasFlockwright(snapshot?.players?.find(p=>p.id===playerId));
   // Remote Hero equipment: a canonical clone of an already-loaded template (shared geometry/materials); hero-view poses it
@@ -1292,6 +1307,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     if(event.kind==='mill_crank')homeSound.chord(event.position,[-10,-8],.05,120,.8);
     if(event.kind==='shop_buy'){homeSound.chord(event.position,[12,16,19,24],.07,55,1.2);}
     if(event.kind==='shop_sell')homeSound.chord(event.position,[19,16],.05,60,.8);
+    if(event.kind==='weapon_forged'){homeSound.chord(event.position,[0,4,7,12,16],.08,90,2.2);if(event.id===playerId){const rung=WEAPON_LADDER[event.rung];say(`The ${WEAPON_NAMES[event.tool]||event.tool} is yours! (${event.rung} of ${event.of})${rung?` Next on the ladder: the ${WEAPON_NAMES[rung.tool]}, for ${costText(rung.cost)}.`:' Every weapon is forged.'}`);setTimeout(()=>equip(event.tool),300);}}
     if(event.kind==='armoury_take'){homeSound.chord(event.position,[0,7,12,16],.05,70,1.2);if(event.id===playerId){flockTaken=true;if(tool!=='flockwright')equip('flockwright');report(event.first?'You lift a Flockwright off the stand. Six goggled birds hop aboard. It lives on key 9 now.':'The crew is already with you: Flockwright in hand.');}}
     if(event.kind==='tavern_ale'){homeSound.chord(event.position,[0,4,7,12],.06,80,1.4);if(event.id===playerId)report('A Hearty Ale! Fully mended, and blows land 20% softer for three minutes.');}
     if(event.kind==='draught_drunk'){homeSound.chord(event.position,[7,11,14],.06,50,1);if(event.id===playerId)report(`Glug. Healing Draught down; ${event.draughts} left. Refill at your keep's well.`);}
@@ -1353,7 +1369,8 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     if(tool==='crossbow'){siegebirdSight=createSiegebirdSight(THREE,axeModel);siegebirdAim=createSiegebirdAim({anchor:weaponAnchor,weapon:axeModel,camera,sight:siegebirdSight});resumeSiegebird();}
   }
   async function equip(next) {if(!active||role!=='hero'||!equipment.includes(next))return;
-    if(!toolAllowed(next)){report(`${WEAPON_NAMES[next]||next} is resting in the Labs for now.`);return;}
+    if(weaponShelved(next,{labs:labsOn()})){say(`${WEAPON_NAMES[next]||next} is resting in the Labs for now.`);return;}
+    if(!toolAllowed(next)){tryForge(next);return;}
     if(next==='flockwright'&&!ownsFlockwright()){report('The Flockwright rests on its stand in the Armoury, just outside Dawnhold\'s gate. Walk up and press E to take one.');return;}
     const request=++equipRequest;
     if(STREAMED_WEAPONS.has(next)&&!weaponModels.has(next)){
@@ -1821,7 +1838,8 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
         for (const action of actions) {
           if (action === 'menu') { weapons.cancel(); presses.invalidate(); void renderer.xr.getSession()?.end().then(onMenu); }
           else if (action === 'jump') jumpPending = true;
-          else if (action === 'cycle') { const choices=hotbarSlots.filter(t=>(t!=='flockwright'||ownsFlockwright())&&toolAllowed(t)); equip(choices[(choices.indexOf(tool)+1)%choices.length]); }
+          else if (action === 'cycle') { const me=selfNow(),rung=nextWeapon(snapshot,me),forgeable=rung&&me&&nearForge(me)&&!Object.keys(costShortfall(me.resources,rung.cost)).length?rung.tool:null; // VR has no hotbar: cycling onto an affordable next weapon at the forge forges it
+            const choices=hotbarSlots.filter(t=>(t!=='flockwright'||ownsFlockwright())&&(toolAllowed(t)||t===forgeable)); equip(choices[(choices.indexOf(tool)+1)%choices.length]); }
           else if (action === 'hand') { if (holdingLoose()) release(false, index); else grab(index); }
           else if (action === 'bridge') onAction('buildBridge');
           else if (action === 'interact') interact();

@@ -64,7 +64,8 @@ import {insideTavern} from './shared/taverns.js';
 import './client/hero-progress.css';
 import './client/quartermaster.css';
 import './client/ui-polish.css';
-import {SHELVED_WEAPONS, weaponShelved} from './shared/arsenal.js';
+import {SHELVED_WEAPONS, weaponShelved, WEAPON_LADDER, weaponOwned, nextWeapon, WEAPON_NAMES} from './shared/arsenal.js';
+import {materialLabel} from './shared/material-catalog.js';
 import {labsOn} from './client/labs.js';
 
 // ---------------------------------------------------------------- helpers
@@ -643,6 +644,12 @@ function onSnapshot(snapshot) {
     for(const b of all('[data-equip]'))setAttr(b,'aria-pressed',String(b.dataset.equip===(self.tool||'axe')));
     {const chip=document.querySelector('[data-equip="flockwright"]');if(chip&&chip.hidden===!!self.flockwright)chip.hidden=!self.flockwright;}
     for(const t of SHELVED_WEAPONS){const chip=document.querySelector(`[data-equip="${t}"]`);const hide=weaponShelved(t,{labs:labsOn()});if(chip&&chip.hidden!==hide)chip.hidden=hide;}
+    // The Wilds weapon ladder: forged weapons show as normal, the next one shows locked with its price, later ones hide.
+    {const next=nextWeapon(snapshot,self);for(const {tool,cost} of WEAPON_LADDER){const chip=document.querySelector(`[data-equip="${tool}"]`);if(!chip)continue;
+      const owned=weaponOwned(snapshot,self,tool),locked=!owned&&next?.tool===tool,hide=!owned&&!locked;
+      if(chip.hidden!==hide)chip.hidden=hide;if(chip.classList.contains('bf-locked')!==locked)chip.classList.toggle('bf-locked',locked);
+      const title=locked?`Forge the ${WEAPON_NAMES[tool]} at the village forge: ${Object.entries(cost).map(([k,n])=>`${n} ${materialLabel(k)}`).join(', ')}`:`${WEAPON_NAMES[tool]} (${chip.getAttribute('aria-keyshortcuts')})`;
+      if(chip.title!==title)chip.title=title;}}
     const weaponText={flockwright:'Flockwright · click to fire a heavy bolt · right click to aim down the ring sight · the crew reloads',staff:'Sunthread · hold click for a sun-thread · Q Radiant Nova',axe:'Axe · click to chop · Q sundering strike',pick:'Stonewhisper · click to mine · hold Q to aim crystal wall',hammer:'Sunfall · click to strike · Q ground slam',crossbow:`Siegebird · click to fire · songbirds bring each bolt · golden bird ${(siegebirdGoldenChance(self.siegebird?.hits||0,!!self.talents?.crossbow?.includes('flock'))*100).toFixed(1)}%`,bow:'Emberwing · hold attack to draw, release to fire · right click then aim to curve · Q phoenix flare',limb:'Bone · click to strike · G drop · X throw',wyrmspout:`Wyrmspout · hold to spray sticky fire · Q: Gout · Tank ${Math.round((1-(self.heat||0))*100)}%${self.overheatUntil>snapshot.tick?' · Refilling':''}`,stormreel:'Stormreel · hold to charge, release to fire · + and \u2212 bolts in one foe close the circuit · G spikes it · Q reels in',flask:mobile?.enabled?'Emberdew · attack: hurl a lit bottle · Special: Cinder Cluster':'Emberdew · click to toss fuel · hold right click to light and aim · hold Q for Cinder Cluster'}[self.tool||'axe'];if($('weaponHint'))setText($('weaponHint'),weaponText);
     meter('hp', self.hp, self.maxHp ?? self.hpMax ?? self.maxHealth ?? 100);
     heroProgress.update(self, {role: currentRole});
