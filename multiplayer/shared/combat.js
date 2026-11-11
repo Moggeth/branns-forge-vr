@@ -211,6 +211,22 @@ function blastApart(state,enemy,parts,at,energy,skeleton){
     wake(d);
   });
 }
+// A golem that loses its binding goes over like a felled tower: it pivots on its feet away from the killing blow,
+// so the higher a stone sits the faster it swings out, and each block tumbles on its own once it hits the ground.
+// The legs kick back the other way. Seeded per body, so every peer sees the same fall.
+export const GOLEM_TOPPLE=Object.freeze({swing:2.1,lift:.9,spin:3.2,legKick:.7});
+function toppleGolem(state,enemy,parts,hit){
+  const T=GOLEM_TOPPLE,normal=unit(hit?.normal)?hit.normal:null,yaw=enemy.yaw;
+  let dir=normal?[-normal[0],-normal[2]]:[-Math.sin(yaw),-Math.cos(yaw)];const l=Math.hypot(...dir);dir=l>1e-3?[dir[0]/l,dir[1]/l]:[-Math.sin(yaw),-Math.cos(yaw)];
+  const axis=[dir[1],0,-dir[0]],base=enemy.position[1],scale=1.45*bossScale(enemy);
+  parts.forEach((d,i)=>{
+    const h=clamp((d.position[1]-base)/(2.6*scale),0,1.2),r=seeded(enemy.id,120+i),leg=d.part.endsWith('Leg');
+    const out=leg?-T.legKick*(.6+.8*r):T.swing*h*(.8+.4*r)*scale,side=(seeded(enemy.id,130+i)-.5)*.9;
+    d.velocity=[dir[0]*out+dir[1]*side,T.lift*(leg?.4:.6+.6*h),dir[1]*out-dir[0]*side].map(v=>clamp(v,-30,30));
+    d.angularVelocity=axis.map((a,k)=>a*T.spin*(leg?-.5:.6+h)*(.8+.4*r)+(seeded(enemy.id,140+i*3+k)-.5)*1.4);
+    wake(d);
+  });
+}
 // The same bang shoves whatever already lies about: old bones skitter, held pieces stay put. Deterministic.
 export function blastRemains(state,at,radius,power=1){
   if(!vec(at))return;
@@ -268,7 +284,7 @@ export function hitEnemyPart(state,enemy,part,amount,hit,ctx,events,{projectile=
     // so discard any contacts still attached to the dead actor before saves validate their targets.
     state.embeds=state.embeds.filter(e=>e.targetId!==enemy.id);
     clingSplash(state,enemy,ctx,events);
-    const style=deathStyle(enemy,part,hit,projectile);if(enemy.kind==='skeleton')ragdoll(state,enemy,fallen,hit,style);else if(enemy.kind==='golem'&&vec(hit?.blastFrom)&&fallen.length)blastApart(state,enemy,fallen,hit.blastFrom,clamp(Number(hit?.energy)||1,.5,2),false);events.push({kind:'death',position:[...enemy.position],id:enemy.id,creature:enemy.kind,part,normal:unit(hit?.normal)?[...hit.normal]:[0,1,0],energy:hit?.tool==='hammer'?1.8:1,...(style?{style}:{}),...(style&&vec(hit?.point)?{point:[...hit.point]}:{}),...(style==='headshot'&&unit(hit?.direction)?{direction:[...hit.direction],shot:hit.shot}:style==='shatter'&&unit(hit?.direction)?{direction:[...hit.direction]}:style==='blast'?{from:[...hit.blastFrom]}:{})});state.enemies.splice(state.enemies.indexOf(enemy),1);
+    const style=deathStyle(enemy,part,hit,projectile);if(enemy.kind==='skeleton')ragdoll(state,enemy,fallen,hit,style);else if(enemy.kind==='golem'&&fallen.length){if(vec(hit?.blastFrom))blastApart(state,enemy,fallen,hit.blastFrom,clamp(Number(hit?.energy)||1,.5,2),false);else toppleGolem(state,enemy,fallen,hit);}events.push({kind:'death',position:[...enemy.position],id:enemy.id,creature:enemy.kind,part,normal:unit(hit?.normal)?[...hit.normal]:[0,1,0],energy:hit?.tool==='hammer'?1.8:1,...(style?{style}:{}),...(style&&vec(hit?.point)?{point:[...hit.point]}:{}),...(style==='headshot'&&unit(hit?.direction)?{direction:[...hit.direction],shot:hit.shot}:style==='shatter'&&unit(hit?.direction)?{direction:[...hit.direction]}:style==='blast'?{from:[...hit.blastFrom]}:{})});state.enemies.splice(state.enemies.indexOf(enemy),1);
     if(critterDying)critterDeath(state,enemy,hit,{...ctx,hitEnemyPart},events,owner);}
   return true;
 }
