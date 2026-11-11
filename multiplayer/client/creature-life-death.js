@@ -858,7 +858,7 @@ totalEmissiveRadiance *= 1. + cldCore;`);
   }
   function death(entry, event = {}) {
     const id = entry?.data?.id ?? event.id; if (id == null) return null;
-    const st = states.get(id), kind = (entry?.data?.kind || event.kind) === 'golem' ? 'golem' : 'skeleton', seed = hashId(id);
+    const st = states.get(id), kind = (entry?.data?.kind || event.creature || event.kind) === 'golem' ? 'golem' : 'skeleton', seed = hashId(id);
     if (corpses.size >= LIMITS.corpses) { const first = corpses.keys().next().value; endCorpse(corpses.get(first)); }
     const pivot = new THREE.Vector3();
     if (entry?.root) entry.root.getWorldPosition(pivot); else if (event.position) pivot.fromArray(event.position);
@@ -877,9 +877,7 @@ totalEmissiveRadiance *= 1. + cldCore;`);
       const core = v && findAny(v, 'BodyCore'); if (core) core.getWorldPosition(_v2);
       wisps(_v2.x, _v2.y, _v2.z, 30, seed, 402, col, 1.8, 1.1);
       // The crystal heart gives way: a cold flash and ring, and a spray of glowing shards that arc out and fall.
-      heartFx.blast([_v2.x, _v2.y - .45, _v2.z], 'crystal', 3.2);
-      for (let i = 0; i < 36; i++) { const a = rand(seed, 600 + i) * 6.283, e = .15 + rand(seed, 640 + i) * 1.1, sp = 2.5 + rand(seed, 680 + i) * 4.5;
-        emit(magic, _v2.x, _v2.y, _v2.z, Math.cos(a) * Math.cos(e) * sp, Math.sin(e) * sp + 1.5, Math.sin(a) * Math.cos(e) * sp, col[0] * 1.4 + .2, col[1] * 1.4 + .2, col[2] * 1.4 + .2, .7 + rand(seed, 720 + i) * .8, -9.8, .35); }
+      heartFx.blast([_v2.x, _v2.y, _v2.z], 'crystal', 3.6); // with its glowing shards (client/blast-fx.js)
       addDecal(decals, 'crack', pivot.x, H(pivot.x, pivot.z), pivot.z, 1.2, 2.2, c.color || 0x66ccff, rand(seed, 3) * 6.28);
     }
     if (st) release(st);
