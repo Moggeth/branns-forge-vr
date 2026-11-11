@@ -41,4 +41,12 @@ function fell(talents) {
   const {events, under} = fell({});
   assert.ok(!events.some(e => e.kind === 'timber_crush'), 'no talent, no crush'); assert.equal(under.hp, 500);
 }
+{
+  // A refused hit (here: the feller sheltering in a tavern, as hitEnemyPart rules) neither counts nor launches.
+  const {timberCrush} = await import('../shared/timber-crush.js');
+  const state = {tick: 5, players: [{id: 'h', role: 'hero', talents: {axe: ['timber']}}], harvestedTrees: [{id: 't', by: 'h'}], enemies: [{id: 'e', hp: 50, position: [0, 0, 2]}]};
+  const events = [{kind: 'tree_land', id: 't', position: [0, 0, 2]}];
+  timberCrush(state, events, 0, {trees: {get: () => ({x: 0, z: 0, height: 6})}, hitEnemyPart: () => false, combat: {}, terrainHeight: () => 0});
+  assert.equal(state.enemies[0].launchTick, undefined); assert.ok(!events.some(e => e.kind === 'timber_crush'));
+}
 console.log('timber-crush: ok');

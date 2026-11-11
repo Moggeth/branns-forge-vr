@@ -37,7 +37,8 @@ export function timberCrush(state, events, from, ctx) {
     for (const enemy of [...state.enemies]) {
       if (enemy.hp <= 0 || toSegment(enemy.position[0], enemy.position[2], ax, az, bx, bz) > width + ENEMY_RADIUS) continue;
       if (friendlyEnemyHit(state, enemy, {ownerId: who.p.id})) continue;
-      ctx.hitEnemyPart(state, enemy, 'torso', damage, {tool: 'axe', point: [enemy.position[0], enemy.position[1] + 1, enemy.position[2]], ownerId: who.p.id}, ctx.combat, out);
+      // A refused hit (ward, tavern peace) neither counts nor throws the foe.
+      if (!ctx.hitEnemyPart(state, enemy, 'torso', damage, {tool: 'axe', point: [enemy.position[0], enemy.position[1] + 1, enemy.position[2]], ownerId: who.p.id}, ctx.combat, out)) continue;
       hits.push(enemy.id); if (state.enemies.includes(enemy)) enemy.launchTick = state.tick;
     }
     if (hits.length) out.push({kind: 'timber_crush', id: e.id, by: who.p.id, rank: who.rank, position: [...e.position],
