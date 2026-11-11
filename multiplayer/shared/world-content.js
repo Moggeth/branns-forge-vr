@@ -64,9 +64,19 @@ export function renewGeology(state,ctx,events=[]){
  }
  return false;
 }
+// Brann's Valley species mix (2026-11-11). Apple trees (variant 0) keep their spots, because their fruit is gameplay.
+// Out on the valley rim the oaks and birches become Highland Firs that climb toward the alpine forest; nearer the
+// village every other oak turns Emberleaf Maple and every other birch Dawnbloom Cherry. Firs stand a little taller.
+function valleySpecies(t, i) {
+  if (t.variant === 0) return t;
+  if (Math.hypot(t.x, t.z) > 29) return {...t, variant: 3, height: +Math.min(11, t.height * 1.25).toFixed(2)};
+  if (i % 2 === 0) return t;
+  return {...t, variant: t.variant === 1 ? 4 : 5};
+}
+
 export function worldTrees(state) {
-  const trees = state.world ? wildsTrees(state) : baseTrees.map(([x,z,height], i) => ({id: `tree${i + 1}`, x, z, height, variant: i % 3}));
-  if (!state.world) for (let i = 0; i < 14; i++) { const h = hash(state.seed, i); const a = (h % 6283) / 1000; const r = 25 + ((h >>> 12) % 25); trees.push({id:`outer${i + 1}`, x:+(Math.cos(a)*r).toFixed(3), z:+(Math.sin(a)*r).toFixed(3), height:5 + (h % 30)/10, variant:(h>>>8)%3}); }
+  const trees = state.world ? wildsTrees(state) : baseTrees.map(([x,z,height], i) => valleySpecies({id: `tree${i + 1}`, x, z, height, variant: i % 3}, i));
+  if (!state.world) for (let i = 0; i < 14; i++) { const h = hash(state.seed, i); const a = (h % 6283) / 1000; const r = 25 + ((h >>> 12) % 25); trees.push(valleySpecies({id:`outer${i + 1}`, x:+(Math.cos(a)*r).toFixed(3), z:+(Math.sin(a)*r).toFixed(3), height:5 + (h % 30)/10, variant:(h>>>8)%3}, i + 1)); }
   if(state.landmarks&&!state.world) trees.splice(0,trees.length,...clearLandmarkTrees(trees));
   // Home-base worlds keep both domes clear of wild trees (shared/home-bases.js).
   if(state.battle?.v===2) trees.splice(0,trees.length,...trees.filter(t=>!insideHome(t.x,t.z,2)));

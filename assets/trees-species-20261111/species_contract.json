@@ -1,0 +1,271 @@
+{
+ "trees": {
+  "tree_fir": {
+   "height": 8.4,
+   "firstLimb": 2.85,
+   "rings": [
+    [
+     -0.1,
+     0.36
+    ],
+    [
+     0.0,
+     0.36
+    ],
+    [
+     0.12,
+     0.3192
+    ],
+    [
+     0.3,
+     0.244
+    ],
+    [
+     0.6,
+     0.2362
+    ],
+    [
+     1.0,
+     0.2259
+    ],
+    [
+     1.4,
+     0.2155
+    ],
+    [
+     1.8,
+     0.2052
+    ],
+    [
+     2.0,
+     0.2
+    ],
+    [
+     2.533,
+     0.1813
+    ],
+    [
+     3.067,
+     0.1627
+    ],
+    [
+     3.6,
+     0.144
+    ]
+   ],
+   "contour_dev": 0.0639
+  },
+  "tree_maple": {
+   "height": 6.8,
+   "firstLimb": 2.3,
+   "rings": [
+    [
+     -0.1,
+     0.4
+    ],
+    [
+     0.0,
+     0.4
+    ],
+    [
+     0.12,
+     0.3515
+    ],
+    [
+     0.3,
+     0.2623
+    ],
+    [
+     0.6,
+     0.254
+    ],
+    [
+     1.0,
+     0.2428
+    ],
+    [
+     1.4,
+     0.2317
+    ],
+    [
+     1.8,
+     0.2206
+    ],
+    [
+     2.0,
+     0.215
+    ],
+    [
+     2.333,
+     0.1949
+    ],
+    [
+     2.667,
+     0.1749
+    ],
+    [
+     3.0,
+     0.1548
+    ]
+   ],
+   "contour_dev": 0.063
+  },
+  "tree_blossom": {
+   "height": 5.2,
+   "firstLimb": 2.2,
+   "rings": [
+    [
+     -0.1,
+     0.34
+    ],
+    [
+     0.0,
+     0.34
+    ],
+    [
+     0.12,
+     0.3062
+    ],
+    [
+     0.3,
+     0.244
+    ],
+    [
+     0.6,
+     0.2362
+    ],
+    [
+     1.0,
+     0.2259
+    ],
+    [
+     1.4,
+     0.2155
+    ],
+    [
+     1.8,
+     0.2052
+    ],
+    [
+     2.0,
+     0.2
+    ],
+    [
+     2.3,
+     0.1813
+    ],
+    [
+     2.6,
+     0.1627
+    ],
+    [
+     2.9,
+     0.144
+    ]
+   ],
+   "contour_dev": 0.0632
+  }
+ },
+ "built": [
+  {
+   "file": "tree_fir.glb",
+   "height": 8.4,
+   "crownFit": 1.0,
+   "lowest": {
+    "Branches": 2.683,
+    "Leaves": 2.0,
+    "Fruit": 2.39
+   },
+   "tris": {
+    "Branches": 3128,
+    "Fruit": 200,
+    "Leaves": 4160,
+    "Roots": 1200,
+    "Trunk": 276
+   },
+   "kb": 971
+  },
+  {
+   "file": "tree_fir_lod.glb",
+   "height": 8.4,
+   "crownFit": 1.0,
+   "lowest": {
+    "Branches": 2.675,
+    "Leaves": 2.0
+   },
+   "tris": {
+    "Branches": 1290,
+    "Leaves": 1336,
+    "Roots": 390,
+    "Trunk": 88
+   },
+   "kb": 325
+  },
+  {
+   "file": "tree_maple.glb",
+   "height": 6.8,
+   "crownFit": 1.036,
+   "lowest": {
+    "Branches": 2.214,
+    "Leaves": 2.924,
+    "Fruit": 2.109
+   },
+   "tris": {
+    "Branches": 3274,
+    "Fruit": 680,
+    "Leaves": 2808,
+    "Roots": 1200,
+    "Trunk": 276
+   },
+   "kb": 804
+  },
+  {
+   "file": "tree_maple_lod.glb",
+   "height": 6.8,
+   "crownFit": 1.009,
+   "lowest": {
+    "Branches": 2.255,
+    "Leaves": 2.372
+   },
+   "tris": {
+    "Branches": 1108,
+    "Leaves": 488,
+    "Roots": 390,
+    "Trunk": 88
+   },
+   "kb": 226
+  },
+  {
+   "file": "tree_blossom.glb",
+   "height": 5.2,
+   "crownFit": 1.023,
+   "lowest": {
+    "Branches": 2.122,
+    "Leaves": 2.553
+   },
+   "tris": {
+    "Branches": 2656,
+    "Leaves": 2496,
+    "Roots": 1000,
+    "Trunk": 276
+   },
+   "kb": 684
+  },
+  {
+   "file": "tree_blossom_lod.glb",
+   "height": 5.2,
+   "crownFit": 0.91,
+   "lowest": {
+    "Branches": 2.107,
+    "Leaves": 2.18
+   },
+   "tris": {
+    "Branches": 792,
+    "Leaves": 432,
+    "Roots": 325,
+    "Trunk": 88
+   },
+   "kb": 197
+  }
+ ]
+}
