@@ -18,7 +18,7 @@ const BONE = 0xe8dcc0, OOZE = 0x8cff4a, SOCKET = 0x150b18;
 
 const domeVertex = `varying vec3 vN; varying vec3 vV; varying vec3 vP;
 void main(){ vec4 w = modelMatrix * vec4(position,1.0); vP = position; vN = normalize(mat3(modelMatrix) * normal); vV = normalize(cameraPosition - w.xyz); gl_Position = projectionMatrix * viewMatrix * w; }`;
-const domeFragment = `uniform vec3 uColor; uniform float uTime; uniform float uAlpha; uniform float uFlash; uniform vec3 uFlashAt;
+const domeFragment = `uniform vec3 uColor; uniform float uTime; uniform float uAlpha; uniform float uFlash; uniform vec3 uFlashAt; uniform float uInside;
 varying vec3 vN; varying vec3 vV; varying vec3 vP;
 void main(){
   float rim = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 2.2);
@@ -26,11 +26,13 @@ void main(){
   vec2 c = abs(fract(g + vec2(0.0, uTime * 0.05)) - 0.5);
   float hex = smoothstep(0.46, 0.5, max(c.x, c.y));
   float ring = exp(-pow((distance(vP, uFlashAt) - uFlash * 9.0) * 1.4, 2.0)) * (1.0 - uFlash);
-  float a = (0.05 + rim * 0.55 + hex * 0.16 + ring * 0.8) * uAlpha;
+  // From inside your own base the shield is a faint shimmer you look through, not a tinted grid over the whole view.
+  float a = (mix(0.05, 0.012, uInside) + rim * mix(0.55, 0.3, uInside) + hex * mix(0.16, 0.045, uInside) + ring * 0.8) * uAlpha;
   if (vP.y < -0.6) discard;
   gl_FragColor = vec4(uColor * (0.7 + rim + ring * 1.5), a);
 }`;
 
+const camWorld = new THREE.Vector3();
 function mat(color, extra = {}) { return new THREE.MeshStandardMaterial({color, roughness: .82, metalness: 0, flatShading: true, ...extra}); }
 function glowMat(color, intensity = 1.4) { return new THREE.MeshStandardMaterial({color, emissive: color, emissiveIntensity: intensity, roughness: .3, flatShading: true}); }
 
@@ -169,7 +171,7 @@ export function createHomeBaseView({scene, timberline = () => null}) {
 
   function domeFor(side) {
     const dome = new THREE.Mesh(geo.dome, new THREE.ShaderMaterial({vertexShader: domeVertex, fragmentShader: domeFragment, transparent: true, depthWrite: false, side: THREE.DoubleSide,
-      uniforms: {uColor: {value: STYLE[side].dome}, uTime: {value: 0}, uAlpha: {value: 1}, uFlash: {value: 1}, uFlashAt: {value: new THREE.Vector3()}}}));
+      uniforms: {uColor: {value: STYLE[side].dome}, uTime: {value: 0}, uAlpha: {value: 1}, uFlash: {value: 1}, uFlashAt: {value: new THREE.Vector3()}, uInside: {value: 0}}}));
     dome.renderOrder = 5; const [x, z] = homePoint(side, [0, 0]); dome.position.set(x, terrainHeight(snapshot, x, z, false) - .3, z); return dome;
   }
 
@@ -269,6 +271,7 @@ export function createHomeBaseView({scene, timberline = () => null}) {
       const data = b.data, fallen = data.fallenUntil > snapshot.tick, pylonsUp = data.parts.some(p => p.kind === 'pylon' && p.hp > 0), shield = !fallen && pylonsUp;
       b.domeAlpha += ((shield ? 1 : 0) - b.domeAlpha) * k;
       const u = b.dome.material.uniforms; u.uTime.value = t; u.uAlpha.value = b.domeAlpha * (0.85 + Math.sin(t * 2.1) * .05); b.dome.visible = b.domeAlpha > .01;
+      if (camera) { camera.getWorldPosition(camWorld); const dx = camWorld.x - b.dome.position.x, dz = camWorld.z - b.dome.position.z, dy = camWorld.y - b.dome.position.y; const d = Math.sqrt(dx * dx + dy * dy + dz * dz) / HOME.domeRadius; u.uInside.value = Math.min(1, Math.max(0, (1.02 - d) / .08)); }
       if (b.flashStart) { u.uFlash.value = Math.min(1, (now - b.flashStart) / 700); if (u.uFlash.value >= 1) b.flashStart = 0; }
       const heartUp = fallen ? 0 : 1; b.heartAlive += (heartUp - b.heartAlive) * k;
       const h = b.heart; h.heart.position.y = (h.heartY ?? 4.6) + Math.sin(t * 1.3) * .18; h.core.rotation.y = t * .6;

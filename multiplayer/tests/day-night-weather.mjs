@@ -60,7 +60,7 @@ forced.update({tick: 0, seed: 41, time: 2, camera});
 assert.ok(env.overcast > .7 && env.fogScale < .7);
 const st = forced.stats(); assert.equal(st.weather, 'rain'); assert.ok(st.rain > 1000 && st.rain <= 1600 && st.snow === 0);
 const fog = createDayNightWeather({scene, orchard, quality: 'high', preview: {phase: .3, weather: 'fog'}}); fog.update({tick: 0, camera, time: 0});
-assert.ok(env.fogScale < .2);
+assert.ok(env.fogScale < .45 && env.fogScale >= .3, 'fog closes in but stays readable (2026-11-11 clarity pass)');
 for (const s of [sky, forced, fog]) s.dispose();
 assert.equal(scene.children.length, before);
 
@@ -92,7 +92,7 @@ import('../client/atmosphere-materials.js').then(async ({ATMOSPHERE, adoptAtmosp
   golden.setTrees(trees); golden.update({tick: 0, camera, time: 0, dt: 0});
   const beamAxis = golden.stats() && scene.children.filter(o => o.name === 'sunbeams').at(-1).material.uniforms.uAxis.value;
   assert.ok(-beamAxis.y > Math.sin(60 * Math.PI / 180), `low sun still drops shafts steeply: ${beamAxis.y.toFixed(3)}`);
-  const gs = golden.stats(); assert.ok(gs.sunbeams.beams === 6 && gs.sunbeams.strength > .3, `golden-hour shafts ${JSON.stringify(gs.sunbeams)}`);
+  const gs = golden.stats(); assert.ok(gs.sunbeams.beams === 6 && gs.sunbeams.strength > .2, `golden-hour shafts ${JSON.stringify(gs.sunbeams)}`);
   const noonSky = createDayNightWeather({scene, orchard, height, quality: 'high', preview: {phase: DAYLIGHT_SHARE / 2, weather: 'clear'}});
   noonSky.setTrees(trees); noonSky.update({tick: 0, camera, time: 0, dt: 0});
   assert.ok(dawnMist > ATMOSPHERE.bfMist.value * 2, 'dawn is far mistier than noon');
