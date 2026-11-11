@@ -20,12 +20,13 @@ for (const active of [false, true]) {
     touchAxes: {left: {x: 1, y: 1}}, xrButtons: new Map(), presses: new Map(),
     zeroInputTimer: null, clearTimeout: noop, performance: {now: () => 100}, sentAt: 0,
     sendInput: (now, zero) => sent.push({now, zero}), dragonRide: {clearInput: noop},
-    strikeClock: {cancel: noop}, viewPunch: {reset: noop},
+    strikeClock: {cancel: noop}, viewPunch: {reset: noop}, sunfall: {cancelSlam() { context.slamCancelled = true; }},
   };
   runInNewContext(source.slice(start, end) + '\nclearInput();', context);
   assert.equal(context.scoping, false, 'scope hold clears even when mouseup was lost');
   assert.equal(context.aiming, false);
   assert.equal(context.crankHeld, false);
+  assert.equal(context.slamCancelled, true, 'a Sunfall slam in progress never lands after input is cleared');
   assert.equal(context.keys.size, 0);
   assert.equal(context.touchAxes.left.x, 0);
   assert.equal(sent.length, Number(active), 'active cleanup preserves the stop packet');
