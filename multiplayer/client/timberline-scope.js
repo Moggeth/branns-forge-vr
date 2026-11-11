@@ -15,10 +15,12 @@ export function timberlineAmmoText({bolts=0,raw=0}={}){
 
 export function createTimberlineAmmoHud({parent=document.body}={}){
  const el=document.createElement('div');el.className='timberline-ammo';el.setAttribute('role','status');el.setAttribute('aria-live','polite');el.hidden=true;
- el.innerHTML='<span class="timberline-ammo-glyph" aria-hidden="true"></span><span class="timberline-ammo-count"></span><span class="timberline-ammo-state"></span>';parent.appendChild(el);
- const count=el.querySelector('.timberline-ammo-count'),state=el.querySelector('.timberline-ammo-state');let last='';
+ el.innerHTML='<span class="timberline-ammo-glyph" aria-hidden="true"></span><span class="timberline-ammo-count"></span><span class="timberline-ammo-state"></span><span class="timberline-ammo-off"></span><span class="timberline-ammo-keys"></span>';parent.appendChild(el);
+ const count=el.querySelector('.timberline-ammo-count'),state=el.querySelector('.timberline-ammo-state'),off=el.querySelector('.timberline-ammo-off'),keys=el.querySelector('.timberline-ammo-keys');let last='';
  return {element:el,
-  set(info){if(!info){if(!el.hidden)el.hidden=true;last='';return;}const t=info.label||timberlineAmmoText(info),s=info.state||'';const key=`${t}|${s}|${!!info.scoped}`;if(key===last)return;last=key;el.hidden=false;
-   count.textContent=t;state.textContent=s;el.classList.toggle('is-empty',!info.bolts&&!info.raw);el.classList.toggle('is-scoped',!!info.scoped);},
+  // info.stepOff: the dismount key (desktop) shown as a small keycap; info.keys: a one-line controls reminder, shown
+  // under the plate for the first moments in the seat (the old prompt that sat on the aim point carried it).
+  set(info){if(!info){if(!el.hidden)el.hidden=true;last='';return;}const t=info.label||timberlineAmmoText(info),s=info.state||'',o=info.stepOff||'',k=info.keys||'';const key=`${t}|${s}|${!!info.scoped}|${o}|${k}`;if(key===last)return;last=key;el.hidden=false;
+   count.textContent=t;state.textContent=s;off.textContent=o?`${o} Step off`:'';keys.textContent=k;el.classList.toggle('is-empty',!info.bolts&&!info.raw);el.classList.toggle('is-scoped',!!info.scoped);},
   dispose(){el.remove();}};
 }

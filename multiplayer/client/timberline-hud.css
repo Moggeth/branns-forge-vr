@@ -22,7 +22,19 @@
 /* Sighting along the ladder keeps the world in view, so the plate only dims a little. */
 .timberline-ammo.is-scoped { opacity: .8; transition: opacity .12s; }
 @media (pointer: coarse) { .timberline-ammo { top: calc(env(safe-area-inset-top, 0px) + 56px); font-size: 14px; } }
-/* Seated at the machine the hand weapons can't be used, so their bar steps out of the sight line. */
+/* The dismount key rides on the plate, and the controls reminder hangs under it for the first moments in the seat. */
+.timberline-ammo { flex-wrap: wrap; justify-content: center; }
+.timberline-ammo-off { font-size: 12px; color: #d9c69c; opacity: .85; padding-left: 8px; border-left: 1px solid rgba(236,210,154,.3); }
+.timberline-ammo-off:empty, .timberline-ammo-keys:empty { display: none; }
+.timberline-ammo-keys { flex-basis: 100%; text-align: center; font-size: 12px; font-weight: 500; color: #cfe9ff; opacity: .85; margin-top: 2px; }
+.timberline-ammo.is-scoped .timberline-ammo-keys { display: none; }
+@media (pointer: coarse) { .timberline-ammo-off, .timberline-ammo-keys { display: none; } }
+/* Seated at the machine nothing sits between the operator and the target (2026-11-11): the hand-weapon bar, its hint
+   and supplies, and the floating interaction prompt all step away. The plate above carries ammo, state and Step off.
+   On touch the Sight (special) button and the touch pad stay, since that is how a phone sights and fires. */
 body.timberline-manned .bf-equip, body.timberline-manned .mui-weapons { visibility: hidden; }
+body.timberline-manned #heroTools .bf-bar, body.timberline-manned #heroTools .bf-sub, body.timberline-manned #heroTools .bf-help,
+body.timberline-manned .bf-cue, body.timberline-manned .bf-cue-leader, body.timberline-manned .look-hint { visibility: hidden !important; }
+@media (pointer: fine) { body.timberline-manned #heroTools .bf-special { visibility: hidden; } }
 /* No screen-centre mark while seated: the operator aims with the brass ladder on the machine. */
 body.timberline-manned .mui-reticle, body.timberline-manned .rr-root { visibility: hidden; }

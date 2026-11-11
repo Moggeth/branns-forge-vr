@@ -1,0 +1,46 @@
+<!doctype html><html><head><meta charset="utf-8"><title>loading</title><style>html,body{margin:0;background:#9fb3c4;overflow:hidden}</style></head><body>
+<script type="module">
+// Review lab for the Timberline's flip-up Wirewidth sight (client/timberline-flip-sight.js) on the real kit model,
+// with stand-in targets (1.1 m wide, 1.8 m tall posts) at every range on flat grass. Game-like tone mapping and lights.
+//   lab.view(name)        sight | seated | side | three | top
+
+//   lab.flip(up)          animate the leaf; then lab.frame(n) to advance n 60 Hz frames
+import * as T from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {createTimberlineBallista} from '../assets-source/timberline-twinbolt-20261003/runtime/timberline-ballista.js';
+import {addFlipSight} from '../client/timberline-flip-sight.js';
+import {ladderMarks} from '../client/timberline-ladder.js';
+const W = innerWidth || 960, H = innerHeight || 540, renderer = new T.WebGLRenderer({antialias: true, preserveDrawingBuffer: true});
+renderer.setSize(W, H); renderer.setPixelRatio(devicePixelRatio || 1); renderer.toneMapping = T.ACESFilmicToneMapping; renderer.outputColorSpace = T.SRGBColorSpace; document.body.appendChild(renderer.domElement);
+const scene = new T.Scene(); scene.background = new T.Color(0x9fc0dc); scene.fog = new T.Fog(0x9fc0dc, 120, 520);
+const pmrem = new T.PMREMGenerator(renderer), room = new RoomEnvironment(); scene.environment = pmrem.fromScene(room, .04).texture; scene.environmentIntensity = .55; room.dispose();
+scene.add(new T.HemisphereLight(0xc6e0ed, 0x5e5139, 1.2)); const sun = new T.DirectionalLight(0xffe3ad, 2.2); sun.position.set(-22, 38, 15); scene.add(sun);
+const ground = new T.Mesh(new T.PlaneGeometry(1200, 1200).rotateX(-Math.PI / 2), new T.MeshStandardMaterial({color: 0x7f9a52, roughness: 1})); scene.add(ground);
+// Targets at each range: a 1.1 m wide, 1.8 m tall post with a pale head, staggered either side of the line of fire.
+for (const [i, m] of ladderMarks().entries()) {
+  const post = new T.Mesh(new T.BoxGeometry(1.1, 1.8, .4), new T.MeshStandardMaterial({color: 0x8a5a3a, roughness: .8})); post.position.set((i % 2 ? -1 : 1) * m.range * .045, .9, -m.range); scene.add(post);
+  const head = new T.Mesh(new T.SphereGeometry(.28, 12, 8), new T.MeshStandardMaterial({color: 0xf0e6d0})); head.position.set((i % 2 ? -1 : 1) * m.range * .045, 2.05, -m.range); scene.add(head);
+}
+const camera = new T.PerspectiveCamera(47, W / H, .02, 2000);
+const gltf = await new GLTFLoader().loadAsync('/assets/timberline_ballista.glb');
+const machine = createTimberlineBallista(gltf, {castShadow: false}); scene.add(machine.object);
+const sight = addFlipSight(machine.nodes); let pitch = 0, raised = true;
+const eye = new T.Vector3();
+function place(name) {
+  machine.object.updateWorldMatrix(true, true); machine.nodes.Socket_ScopeEye.getWorldPosition(eye);
+  const views = {sight: () => { camera.fov = 47; camera.position.copy(eye); camera.rotation.set(pitch, 0, 0, 'YXZ'); },
+    seated: () => { camera.fov = 70; camera.position.set(0, 1.65 + .25, 1.5); camera.rotation.set(pitch - .08, 0, 0, 'YXZ'); },
+    side: () => { camera.fov = 30; camera.position.set(1.4, 1.6, -.1); camera.lookAt(0, 1.55, -.3); },
+    three: () => { camera.fov = 30; camera.position.set(-.9, 2.05, .9); camera.lookAt(0, 1.55, -.25); },
+    top: () => { camera.fov = 30; camera.position.set(0, 2.6, -.2); camera.lookAt(0, 1.5, -.3); }};
+  views[name](); camera.updateProjectionMatrix();
+}
+let view = 'sight';
+function render() { machine.aimImmediate(0, pitch); machine.seekCycle(99, camera, H, {ammo: true}); place(view); renderer.render(scene, camera); }
+window.lab = {
+  view(n) { view = n; render(); }, pitch(p) { pitch = p; render(); },
+  flip(up) { raised = up; }, frame(n = 1) { for (let i = 0; i < n; i++) sight.update(1 / 60, raised, view === 'sight' ? 1 : 0); render(); },
+  instant(up) { sight.raise(up); render(); }, ready: true, sight};
+sight.raise(true); render(); document.title = 'ready';
+</script></body></html>
