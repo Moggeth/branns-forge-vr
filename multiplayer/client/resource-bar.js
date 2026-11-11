@@ -2,15 +2,16 @@
 // side's stores hold some). Presentation only: it reads the snapshot and never changes state.
 import {MATERIAL_CATALOG,materialLabel} from '../shared/material-catalog.js';
 
-// Basics, then ores, then refined metals. Each ore sits in the same column order as the metal it smelts into.
+// The three primaries (Wood, Iron, Crystal: what every forge goal costs), then extras: stone and ores, then the rarer
+// refined metals. Each ore sits in the same column order as the metal it smelts into.
 export const RESOURCE_BAR_GROUPS = Object.freeze([
-  Object.freeze(['wood', 'stone', 'gems']),
-  Object.freeze(['ironOre', 'mithrilOre', 'starOre', 'copperOre', 'goldOre']),
-  Object.freeze(['iron', 'mithril', 'starMetal', 'copper', 'gold']),
+  Object.freeze(['wood', 'iron', 'gems']),
+  Object.freeze(['stone', 'ironOre', 'mithrilOre', 'starOre', 'copperOre', 'goldOre']),
+  Object.freeze(['mithril', 'starMetal', 'copper', 'gold']),
 ]);
 export const RESOURCE_BAR_KEYS = Object.freeze(RESOURCE_BAR_GROUPS.flat());
-/** Always shown on small touch screens even at zero; other materials appear there once you have some. */
-export const RESOURCE_BAR_CORE = Object.freeze(['wood', 'stone', 'gems']);
+/** Always shown, even at zero; other materials appear once you have some. */
+export const RESOURCE_BAR_CORE = Object.freeze(['wood', 'iron', 'gems']);
 
 const rgb = n => [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 const shade = (n, f) => '#' + rgb(n).map(c => Math.round(f >= 0 ? c + (255 - c) * f : c * (1 + f)).toString(16).padStart(2, '0')).join('');
@@ -42,22 +43,45 @@ export function resourceIcon(key) {
 
 const count = n => (n >= 1000 ? `${Math.floor(n / 100) / 10}k` : String(n));
 
+const GOAL_ICON = {axe: 'bfi-axe', pick: 'bfi-pick', hammer: 'bfi-hammer', crossbow: 'bfi-crossbow', bow: 'bfi-bow', wyrmspout: 'bfi-wyrmspout'};
+
 export function createResourceBar(mount) {
   const root = document.createElement('div');
   root.className = 'res-bar'; root.id = 'resourceBar'; root.setAttribute('role', 'status'); root.setAttribute('aria-label', 'Supplies');
-  root.innerHTML = RESOURCE_BAR_GROUPS.map(g => `<span class="rb-group">${g.map(k => `<span class="rb-item" data-res="${k}" data-zero="true"${RESOURCE_BAR_CORE.includes(k) ? ' data-core="true"' : ''}>${resourceIcon(k)}<b>0</b><i></i></span>`).join('')}</span>`).join('');
+  // The forge goal leads the strip: the weapon you are gathering for (or the next temper), glowing once you can pay.
+  root.innerHTML = `<span class="rb-goal" hidden><svg class="rb-goal-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#bfi-crossbow"/></svg><span class="rb-goal-t"></span></span>` +
+    RESOURCE_BAR_GROUPS.map(g => `<span class="rb-group">${g.map(k => `<span class="rb-item" data-res="${k}" data-zero="true"${RESOURCE_BAR_CORE.includes(k) ? ' data-core="true"' : ''}>${resourceIcon(k)}<b>0</b><em></em><i></i></span>`).join('')}</span>`).join('');
   mount.append(root);
-  const items = Object.fromEntries([...root.querySelectorAll('[data-res]')].map(el => [el.dataset.res, {el, b: el.querySelector('b'), i: el.querySelector('i'), key: '', n: 0}]));
-  function update(carried = {}, stored = {}) {
+  const items = Object.fromEntries([...root.querySelectorAll('[data-res]')].map(el => [el.dataset.res, {el, b: el.querySelector('b'), em: el.querySelector('em'), i: el.querySelector('i'), key: '', n: 0}]));
+  const goalEl = root.querySelector('.rb-goal'), goalUse = goalEl.querySelector('use'), goalText = goalEl.querySelector('.rb-goal-t');
+  let goalKey = '';
+  function update(carried = {}, stored = {}, goal = null) {
+    const need = {};
+    for (const [k, n] of Object.entries(goal?.cost || {})) need[k] = {n, met: !goal.short?.[k]};
+    // While a goal costs Iron, carried iron ore shows inside the Iron count: the forge smelts it as it pays.
+    const fold = !!need.iron, ore = fold ? Math.max(0, carried?.ironOre | 0) : 0;
     for (const k of RESOURCE_BAR_KEYS) {
-      const n = Math.max(0, carried?.[k] | 0), s = Math.max(0, stored?.[k] | 0), it = items[k], sig = n + '/' + s;
+      const n = Math.max(0, carried?.[k] | 0) + (k === 'iron' ? ore : 0) - (k === 'ironOre' ? ore : 0), s = Math.max(0, stored?.[k] | 0), it = items[k], g = need[k], sig = n + '/' + s + '/' + ore + '/' + (g ? g.n + (g.met ? '+' : '-') : '');
       if (it.key === sig) continue;
       if (it.key && n > it.n) { it.el.classList.remove('rb-gain'); void it.el.offsetWidth; it.el.classList.add('rb-gain'); }
       it.key = sig; it.n = n; it.b.textContent = count(n); it.i.textContent = s ? `+${count(s)}` : '';
+      it.em.textContent = g ? `/${g.n}` : '';
       it.el.dataset.zero = String(!n && !s);
-      const label = `${materialLabel(k)}: ${n} carried${s ? `, ${s} stored` : ''}`;
+      if (g) it.el.dataset.goal = g.met ? 'met' : 'short'; else delete it.el.dataset.goal;
+      const label = `${materialLabel(k)}: ${n} carried${k === 'iron' && ore ? ` (${ore} as ore)` : ''}${s ? `, ${s} stored` : ''}${g ? `, ${g.n} needed` : ''}`;
       it.el.title = label; it.el.setAttribute('aria-label', label);
     }
+    const state = !goal ? '' : goal.ready ? (goal.here ? 'here' : 'ready') : 'work';
+    const sig = goal ? `${goal.kind}|${goal.tool}|${goal.title}|${state}` : '';
+    if (sig === goalKey) return;
+    goalKey = sig; goalEl.hidden = !goal;
+    if (!goal) { delete root.dataset.goal; return; }
+    root.dataset.goal = state;
+    goalUse.setAttribute('href', '#' + (GOAL_ICON[goal.tool] || 'bfi-axe'));
+    goalText.textContent = goal.title;
+    const where = goal.kind === 'forge' ? 'the village forge' : 'the forge';
+    goalEl.title = state === 'work' ? `Next: ${goal.label}` : state === 'ready' ? `${goal.label}: you have everything. Take it to ${where}.` : `${goal.label}: you're at ${where}. ${goal.kind === 'forge' ? 'Draw it from your hotbar to forge it.' : 'Open Talents to temper.'}`;
+    goalEl.setAttribute('aria-label', goalEl.title);
   }
   return {root, update, dispose: () => root.remove()};
 }

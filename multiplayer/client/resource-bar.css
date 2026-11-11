@@ -31,3 +31,28 @@ body.xr .res-bar { display: none; }
 @media (prefers-reduced-motion: reduce) { .rb-item.rb-gain { animation: none; } }
 body.touch-controls-active .rb-item i { display: none; } /* phones: carried counts only, so the strip stays one row */
 body.touch-controls-active .res-bar { z-index: 6; max-width: calc(100vw - 8px); }
+
+/* ---- Forge goal: what you're gathering for leads the strip; each primary shows "have/need" ---- */
+.rb-goal {
+  display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px 3px 6px; margin-right: 4px; border-radius: 999px;
+  color: #e9d3a3; font: 700 12px/1 system-ui, "Segoe UI", sans-serif; letter-spacing: .02em; white-space: nowrap;
+  background: rgba(255, 214, 140, .07); border: 1px solid rgba(201, 162, 94, .28); transition: background .3s, border-color .3s, color .3s;
+}
+.rb-goal[hidden] { display: none; }
+.rb-goal-ico { width: 18px; height: 18px; flex: none; fill: currentColor; color: inherit; }
+.rb-item em { font: 600 11px/1 system-ui, sans-serif; font-style: normal; color: #b8a27c; margin-left: -2px; }
+.rb-item em:empty { display: none; }
+.rb-item[data-goal="short"][data-zero="true"] { opacity: .62; } /* needed but empty: dim, not hidden */
+.rb-item[data-goal="met"] b, .rb-item[data-goal="met"] em { color: #bfe48a; }
+.res-bar[data-goal="ready"] .rb-goal, .res-bar[data-goal="here"] .rb-goal {
+  color: #fff3dc; background: linear-gradient(180deg, #e27c35, #b4521f); border-color: #ffb36b;
+  box-shadow: 0 0 12px rgba(255, 140, 60, .55);
+}
+.res-bar[data-goal="here"] .rb-goal { animation: rb-goal-here 1.6s ease-in-out infinite; }
+@keyframes rb-goal-here { 50% { box-shadow: 0 0 20px rgba(255, 160, 70, .9); } }
+@media (prefers-reduced-motion: reduce) { .res-bar[data-goal="here"] .rb-goal { animation: none; } }
+/* Phones: the weapon glyph alone carries the goal so the strip stays one short row. */
+body.touch-controls-active .rb-goal { padding: 2px 5px; margin-right: 2px; gap: 0; }
+body.touch-controls-active .rb-goal-t { display: none; }
+body.touch-controls-active .rb-goal-ico { width: 16px; height: 16px; }
+body.touch-controls-active .rb-item em { font-size: 9px; margin-left: -1px; }

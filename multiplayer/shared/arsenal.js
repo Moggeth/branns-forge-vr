@@ -56,7 +56,7 @@ export function costShortfall(resources, cost) {
   for (const [k, n] of Object.entries(cost)) { const have = held(resources, k); if (have < n) out[k] = n - have; }
   return out;
 }
-function payCost(resources, cost) {
+export function payCost(resources, cost) {
   for (const [k, n] of Object.entries(cost)) {
     let due = n;
     for (const key of PAID_WITH[k] || [k]) { const take = Math.min(due, resources[key] || 0); resources[key] -= take; due -= take; }

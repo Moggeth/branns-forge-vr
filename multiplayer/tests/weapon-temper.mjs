@@ -84,6 +84,14 @@ test('wilds: only weapons you have forged temper, at the village forge', () => {
   assert.equal(cmd({action: 'temper', tool: 'pick'}).code, 'too_far');
 });
 
+test('carried iron ore pays for a temper, as it does at the forge', () => {
+  const sim = createSimulation(); sim.addPlayer({id: 'h', name: 'Ore'}); const c = sim.checkpoint(), p = c.players[0];
+  p.role = 'hero'; p.position = [0, terrainHeight(c, 0, 2), 2]; p.resources = {wood: 4, iron: 2, ironOre: 5};
+  const u = loadSimulation(c), r = u.command('h', {type: 'action', seq: 1, action: 'temper', tool: 'axe'});
+  assert.equal(r.ok, true, JSON.stringify(r)); const me = u.snapshot().players[0];
+  assert.equal(me.resources.iron, 0, 'refined iron goes first'); assert.equal(me.resources.ironOre, 1); assert.equal(me.temper.axe, 1);
+});
+
 test('panel model shows the temper tier, cost and whether you can pay here', () => {
   const m = progressModel({xp: 0, temper: {axe: 1}, resources: {wood: 99, iron: 99, gems: 99}}, {atForge: true});
   const axe = m.weapons.find(w => w.id === 'axe');
