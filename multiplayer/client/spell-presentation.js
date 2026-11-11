@@ -441,6 +441,8 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
     // The actual golem kit owns emergence, stone assembly, dust and binding.
     // The former six-box stand-in duplicated that actor and obscured its pieces.
     golem(ev) { ev.dur = .01; },
+    // Rabble: the critter's own view (client/critter-view.js) owns its arrival; the call is a quick ring of sparks and steam.
+    rabble(ev, c) { ev.dur = 1.6; pulse(ev, c, ribMat(PAL.gold, PAL.amber, 0, 1), 0.4, 2.6, 0, 0.8, 0.35); let acc = 0; ev.fx.push((age, dt) => { if (age > 1) return; acc += dt * 30 * Q.n; while (acc >= 1) { acc--; motes(c, c.x, c.z, 1.8, c.R() < 0.5 ? PAL.gold : PAL.amber, 0.18, 1.6); } }); },
     // RAISE EARTH: ground shudders (soil decal + radial fissures), clods churn up from below in a spiral and heap into a mound,
     // a crown of soil is flung up, loose rocks tumble down the flanks and a low dust skirt rolls outward over the terrain.
     raise(ev, c) {
