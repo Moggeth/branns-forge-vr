@@ -1,3 +1,4 @@
+import {setLiveInstances} from './instance-upload.js';
 import * as THREE from 'three';
 
 // Authored creature life and death presentation for the browser client.
@@ -380,7 +381,7 @@ function stepDecals(d, dt) {
     }
   }
   for (const [k, n] of Object.entries(counts)) {
-    const m = d.meshes[k]; m.count = n; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true;
+    setLiveInstances(d.meshes[k], n);
   }
 }
 function put(mesh, i, it, s, sy, yaw, color, dy = 0) {

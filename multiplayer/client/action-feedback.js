@@ -13,7 +13,7 @@ const RECOVERY = {
  "dragon_cooldown": "The dragon is catching its breath. Watch the button fill, then try again.",
  "out_of_reach": "That target is beyond reach. Move closer and aim at it again.",
  "warband_full": "Six Forgelings is a full warband. Lose one in battle before mustering more.",
- "no_warband": "You have no Forgelings yet. Cast Muster from the Summon spells to call three down.",
+ "no_warband": "You have no Forgelings yet. Cast Muster from the Command spells to call three down.",
  "invalid_order": "That order could not be given. Choose ground inside the world, or an enemy to attack.",
  "invalid_target": "That target is gone or cannot receive this action. Aim at another valid target.",
  "invalid_cast": "The spell target is not valid. Aim at ground inside the valley and try again.",
@@ -96,7 +96,7 @@ export function actionError(code,{world={},player={},command={}}={}){
   if(['fire','flame','pour'].includes(command.action))return 'The projectile limit is reached. Let the current shots land before firing again (up to 8s).';
   if((world.pickups?.length||0)>=256)return 'Too many loose resources are on the ground. Collect a few before breaking another deposit.';
   if(command.action==='buildBridge')return 'The world already has 32 bridges. This world cannot accept another bridge.';
-  if((world.enemies?.length||0)>=61&&['skeleton','squad','golem'].includes(command.spell))return 'The world has reached its creature limit. Defeat some enemies before summoning more.';
+  if((world.enemies?.length||0)>=61&&['skeleton','squad','golem','rabble'].includes(command.spell))return 'The world has reached its creature limit. Defeat some enemies before summoning more.';
   if(['awaken','wildwake'].includes(command.spell))return 'The forest has too many trees resting from awakening. Wait for some to root again before waking more.';
   if((world.groves?.length||0)>=64&&['grove','ring','wave'].includes(command.spell))return 'The grove limit is reached. This world cannot accept another grove.';
   if((world.pendingStarfalls?.length||0)>=8&&command.spell==='starfall')return 'Eight meteors are already descending. Wait for an impact before calling another.';

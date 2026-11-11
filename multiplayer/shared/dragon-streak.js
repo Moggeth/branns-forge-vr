@@ -139,12 +139,13 @@ function burnGround(state, at, radius, ctx) {
 }
 function scorch(state, p, at, radius, damage, push, burn, ctx, events) {
   const hits = [];
+  if (push) ctx.blastRemains?.(state, at, radius * 1.3, Math.min(push, 2)); // the bang throws loose bones and rubble too
   for (const enemy of [...state.enemies]) {
     if (!enemyHostileTo(enemy, p.side || 'party')) continue;
     const dx = enemy.position[0] - at[0], dz = enemy.position[2] - at[2], d = Math.hypot(dx, dz);
     if (d > radius || Math.abs(enemy.position[1] - at[1]) > 4) continue;
     if (burn) { enemy.burnUntil = state.tick + burn; enemy.burnPart = 'torso'; }
-    ctx.hitEnemyPart(state, enemy, 'torso', damage * (1 - .35 * d / radius), {tool: 'dragon', point: [enemy.position[0], enemy.position[1] + 1, enemy.position[2]], normal: [0, 1, 0], ownerId: p.id, side: p.side || 'party', energy: 1.6}, ctx, events);
+    ctx.hitEnemyPart(state, enemy, 'torso', damage * (1 - .35 * d / radius), {tool: 'dragon', point: [enemy.position[0], enemy.position[1] + 1, enemy.position[2]], normal: [0, 1, 0], ownerId: p.id, side: p.side || 'party', ...(push ? {blastFrom: [at[0], at[1], at[2]]} : {}), energy: 1.6}, ctx, events);
     hits.push(enemy.id);
     if (push && state.enemies.includes(enemy) && enemy.kind !== 'ent') {
       const k = push * (1 - .5 * d / radius), nx = d > 1e-3 ? dx / d : 1, nz = d > 1e-3 ? dz / d : 0;

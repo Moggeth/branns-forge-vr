@@ -1,17 +1,21 @@
-// World creation menu: pick which world a new room starts in. Brann's Valley (the classic arena) stays the default;
-// the generated worlds are labelled experimental. Only a small descriptor leaves this menu ({kind, seed, preset});
+// World creation menu: pick which world a new room starts in. The Great Wilds comes first and is selected by default. Only a small descriptor leaves this menu ({kind, seed, preset});
 // every player regenerates the same land from it.
 import {PRESETS, PRESET_IDS} from '../shared/worldgen/presets.js';
 import {friendlySeed, cleanSeed} from '../shared/worldgen/random.js';
 import {worldDescriptor} from '../shared/worldgen/registry.js';
 import './world-menu.css';
 
-const MODES = [
+import {labsOn} from './labs.js';
+
+// Scope (2026-11-11): the Great Wilds is the game; Brann's Valley stays for its keeps. The two experiments are shelved
+// to Labs (?labs=1) with all their code intact.
+const ALL_MODES = [
+  {id: 'wilds', title: 'The Great Wilds', tag: 'Recommended', blurb: 'A seeded land kilometres wide. Rivers run to the sea, forests climb the hills, and danger grows the further you roam from the village.'},
   {id: 'arena', title: "Brann's Valley", tag: 'Classic', blurb: 'The hand-built valley: the forge, Dawnhold and Grumblekeep, and the battle for the pylons.'},
-  {id: 'wilds', title: 'The Great Wilds', tag: 'Experimental', blurb: 'A seeded land kilometres wide. Rivers run to the sea, forests climb the hills, and danger grows the further you roam from the village.'},
-  {id: 'expedition', title: 'Expedition Roguelite', tag: 'Experimental', blurb: 'Short seeded runs out of the forge camp. Pick a route, take boons, and decide when to push on or head home.'},
-  {id: 'underways', title: 'The Underways', tag: 'Experimental', blurb: 'Caves beneath the Wilds: delve a procedural dungeon to its finale and bring the treasure home.'},
+  {id: 'expedition', title: 'Expedition Roguelite', tag: 'Experimental', labs: true, blurb: 'Short seeded runs out of the forge camp. Pick a route, take boons, and decide when to push on or head home.'},
+  {id: 'underways', title: 'The Underways', tag: 'Experimental', labs: true, blurb: 'Caves beneath the Wilds: delve a procedural dungeon to its finale and bring the treasure home.'},
 ];
+const MODES = ALL_MODES.filter(m => !m.labs || labsOn());
 
 /**
  * createWorldMenu({parent, onStart, available})

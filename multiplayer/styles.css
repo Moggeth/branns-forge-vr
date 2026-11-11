@@ -225,6 +225,7 @@ body.xr .hud-bottom { display: none; }   /* VR draws its own controls; free the 
 [data-school="shape"]  { --school: #c9a46a; }
 [data-school="summon"] { --school: #b59ad8; }
 [data-school="sky"]    { --school: var(--bf-frost); }
+[data-school="command"] { --school: #ffc857; }
 [data-school="grow"]   { --school: var(--bf-moss); }
 .bf-spell::before { content: ""; position: absolute; left: 6px; right: 6px; top: 0; height: 2px; border-radius: 2px; background: var(--school, var(--bf-gold)); opacity: .8; }
 .bf-toggle { min-height: 44px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }

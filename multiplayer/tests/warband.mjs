@@ -16,7 +16,7 @@ const order = (who, body) => sim.command(who, {type: 'action', seq: ++seq, actio
 const steps = n => { for (let i = 0; i < n; i++) sim.step(); };
 S.enemies.length = 0; S.battle = createBattle(); // no keep war: a quiet valley to drill in
 
-assert.ok(SPELL_SCHOOLS.find(s => s.id === 'summon').spells.includes('muster'));
+assert.ok(SPELL_SCHOOLS.find(s => s.id === 'command').spells.includes('muster'));
 assert.deepEqual(formationOffsets(0), []);
 for (const n of [1, 2, 3, 4, 5, 6]) { const o = formationOffsets(n); assert.equal(o.length, n); for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) assert.ok(Math.hypot(o[i][0] - o[j][0], o[i][1] - o[j][1]) > 1.1, `formation ${n} keeps its spacing`); }
 

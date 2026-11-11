@@ -64,6 +64,8 @@ import {insideTavern} from './shared/taverns.js';
 import './client/hero-progress.css';
 import './client/quartermaster.css';
 import './client/ui-polish.css';
+import {SHELVED_WEAPONS, weaponShelved} from './shared/arsenal.js';
+import {labsOn} from './client/labs.js';
 
 // ---------------------------------------------------------------- helpers
 const $ = id => document.getElementById(id);
@@ -497,6 +499,7 @@ function onWelcome(detail) {
   roomInput.value = ROOM_PATTERN.test(room) ? room : roomInput.value;
   setText($('hudRoom'), detail.local?'Solo':room); setText($('menuRoom'), detail.local?'Solo — this device':room);
   for(const id of ['copyCode','copyInvite','menuCopyCode','menuCopyInvite','showInviteQr'])$(id).disabled=!!detail.local;
+  for(const id of ['copyCode','copyInvite','showInviteQr'])$(id).hidden=!!detail.local; // solo: no invite clutter in the top bar
   $('inviteQr').hidden=!!detail.local;
   $('inviteQr').open=false;
   $('inviteQrImage').hidden=true;
@@ -639,6 +642,7 @@ function onSnapshot(snapshot) {
     resourceBar.update(self.resources, snapshot.inventions?.stockpiles?.[self.side==='rivals'?'rivals':'party']);
     for(const b of all('[data-equip]'))setAttr(b,'aria-pressed',String(b.dataset.equip===(self.tool||'axe')));
     {const chip=document.querySelector('[data-equip="flockwright"]');if(chip&&chip.hidden===!!self.flockwright)chip.hidden=!self.flockwright;}
+    for(const t of SHELVED_WEAPONS){const chip=document.querySelector(`[data-equip="${t}"]`);const hide=weaponShelved(t,{labs:labsOn()});if(chip&&chip.hidden!==hide)chip.hidden=hide;}
     const weaponText={flockwright:'Flockwright · click to fire a heavy bolt · right click to aim down the ring sight · the crew reloads',staff:'Sunthread · hold click for a sun-thread · Q Radiant Nova',axe:'Axe · click to chop · Q sundering strike',pick:'Stonewhisper · click to mine · hold Q to aim crystal wall',hammer:'Sunfall · click to strike · Q ground slam',crossbow:`Siegebird · click to fire · songbirds bring each bolt · golden bird ${(siegebirdGoldenChance(self.siegebird?.hits||0,!!self.talents?.crossbow?.includes('flock'))*100).toFixed(1)}%`,bow:'Emberwing · hold attack to draw, release to fire · right click then aim to curve · Q phoenix flare',limb:'Bone · click to strike · G drop · X throw',wyrmspout:`Wyrmspout · hold to spray sticky fire · Q: Gout · Tank ${Math.round((1-(self.heat||0))*100)}%${self.overheatUntil>snapshot.tick?' · Refilling':''}`,stormreel:'Stormreel · hold to charge, release to fire · + and \u2212 bolts in one foe close the circuit · G spikes it · Q reels in',flask:mobile?.enabled?'Emberdew · attack: hurl a lit bottle · Special: Cinder Cluster':'Emberdew · click to toss fuel · hold right click to light and aim · hold Q for Cinder Cluster'}[self.tool||'axe'];if($('weaponHint'))setText($('weaponHint'),weaponText);
     meter('hp', self.hp, self.maxHp ?? self.hpMax ?? self.maxHealth ?? 100);
     heroProgress.update(self, {role: currentRole});
