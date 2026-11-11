@@ -113,12 +113,13 @@ export function createQuartermasterUI({mount = document.body, hudSelf = null, on
     dialog.dataset.side = model.side;
     if (open) { renderSlots(); renderShelves(); }
   }
-  /** Per snapshot. self: the local player; tavern: the tavern you stand in (shared/taverns.js) or null. */
-  function update(self, {role = 'hero', tavern: inTavern = null, tick = 0} = {}) {
+  /** Per snapshot. self: the local player; tavern: the tavern you stand in (shared/taverns.js) or null; wells: false
+   *  where no healing well can refill the draught (the Great Wilds), so an empty flask chip stays out of the way. */
+  function update(self, {role = 'hero', tavern: inTavern = null, tick = 0, wells = true} = {}) {
     hero = role === 'hero' && !!self;
     if (!hero && open) close();
     const n = self?.draughts || 0, cap = hero ? draughtCap(self) : 0;
-    setHidden(draught, !hero); setText(draughtNum, `${n}/${cap}`); if (draught.disabled !== !n) draught.disabled = !n;
+    setHidden(draught, !hero || (!n && !wells)); setText(draughtNum, `${n}/${cap}`); if (draught.disabled !== !n) draught.disabled = !n;
     const ready = n > 0 && (self?.hp ?? 0) < (self?.maxHp ?? 100); if (draught.classList.contains('qm-draught-ready') !== ready) draught.classList.toggle('qm-draught-ready', ready);
     const key = `${self?.resources?.gold || 0}|${(self?.items || []).join(',')}|${self?.side}`;
     if (key !== shownKey) { shownKey = key; model = shopModel(self || {}); render(); }
