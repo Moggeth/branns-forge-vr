@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import {createSimulation, loadSimulation} from '../shared/simulation.js';
 import {createEnemy, hitEnemyPart} from '../shared/combat.js';
 import {terrainHeight} from '../shared/terrain.js';
-import {CRITTER, CRITTER_KINDS, rabbleKind, kettlePhase, bramblePhase, kegPhase, critterDamageScale} from '../shared/critters.js';
+import {stepCritter, validCritter, CRITTER, CRITTER_KINDS, rabbleKind, kettlePhase, bramblePhase, kegPhase, critterDamageScale} from '../shared/critters.js';
 
 const world = () => { const sim = createSimulation({room: 'RABBLE', seed: 5}); sim.addPlayer({id: 'h', role: 'hero'}); return sim; };
 const S = sim => sim.adventureWorld();
@@ -93,5 +93,17 @@ const X = 20, Z = -20; // open ground, clear of the forge apron and the camp
   const sim = world(), s = S(sim), h = hero(s); h.position = at(s, X, Z - 3);
   for (let i = 0; i < 6; i++) place(s, CRITTER_KINDS[i % 3], X + (i % 3) * 3 - 3, Z + 4 + Math.floor(i / 3) * 3, `mix${i}`);
   for (let i = 0; i < 12; i++) { step(sim, 100); for (const e of s.enemies) assert.ok(finiteAll(e), e.id); h.hp = Math.max(h.hp, 60); roundTrip(sim); }
+}
+// Frost Nova / Quake slows reach critters; a long roll through a crowd stays loadable.
+{
+  const run = slowed => { const sim = world(), s = S(sim), h = hero(s); h.position = at(s, X, Z - 9); const k = place(s, 'kegtoter', X, Z, 'slowk'); k.emergeTick = -1e4; if (slowed) k.slowUntil = s.tick + 1e4;
+    const from = [...k.position]; step(sim, 60); return Math.hypot(k.position[0] - from[0], k.position[2] - from[2]); };
+  const free = run(false), slow = run(true);
+  assert.ok(free > .3 && slow < free * .5, `a slowed critter crawls (${slow.toFixed(2)} m vs ${free.toFixed(2)} m)`);
+  const hog = {id: 'hog', kind: 'bramblehog', position: [0, 0, 0], yaw: 0, hp: 120, rollHits: Array.from({length: 12}, (_, i) => `f${i}`), curlTick: 0, rollYaw: 0};
+  const heroes = Array.from({length: 6}, (_, i) => ({id: `h${i}`, position: [0, 0, 0], hp: 100}));
+  const state = {tick: 40, enemies: [hog], players: heroes};
+  try { stepCritter(state, hog, {heroes, foes: [hog], buildings: [], ground: () => 0, resolve: () => {}, damageHero: () => {}, damageEnemy: () => {}, damageStructure: () => {}, events: []}); } catch {}
+  assert.ok(hog.rollHits === undefined || hog.rollHits.length <= 16, `roll history stays within the save limit (${hog.rollHits?.length})`);
 }
 console.log('critters: rabble pick, kettle vent/leak/burst, hog curl/roll/dizzy, keg plant/blast/burrow, keg chains, saves');

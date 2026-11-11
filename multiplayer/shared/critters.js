@@ -150,7 +150,7 @@ function steer(e, dx, dz, speed, {ground, resolve}, s, turn = .14) {
   const len = Math.hypot(dx, dz); if (len < 1e-6 || speed <= 0) return false;
   dx /= len; dz /= len;
   e.yaw = wrap(e.yaw + clamp(wrap(Math.atan2(-dx, -dz) - e.yaw), -turn, turn));
-  const facing = -Math.sin(e.yaw) * dx - Math.cos(e.yaw) * dz, pace = speed / 60 * clamp(.5 + .5 * facing, .35, 1);
+  const facing = -Math.sin(e.yaw) * dx - Math.cos(e.yaw) * dz, pace = speed / 60 * clamp(.5 + .5 * facing, .35, 1) * slowPace;
   for (const angle of [0, .6, -.6, 1.2, -1.2]) {
     const c = Math.cos(angle), sn = Math.sin(angle), x = dx * c - dz * sn, z = dx * sn + dz * c;
     const [px, pz] = clampToWorld(e.position[0] + x * .6, e.position[2] + z * .6), probe = [px, e.position[1], pz], before = [...probe];
@@ -177,8 +177,12 @@ function nearest(e, list) { let best = null, d = Infinity; for (const t of list)
  * One tick for a critter inside stepEnemies. ctx: {heroes, foes (creatures it may hurt), buildings, ground, resolve,
  * damageHero(state, hero, n, events, from), damageEnemy(enemy, n, events, side, ownerId), damageStructure(id, n, events), events}.
  */
+// Frost Nova and Quake slow critters like any other creature (same factor as shared/enemy-behaviour.js). Set per
+// step, before any movement helper runs, so it is deterministic.
+const SLOWED = .35, ROLL_HITS_MAX = 16;
+let slowPace = 1;
 export function stepCritter(state, e, ctx) {
-  e.lastTick = state.tick;
+  e.lastTick = state.tick; slowPace = (e.slowUntil ?? -1) > state.tick ? SLOWED : 1;
   if (state.tick - (e.emergeTick ?? -1e9) < CRITTER_EMERGE_TICKS) { settle(e, ctx, CRITTER[e.kind]); return; } // still climbing out
   if (e.kind === 'kettlebelly') return stepKettle(state, e, ctx);
   if (e.kind === 'bramblehog') return stepBramble(state, e, ctx);
@@ -193,9 +197,9 @@ function stepKettle(state, e, ctx) {
     if (a >= s.leakTicks) { ctx.damageEnemy(e, e.hp + 1, events, undefined, e.leakBy); if (state.enemies.includes(e)) ctx.damageEnemy(e, e.hp + 1, events); return; }
     e.yaw = wrap(e.yaw + s.leakSpin * (e.leakSpin || 1) * (1 + a / s.leakTicks));
     const dx = -Math.sin(e.yaw + 1.9 * (e.leakSpin || 1)), dz = -Math.cos(e.yaw + 1.9 * (e.leakSpin || 1)), before = [...e.position];
-    const [px, pz] = clampToWorld(e.position[0] + dx * s.leakSpeed / 60, e.position[2] + dz * s.leakSpeed / 60);
+    const [px, pz] = clampToWorld(e.position[0] + dx * s.leakSpeed / 60 * slowPace, e.position[2] + dz * s.leakSpeed / 60 * slowPace);
     e.position[0] = px; e.position[2] = pz; settle(e, ctx, s);
-    if (flat(e.position, before) < s.leakSpeed / 60 * .4) e.leakSpin = -(e.leakSpin || 1); // ricochet off whatever stopped it
+    if (flat(e.position, before) < s.leakSpeed / 60 * slowPace * .4) e.leakSpin = -(e.leakSpin || 1); // ricochet off whatever stopped it
     if (a % 30 === 0) for (const h of ctx.heroes) if (flat(h.position, e.position) < s.radius + .55) ctx.damageHero(state, h, s.leakTouch, events, e.position);
     return;
   }
@@ -225,7 +229,7 @@ function stepBramble(state, e, ctx) {
   if (e.dizzyTick !== undefined && t - e.dizzyTick >= s.dizzyTicks) delete e.dizzyTick;
   if (phase === 'curl') { settle(e, ctx, s); return; }
   if (phase === 'roll') {
-    const fx = -Math.sin(e.rollYaw), fz = -Math.cos(e.rollYaw), step = s.rollSpeed / 60;
+    const fx = -Math.sin(e.rollYaw), fz = -Math.cos(e.rollYaw), step = s.rollSpeed / 60 * slowPace;
     const [px, pz] = clampToWorld(e.position[0] + fx * step, e.position[2] + fz * step), probe = [px, e.position[1], pz], before = [...probe];
     ctx.resolve(probe, s.radius, s.height);
     const clipped = Math.hypot(px - e.position[0] - fx * step, pz - e.position[2] - fz * step) > 1e-6; // ran into the world's edge
@@ -233,7 +237,7 @@ function stepBramble(state, e, ctx) {
     if (!stopped) { e.position[0] = probe[0]; e.position[2] = probe[2]; }
     e.yaw = e.rollYaw; settle(e, ctx, s);
     e.rollHits ||= [];
-    for (const h of ctx.heroes) if (!e.rollHits.includes(h.id) && flat(h.position, e.position) < s.radius + .5) { e.rollHits.push(h.id); ctx.damageHero(state, h, s.rollHero, events, e.position); }
+    for (const h of ctx.heroes) if (e.rollHits.length < ROLL_HITS_MAX && !e.rollHits.includes(h.id) && flat(h.position, e.position) < s.radius + .5) { e.rollHits.push(h.id); ctx.damageHero(state, h, s.rollHero, events, e.position); }
     for (const f of ctx.foes) {
       if (f === e || f.hp <= 0 || e.rollHits.includes(f.id) || e.rollHits.length >= 12 || flat(f.position, e.position) > s.radius + (f.kind === 'golem' ? .8 : .45)) continue;
       e.rollHits.push(f.id); events.push({kind: 'bramble_bowl', id: e.id, target: f.id, position: [...f.position]});
@@ -309,7 +313,7 @@ export function validCritter(e, tick) {
   if (e.leakSpin !== undefined && e.leakSpin !== 1 && e.leakSpin !== -1) return false;
   if (e.leakBy !== undefined && (typeof e.leakBy !== 'string' || e.leakBy.length > 64)) return false;
   if (e.rollYaw !== undefined && !Number.isFinite(e.rollYaw)) return false;
-  if (e.rollHits !== undefined && (!Array.isArray(e.rollHits) || e.rollHits.length > 16 || !e.rollHits.every(q => typeof q === 'string' && q.length <= 64))) return false;
+  if (e.rollHits !== undefined && (!Array.isArray(e.rollHits) || e.rollHits.length > ROLL_HITS_MAX || !e.rollHits.every(q => typeof q === 'string' && q.length <= 64))) return false;
   if (e.kegAt !== undefined && (!Array.isArray(e.kegAt) || e.kegAt.length !== 3 || !e.kegAt.every(Number.isFinite))) return false;
   // Phase companions: a lit fuse has its keg on the ground (and only then); a curl or roll has its heading.
   if ((e.plantTick !== undefined && e.blastTick === undefined) !== (e.kegAt !== undefined)) return false;
