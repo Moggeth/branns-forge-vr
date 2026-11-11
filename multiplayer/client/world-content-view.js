@@ -11,10 +11,11 @@ import {createCrystalWall} from './crystal-wall.js';
 import {attachFracture,prepareFractureWarmup,prepareFractureWarmupAsync} from './mining-fracture.js';
 import {createGeodeLight,setGeodeLightTime,geodeLightGlobalStats,GEODE_LIGHT_BUDGET,GEODE_LIGHT_DISTANCE} from './geode-light.js';
 import {createTreeView} from './tree-view.js';
+import {VARIANTS} from '../shared/trees.js';
 
 // Installed GLBs plus the Opus-authored reusable mineral and tree-detail kit.
 // Trees (notches, hinge fall, stumps, physical logs, LOD) are delegated to tree-view.js; this module keeps props.
-const TREE_ASSETS=['tree','tree_b','tree_young','tree_lod','tree_b_lod','tree_young_lod','log','endcap'];
+const TREE_ASSETS=[...VARIANTS,...VARIANTS.map(v=>v+'_lod'),'log','endcap'];
 // Opus resource kit: native metres, origin at the bottom centre (Ground) and ResourcePivot on the same vertical axis,
 // so the existing y spin keeps the authored pivot. Pickups wait for their authored model rather than showing primitive stand-ins.
 export const PICKUP_ASSETS={gems:'star_gem',stone:'stone_chunk',apple:'orchard_apple'};

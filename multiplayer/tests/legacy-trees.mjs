@@ -75,14 +75,14 @@ test('character collision: indexed trunks, stump height, no canopy box', () => {
  const h = fell(s, t), cuts = new Map([[t.id, h]]); assert.deepEqual(R.resolveTrees([t.x + .1, 1.1, t.z], idx, cuts, ground), [t.x + .1, 1.1, t.z], 'standing on the stump is allowed'); });
 
 // ---- Real authored geometry.
-const kits = Object.fromEntries(['tree', 'tree_b', 'tree_young', 'tree_lod', 'tree_b_lod', 'tree_young_lod', 'log', 'endcap'].map(n => [n, loadGLB(art(n))]));
+const kits = Object.fromEntries([...R.VARIANTS, ...R.VARIANTS.map(v => v + '_lod'), 'log', 'endcap'].map(n => [n, loadGLB(art(n))]));
 const uvMap = fitEndcapUV(kits.endcap.scene.getObjectByName('EndCapMesh') || kits.endcap.scene.children[0]);
 const trunkOf = v => { const root = kits[v].scene.getObjectByName('Tree'), m = []; root.getObjectByName('Trunk').traverse(c => c.isMesh && m.push(c)); return {root, tris: bakeTriangles(m[0], root)}; };
-test('assets: root Tree, required parts, trunk axis at origin, endcap UV fit', () => { for (const v of ['tree', 'tree_b', 'tree_young']) { const {root, tris} = trunkOf(v); for (const p of ['Trunk', 'Roots', 'Branches', 'Leaves', 'Fruit']) assert.ok(root.getObjectByName(p), `${v}.${p}`);
+test('assets: root Tree, required parts, trunk axis at origin, endcap UV fit', () => { for (const v of R.VARIANTS) { const {root, tris} = trunkOf(v); for (const p of ['Trunk', 'Roots', 'Branches', 'Leaves', ...(v === 'tree_blossom' ? [] : ['Fruit'])]) assert.ok(root.getObjectByName(p), `${v}.${p}`);
   const ring = tris.flat().filter(x => Math.abs(x.p[1] - 1) < .01); const cx = ring.reduce((a, x) => a + x.p[0], 0)/ring.length, cz = ring.reduce((a, x) => a + x.p[2], 0)/ring.length; assert.ok(Math.hypot(cx, cz) < .02, `${v} axis ${cx},${cz}`); }
  assert.ok(uvMap); const [u0, v0] = uvMap(0, 0), [u1] = uvMap(1, 0); assert.ok(Math.abs(u1 - u0) > .3, 'endcap UV disc spans the texture'); });
 const geomReport = [];
-for (const v of ['tree', 'tree_b', 'tree_young']) {
+for (const v of R.VARIANTS) {
  const {tris} = trunkOf(v), base = audit(tris), prof = R.TREE_PROFILES[v], tree = {height: prof.height, variant: R.VARIANTS.indexOf(v), x: 0, z: 0};
  for (const [cuts, yaw, y] of [[1, .7, 1.0], [2, .7, 1.0], [2, -2.4, .55], [2, 3.0, 1.55]]) test(`${v}: notch cuts=${cuts} yaw=${yaw} y=${y} watertight, UV, normals, winding`, () => {
   const n = R.notchFor(tree, {cuts, cutHeight: y, fallYaw: yaw}, 0), res = buildNotch(tris, n, uvMap), all = [...res.bark, ...res.wood], a = audit(all);

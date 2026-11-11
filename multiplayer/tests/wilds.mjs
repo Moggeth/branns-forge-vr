@@ -45,6 +45,14 @@ assert.ok(c.snapshot().harvestedTrees.some(h => h.id === tree.id), 'change layer
 // Garbage in a save is refused, not trusted.
 assert.throws(() => loadSimulation({...saved, world: {...world, seed: 'NOT OK'}}));
 assert.throws(() => loadSimulation({...saved, wilds: {...saved.wilds, felled: [['../../x', 1]]}}));
+// Saved felled/harvested trees are keyed by generated id, so tree placement (ids and spots) is frozen. Species may
+// change; where trees stand may not. This hash was taken from the pre-species generator and must never move.
+{
+  const {createHash} = await import('node:crypto');
+  const gw = worldFor(worldDescriptor({kind: 'wilds', seed: 'ci-wilds', preset: 'continent', size: 2048}));
+  let key = ''; for (let cx = -3; cx < 3; cx++) for (let cz = -3; cz < 3; cz++) for (const t of chunkContent(gw, cx, cz).trees) key += `${t.id}@${t.x},${t.z};`;
+  assert.equal(createHash('sha1').update(key).digest('hex').slice(0, 16), '0439287206a7c80d', 'generated tree ids keep their saved positions');
+}
 // The arena is untouched.
 const arena = createSimulation({room: 'A', seed: 41}); arena.addPlayer({id: 'x', role: 'hero'}); arena.step();
 assert.equal(arena.snapshot().world, undefined);

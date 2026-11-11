@@ -4,6 +4,7 @@ import {homeBallistaAction,isHomeBallistaId} from './home-ballista.js';
 import {homeAction,isHomeAction} from './home-interact.js';
 import {isShopAction,shopAction,validTownFields,restoreTownFields} from './home-shop.js';
 import {isArmouryAction,armouryAction,hasFlockwright} from './armoury.js';
+import {createArsenal,craftWeapon,weaponOwned,restoreArsenal} from './arsenal.js';
 import {isMillAction,millAction,stepMills} from './home-mill.js';
 import {aleArmor,resolveTaverns,stepTaverns,tavernAle,tavernSafe} from './taverns.js';
 import {itemBonus} from './hero-items.js';
@@ -171,6 +172,7 @@ function newWorldState({room, seed, descriptor, run = null}) {
   newWildsState(state, worldFor(state), terrainHeight);
   // Horses at the start and a wild tiger nearby (shared/mounts.js); an Expedition run travels on foot.
   if (descriptor.kind !== 'expedition') state.mounts = spawnWorldMounts(state, worldFor(state), terrainHeight, wildsOrigin(state, worldFor(state)));
+  if (descriptor.kind === 'wilds') state.arsenal = createArsenal(); // the weapon ladder (shared/arsenal.js)
   worldMode(descriptor.kind)?.newState?.(state, worldFor(state), run || {});
   return state;
 }
@@ -300,6 +302,7 @@ function instantiate(state) {
         if (message.action === 'collectTarget') return collectTarget(state,p,message,{terrainHeight,combatAction,combatContext});
         if (message.action === 'talent') return talentAction(state,p,message);
         if (p.role !== 'hero') return fail('invalid_action');
+        if (message.action === 'craftWeapon') return craftWeapon(state,p,message);
         if (message.action === 'mount' || message.action === 'dismount') return mountAction(state,p,message,{takeApple:h=>{const f=state.fruit,i=f?.drops?.findIndex(d=>d.heldBy===h.id)??-1;if(i<0)return false;f.drops.splice(i,1);return true;}});
         if (message.action === 'dragon') return dragonAction(state,p,message,dragonContext);
         if (p.dragon && message.action !== 'equip') return fail('dragon_riding');
@@ -309,6 +312,7 @@ function instantiate(state) {
           if (message.tool==='stormreel') return wornTower(state,p)?ok():fail('no_pack');
           // The Flockwright is taken down from the Armoury's stand first (shared/armoury.js).
           if (message.tool==='flockwright'&&!hasFlockwright(p)) return fail('no_flockwright');
+          if (!weaponOwned(state,p,message.tool)) return fail('not_forged'); // the Wilds weapon ladder (shared/arsenal.js)
           if (p.tool==='stormreel') { const events=plantPack(state,p,[],(x,z)=>terrainHeight(state,x,z,false)); p.tool=message.tool; releaseHeld(state,p,[0,0,0]); return ok(events); }
           if(message.tool!=='limb')releaseHeld(state,p,[0,0,0]);
           if(message.tool!==p.tool)releaseSnack(state,p);
@@ -567,7 +571,7 @@ function instantiate(state) {
         edits: state.edits, ...(state.terrainBake?{terrainBake:state.terrainBake}:{}), groves: state.groves, pendingStarfalls: state.pendingStarfalls, bloom: state.bloom, springs: state.springs, ...(state.waygate ? {waygate: state.waygate} : {}), ...(state.geodes ? {geodes: state.geodes} : {}), ...(state.beacon ? {beacon: state.beacon} : {}), ...(state.weather?{weather:state.weather}:{}),...(state.underways?.runs.length||Object.keys(state.underways?.delves||{}).length?{underways:state.underways}:{}),
         harvestedTrees: state.harvestedTrees, ...(state.treeRoots?.length?{treeRoots:state.treeRoots}:{}), deposits: state.deposits, pickups: state.pickups, bridges: state.bridges,
         fireCells:state.fireCells,fireSurfaces:state.fireSurfaces,looseLogs:state.looseLogs,battle:state.battle,adventure:state.adventure,settlement:state.settlement,inventions:state.inventions,
-        awakenedTrees:state.awakenedTrees,wildTrees:state.wildTrees,fruit:state.fruit,...(state.run?{run:state.run}:{}),contentVersion: 4, landmarks:state.landmarks, shrine: state.shrine, maxPlayers: MAX_PLAYERS,...(state.world?{world:state.world,wilds:state.wilds}:{}),...(state.mounts?.length?{mounts:state.mounts}:{}),...modeSnapshot(state)});
+        awakenedTrees:state.awakenedTrees,wildTrees:state.wildTrees,fruit:state.fruit,...(state.run?{run:state.run}:{}),contentVersion: 4, landmarks:state.landmarks, shrine: state.shrine, maxPlayers: MAX_PLAYERS,...(state.world?{world:state.world,wilds:state.wilds}:{}),...(state.mounts?.length?{mounts:state.mounts}:{}),...(state.arsenal?{arsenal:state.arsenal}:{}),...modeSnapshot(state)});
     },
     checkpoint() { return copy(state); },
     adventureWorld() { return state; },
@@ -725,6 +729,7 @@ function loadState(saved, descriptor) {
   state.underways=underways;
   const waygate=restoreWaygate(saved);if(waygate)state.waygate=waygate;const geodes=restoreGeodes(saved);if(geodes)state.geodes=geodes;const beacon=restoreBeacon(saved);if(beacon)state.beacon=beacon;
   state.heroLedger = restoreLedger(saved);
+  {const arsenal=restoreArsenal(saved);if(arsenal)state.arsenal=arsenal;else delete state.arsenal;} // saves from before the ladder keep every weapon
   state.shrine = copy(saved.shrine); // Includes break/restore timer.
   state.mounts = restoreMounts(saved, state.players, validPosition);
   if (descriptor) { state.wilds = restoreWilds(saved); worldMode(descriptor.kind)?.restore?.(saved, state); }

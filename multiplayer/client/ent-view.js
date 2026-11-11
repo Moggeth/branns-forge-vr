@@ -174,7 +174,8 @@ export function createParticles(scene, cap, additive, texture) {
  return {emit, tick, count: () => list.length, dispose() { points.removeFromParent(); g.dispose(); m.dispose(); }};
 }
 
-const LEAF = {tree: [[.36, .55, .2], [.5, .66, .26], [.62, .6, .22]], tree_b: [[.42, .6, .3], [.55, .7, .35], [.33, .5, .24]], tree_young: [[.5, .72, .28], [.62, .78, .32], [.4, .6, .2]]};
+const LEAF = {tree: [[.36, .55, .2], [.5, .66, .26], [.62, .6, .22]], tree_b: [[.42, .6, .3], [.55, .7, .35], [.33, .5, .24]], tree_young: [[.5, .72, .28], [.62, .78, .32], [.4, .6, .2]],
+ tree_fir: [[.16, .38, .2], [.3, .52, .22], [.22, .44, .2]], tree_maple: [[.85, .4, .08], [.9, .58, .12], [.72, .2, .06]], tree_blossom: [[.98, .62, .76], [1, .8, .88], [.9, .5, .66]]};
 
 /**
  * createEntView({scene, templates, height(x,z), quality:'high'|'low', onSound(event), onRumble({position, strength, kind})})
