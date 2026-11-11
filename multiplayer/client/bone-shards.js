@@ -13,6 +13,7 @@ export const SHARDS = Object.freeze({
   pool: {high: 72, low: 32},
   life: {high: 7, low: 4.5},
   shatter: {splinter: 12, knob: 6, speed: [3, 8.5], lift: [1.5, 4.5]},
+  blast: {splinter: 14, knob: 8, speed: [2.5, 7], lift: [3, 7]},
   headshot: {chip: 5, speed: [1.6, 3.6], lift: [.6, 1.8]},
   snap: {splinter: 4, speed: [1.2, 3.4], lift: [.8, 2.2]},
 });
@@ -105,6 +106,11 @@ export function createBoneShards({scene, material = null, height = () => 0, qual
       const S = SHARDS.shatter, at = event.point || [event.position[0], event.position[1] + 1.1, event.position[2]], away = event.direction ? flat(event.direction) : flat((event.normal || [0, 0, 0]).map(n => -n));
       burst('splinter', fewer(S.splinter), at, away, S.speed, S.lift, seed, 1);
       burst('knob', fewer(S.knob), at, away, S.speed, S.lift, seed + 1, 1);
+    } else if (event.kind === 'death' && event.creature === 'skeleton' && event.style === 'blast') {
+      // Blown apart: splinters spray every way, mostly up and away from the centre of the bang.
+      const S = SHARDS.blast, at = [event.position[0], event.position[1] + .9, event.position[2]], away = Array.isArray(event.from) ? flat([at[0] - event.from[0], 0, at[2] - event.from[2]]).map(n => n * .6) : [0, 0, 0];
+      burst('splinter', fewer(S.splinter), at, away, S.speed, S.lift, seed, 1);
+      burst('knob', fewer(S.knob), at, away, S.speed, S.lift, seed + 1, 1.1);
     } else if (event.kind === 'death' && event.creature === 'skeleton' && event.style === 'headshot') {
       const S = SHARDS.headshot, at = event.point || [event.position[0], event.position[1] + 1.5, event.position[2]];
       burst('chip', fewer(S.chip), at, event.direction || flat((event.normal || [0, 0, 1]).map(n => -n)), S.speed, S.lift, seed, 1);

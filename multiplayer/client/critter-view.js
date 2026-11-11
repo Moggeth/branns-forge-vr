@@ -8,6 +8,7 @@
 // Draws per critter: one rigid-skinned body (client/critter-geometry.js) and one glow; a Kegtoter adds its keg, fuse and
 // spark. Geometry and the lit materials are shared per kind. No lights: glows are unlit emissive meshes and particles.
 import * as THREE from 'three';
+import {createBlastFx} from './blast-fx.js';
 import {CRITTER, CRITTER_EMERGE_TICKS, isCritter} from '../shared/critters.js';
 import {KETTLE, BRAMBLE, KEG, kettleGeometry, kettleGlow, brambleGeometry, dizzyLeaves, moleGeometry, kegGeometry, fuseGeometry, bake, M} from './critter-geometry.js';
 import {softTexture} from './ent-view.js';
@@ -64,9 +65,8 @@ export function createCritterView({scene, height = () => 0, quality = 'high', on
     glow: new THREE.MeshBasicMaterial({vertexColors: true, toneMapped: false, name: 'CritterGlow'}),
   };
   const geo = {}, need = (k, f) => geo[k] ||= f();
-  const flash = new THREE.MeshBasicMaterial({color: 0xffc070, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false});
-  const flashGeo = new THREE.SphereGeometry(1, 18, 12), ringGeo = new THREE.RingGeometry(.9, 1, 48).rotateX(-Math.PI / 2);
-  const states = new WeakMap(), corpses = [], blasts = [], pieces = [], seenBlast = new Set(), stopInfo = new Map();
+  const blastFx = createBlastFx({scene, height, quality: low ? 'low' : 'high'});
+  const states = new WeakMap(), corpses = [], pieces = [], seenBlast = new Set(), stopInfo = new Map();
   let clock = 0;
   const v1 = new THREE.Vector3(), v2 = new THREE.Vector3(), v3 = new THREE.Vector3(), e1 = new THREE.Euler(), q1 = new THREE.Quaternion();
 
@@ -298,10 +298,7 @@ export function createCritterView({scene, height = () => 0, quality = 'high', on
   // ---- blasts and one-shot events ----
   function boom(position, style, radius) {
     const [x, y, z] = position, keg = style === 'keg', gy = height(x, z);
-    const ball = new THREE.Mesh(flashGeo, flash.clone()), ring = new THREE.Mesh(ringGeo, flash.clone());
-    ball.material.color.set(keg ? 0xffb050 : 0xfff0d0); ring.material.color.set(keg ? 0xffa040 : 0xe8f4ff);
-    ball.position.set(x, y + (keg ? .35 : .6), z); ring.position.set(x, gy + .06, z); ball.renderOrder = ring.renderOrder = 4; scene.add(ball, ring);
-    blasts.push({ball, ring, age: 0, radius, keg});
+    blastFx.blast([x, keg ? y : y + .3, z], keg ? 'keg' : 'kettle', radius); // fireball, smoke, shock ring, scorch (client/blast-fx.js)
     if (keg) {
       for (let i = 0; i < n(26); i++) { const a = Math.random() * TAU, e = Math.random() * .9, s = 2 + Math.random() * 4;
         sparks.emit({x, y: y + .3, z, vx: Math.cos(a) * Math.cos(e) * s, vy: Math.sin(e) * s + 1, vz: Math.sin(a) * Math.cos(e) * s, life: .35 + Math.random() * .35, size: .22 + Math.random() * .2, grav: 1, drag: 3, r: 1.8, g: .8 + Math.random() * .3, b: .25}); }
@@ -367,12 +364,7 @@ export function createCritterView({scene, height = () => 0, quality = 'high', on
       if (k.age > .9) { const s = smooth((k.age - .9) / .6); c.base.position.y = -PIVOT[c.kind] - s * .5; c.pivot.scale.setScalar(Math.max(.001, 1 - s)); }
       if (k.age > 1.5) { endCorpse(k); corpses.splice(i, 1); }
     }
-    for (let i = blasts.length - 1; i >= 0; i--) {
-      const b = blasts[i]; b.age += dt; const u = b.age / (b.keg ? .55 : .45), r = b.age / .5;
-      b.ball.scale.setScalar(b.radius * (b.keg ? .38 : .28) * (.3 + .7 * smooth(u))); b.ball.material.opacity = (1 - smooth(u)) ** 2 * (b.keg ? .6 : .35);
-      b.ring.scale.setScalar(.4 + b.radius * smooth(r)); b.ring.material.opacity = (1 - smooth(r)) ** 1.5 * .45;
-      if (b.age > .6) { b.ball.removeFromParent(); b.ring.removeFromParent(); b.ball.material.dispose(); b.ring.material.dispose(); blasts.splice(i, 1); }
-    }
+    blastFx.update(dt);
     for (let i = pieces.length - 1; i >= 0; i--) {
       const p = pieces[i]; p.age += dt; p.v.y -= 14 * dt; p.mesh.position.addScaledVector(p.v, dt); p.mesh.rotation.x += p.spin.x * dt; p.mesh.rotation.y += p.spin.y * dt; p.mesh.rotation.z += p.spin.z * dt;
       const gy = height(p.mesh.position.x, p.mesh.position.z) + .05;
@@ -382,12 +374,12 @@ export function createCritterView({scene, height = () => 0, quality = 'high', on
     }
     steam.tick(dt, height); sparks.tick(dt, height); chips.tick(dt, height);
   }
-  function stats() { return {corpses: corpses.length, blasts: blasts.length, pieces: pieces.length, steam: steam.count(), sparks: sparks.count(), chips: chips.count()}; }
+  function stats() { return {corpses: corpses.length, blasts: blastFx.stats().live, pieces: pieces.length, steam: steam.count(), sparks: sparks.count(), chips: chips.count()}; }
   function dispose() {
     for (const k of corpses) endCorpse(k); corpses.length = 0;
-    for (const b of blasts) { b.ball.removeFromParent(); b.ring.removeFromParent(); b.ball.material.dispose(); b.ring.material.dispose(); } blasts.length = 0;
+    blastFx.dispose();
     for (const p of pieces) p.mesh.removeFromParent(); pieces.length = 0;
-    steam.dispose(); sparks.dispose(); chips.dispose(); tex.dispose(); flash.dispose(); flashGeo.dispose(); ringGeo.dispose();
+    steam.dispose(); sparks.dispose(); chips.dispose(); tex.dispose();
     for (const g of Object.values(geo)) g.dispose(); for (const m of Object.values(mats)) m.dispose();
   }
   return {build, update, release, event, tick, stats, dispose};

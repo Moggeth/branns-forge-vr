@@ -38,7 +38,7 @@ import {RAINFALL,castRainfall,stepRain,restoreWeather} from './weather-spell.js'
 import {useResource, collectTarget, nearestCollectible, meteorAwakens, flushMeteorRewards,createSettlement,settlementAction,stepSettlement,restoreSettlement,recordSettlementDeaths,reclaimDepletedDeposits,retainedDepositPredicate} from './resources.js';
 import {stepVeins,validateVein} from './ore-veins.js';
 import {stormShot,stormReel,leash,releasePack,plantPack,stormPickup,wornTower,lightningCharge,stepStormspires} from './stormreel.js';
-import {makeBoss,TOOLS,PARTS,mineGolemRemains,createEnemy,enemyParts,enemyMaxHp,combatAction,stepCombat,hitEnemyPart,validPartHit,validateCombat,restoreCombat,releaseHeld,projectileContact,validSiegebird} from './combat.js';
+import {makeBoss,TOOLS,PARTS,mineGolemRemains,createEnemy,enemyParts,enemyMaxHp,combatAction,stepCombat,hitEnemyPart,validPartHit,validateCombat,restoreCombat,releaseHeld,projectileContact,validSiegebird,blastRemains} from './combat.js';
 import {forgeFloor,resolveForge} from './forge-collision.js';
 import {castBoons,spendCharge,swiftFactor,stepBoons,validBoons} from './god-boons.js';
 import {createAdventure,stepAdventure,adventureAction,expeditionRunning,applyAdventureIntents,validateRestore as restoreAdventure} from './adventure.js';
@@ -119,7 +119,7 @@ function spawn(state, ignored = '') {
   return best;
 }
 
-setCritterWorld({damageHero:(s,hero,n,ev,from)=>damageHero(s,hero,n,ev,from),damageStructure:(s,id,n,ev)=>damageInvention(s,id,n,null,ev)}); // blasts on every kill path (shared/critters.js)
+setCritterWorld({blastRemains,damageHero:(s,hero,n,ev,from)=>damageHero(s,hero,n,ev,from),damageStructure:(s,id,n,ev)=>damageInvention(s,id,n,null,ev)}); // blasts on every kill path (shared/critters.js)
 function event(kind, position, id) { return {kind, position: [...position], id}; }
 
 function damageEnemy(state, enemy, amount, events, ownerId, side) {
@@ -179,7 +179,7 @@ function instantiate(state) {
   let fireSampleProvider=null;
   const fireContext={nextId,terrainHeight,fireSamples:e=>fireSampleProvider?.(e),damageHero:(s,p,n,events,from)=>{const start=events.length;damageHero(s,p,n,events,from);for(let i=start;i<events.length;i++)events[i].fire=true;},damageEnemy:(s,e,n,events,ownerId)=>{const start=events.length;damageEnemy(s,e,n,events,ownerId);for(let i=start;i<events.length;i++)events[i].fire=true;}};
   const combatContext={nextId,terrainHeight,damageStructure:(s,id,n,ev)=>damageInvention(s,id,n,null,ev),damageHero:(s,hero,n,ev,from)=>damageHero(s,hero,n,ev,from),playerVelocity:p=>p.role==='hero'?[p.velocity?.[0]||0,p.vy,p.velocity?.[2]||0]:[0,0,0],fireContact:(s,shot,hit)=>fireContact(s,shot,hit,fireContext),flareBurst:(s,point,ownerId)=>flareBurst(s,point,ownerId,fireContext),fruitStrike:(s,from,to,shot)=>fruitStrike(s,{nextId,terrainHeight},from,to,shot)};
-  const dragonContext={...combatContext,hitEnemyPart,ignite:(s,at,radius)=>{addFuel(s,at,radius,.35,true);applyHeat(s,at,radius,1,fireContext);}};
+  const dragonContext={blastRemains,...combatContext,hitEnemyPart,ignite:(s,at,radius)=>{addFuel(s,at,radius,.35,true);applyHeat(s,at,radius,1,fireContext);}};
   const inventionContext={nextId,terrainHeight,createEnemy,damageEnemy,damageHero,hitEnemyPart,chopTree,fruitSlice:(s,from,to,opts)=>fruitSlice(s,{nextId,terrainHeight},from,to,opts)};
   const player = id => state.players.find(p => p.id === id);
   // Trees: spatial index for trunk/stump collision; logs and felling are stepped from shared/trees.js.
