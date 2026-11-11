@@ -132,14 +132,17 @@ function detach(state,enemy,part,hit,ctx,events,dying=false){
 // How a skeleton's bones come apart when it dies (see ragdoll below and docs in shared/remains-physics.js):
 //   shatter:  a War Hammer blow (swing or slam) bursts it; every joint breaks and the bones scatter from the impact.
 //   headshot: a bolt or arrow to the skull snaps the head back on its neck and throws the body over backwards.
+//   blast:    an explosion (a keg, a bursting Kettlebelly, a firebomb, a dragon fireball, a golden-bolt burst) blows
+//             every joint at once; the bones fly up and away from the centre of the bang, the skull highest of all.
 //   crumple:  anything else; the binding magic lets go, the legs fold out and the rest drops into a heap of bones.
 export function deathStyle(enemy,part,hit,projectile){
   if(enemy?.kind!=='skeleton')return null;
+  if(vec(hit?.blastFrom))return 'blast';
   if(hit?.tool==='hammer')return 'shatter';
   if(projectile&&part==='head')return 'headshot';
   return 'crumple';
 }
-export const BONE_DEATH=Object.freeze({snapAt:16,shatterSpeed:7.5,shatterLift:3.2,shatterSpin:16,headSnap:{bolt:5.2,arrow:3},bodyThrow:{bolt:.95,arrow:.35}});
+export const BONE_DEATH=Object.freeze({blastSpeed:3.6,blastLift:8.5,blastSkull:5,blastSpin:22,blastRemains:2.6,snapAt:16,shatterSpeed:7.5,shatterLift:3.2,shatterSpin:16,headSnap:{bolt:5.2,arrow:3},bodyThrow:{bolt:.95,arrow:.35}});
 const seeded=(id,n)=>{let h=Math.imul([...String(id)].reduce((a,c)=>Math.imul(a^c.charCodeAt(0),0x01000193),0x811c9dc5)^Math.imul(n,0x9e3779b1),0x85ebca6b);h^=h>>>13;h=Math.imul(h,0xc2b2ae35);h^=h>>>16;return (h>>>0)/4294967296;};
 // A dead skeleton stays one body: its parts pin at the neck, shoulders and hips and fall as a ragdoll.
 // Exact bone pivots (from the struck pose) are the joints; without them, the canonical skeleton's joints.
@@ -150,6 +153,7 @@ function ragdoll(state,enemy,parts,hit,style='crumple'){
   for(const d of parts)delete d.posed;
   const e=clamp(Number(hit?.energy)||1,.5,2)*(hit?.golden?2.4:1),forward=[Math.sin(enemy.yaw),0,Math.cos(enemy.yaw)];
   const away=unit(hit?.direction)?hit.direction:unit(hit?.normal)?hit.normal.map(n=>-n):forward.map(n=>-n);
+  if(style==='blast'){blastApart(state,enemy,parts,hit.blastFrom,e,true);return;}
   if(style==='shatter'){
     // The hammer's swing carries through: each bone flies from the impact point, mostly the way the head was going.
     const at=vec(hit?.point)?hit.point:partPosition(enemy,'torso'),B=BONE_DEATH;
@@ -188,6 +192,34 @@ function ragdoll(state,enemy,parts,hit,style='crumple'){
   torso.velocity=torso.velocity.map((v,i)=>v+away[i]*.3);
   const slump=[away[2],0,-away[0]],k=1.8+seeded(enemy.id,3)*1.2; // tips the ribcage over the way the blow pushed it
   torso.angularVelocity=torso.angularVelocity.map((w,i)=>w+slump[i]*k+forward[i]*(seeded(enemy.id,4)-.5)*1.2);
+}
+// An explosion under a dying body: every piece leaves on its own arc, out from the centre of the bang and up.
+// Light pieces fly furthest; a skeleton's skull gets an extra pop so it sails over the rest. Seeded per body and
+// piece, so every peer sees the same tumble. Golems use it too (their rocks are heavy, so they mostly tumble).
+function blastApart(state,enemy,parts,at,energy,skeleton){
+  const B=BONE_DEATH,mid=partPosition(enemy,'torso');
+  parts.forEach((d,i)=>{
+    tear(state,d);
+    const off=d.position.map((v,k)=>v-at[k]),r=Math.hypot(off[0],off[2]),fallback=[mid[0]-at[0],0,mid[2]-at[2]],fl=Math.hypot(fallback[0],fallback[2]);
+    const a=(seeded(enemy.id,60+i)-.5)*.9,base=r>.05?[off[0]/r,off[2]/r]:fl>.05?[fallback[0]/fl,fallback[2]/fl]:[Math.sin(enemy.yaw+i*2.4),Math.cos(enemy.yaw+i*2.4)];
+    const dir=[base[0]*Math.cos(a)-base[1]*Math.sin(a),base[0]*Math.sin(a)+base[1]*Math.cos(a)]; // fan out so pieces never fly in step
+    const near=1-.4*clamp(Math.hypot(...off)/5,0,1),light=skeleton?(d.part==='torso'?.8:d.part.endsWith('Leg')?.85:1):(.42/Math.sqrt(partMass(d)/5));
+    const speed=B.blastSpeed*(.75+.5*seeded(enemy.id,70+i))*light*near*clamp(energy,.8,1.6);
+    const lift=(B.blastLift*(.7+.6*seeded(enemy.id,80+i))+(skeleton&&d.part==='head'?B.blastSkull:0))*light*near;
+    d.velocity=[dir[0]*speed,lift,dir[1]*speed].map(v=>clamp(v,-30,30));
+    d.angularVelocity=[0,1,2].map(k=>(seeded(enemy.id,90+i*3+k)-.5)*2*B.blastSpin*(skeleton?(d.part==='torso'?.5:1):.35));
+    wake(d);
+  });
+}
+// The same bang shoves whatever already lies about: old bones skitter, held pieces stay put. Deterministic.
+export function blastRemains(state,at,radius,power=1){
+  if(!vec(at))return;
+  for(const d of state.detachedParts){
+    if(d.heldBy||d.carry)continue;
+    const off=d.position.map((v,i)=>v-at[i]),r=Math.hypot(...off);if(r>radius)continue;
+    const k=BONE_DEATH.blastRemains*power*(1-r/radius)*partMass(d),n=r>1e-4?off.map(v=>v/r):[0,1,0];
+    applyImpulse(state,d,[n[0]*k,(Math.abs(n[1])*.4+.55)*k,n[2]*k],d.position);
+  }
 }
 // Actual detached rock geometry remains the target: two pick strikes salvage a chunk.
 export function mineGolemRemains(state,p,m,ctx){
@@ -236,7 +268,7 @@ export function hitEnemyPart(state,enemy,part,amount,hit,ctx,events,{projectile=
     // so discard any contacts still attached to the dead actor before saves validate their targets.
     state.embeds=state.embeds.filter(e=>e.targetId!==enemy.id);
     clingSplash(state,enemy,ctx,events);
-    const style=deathStyle(enemy,part,hit,projectile);if(enemy.kind==='skeleton')ragdoll(state,enemy,fallen,hit,style);events.push({kind:'death',position:[...enemy.position],id:enemy.id,creature:enemy.kind,part,normal:unit(hit?.normal)?[...hit.normal]:[0,1,0],energy:hit?.tool==='hammer'?1.8:1,...(style?{style}:{}),...(style&&vec(hit?.point)?{point:[...hit.point]}:{}),...(style==='headshot'&&unit(hit?.direction)?{direction:[...hit.direction],shot:hit.shot}:style==='shatter'&&unit(hit?.direction)?{direction:[...hit.direction]}:{})});state.enemies.splice(state.enemies.indexOf(enemy),1);
+    const style=deathStyle(enemy,part,hit,projectile);if(enemy.kind==='skeleton')ragdoll(state,enemy,fallen,hit,style);else if(enemy.kind==='golem'&&vec(hit?.blastFrom)&&fallen.length)blastApart(state,enemy,fallen,hit.blastFrom,clamp(Number(hit?.energy)||1,.5,2),false);events.push({kind:'death',position:[...enemy.position],id:enemy.id,creature:enemy.kind,part,normal:unit(hit?.normal)?[...hit.normal]:[0,1,0],energy:hit?.tool==='hammer'?1.8:1,...(style?{style}:{}),...(style&&vec(hit?.point)?{point:[...hit.point]}:{}),...(style==='headshot'&&unit(hit?.direction)?{direction:[...hit.direction],shot:hit.shot}:style==='shatter'&&unit(hit?.direction)?{direction:[...hit.direction]}:style==='blast'?{from:[...hit.blastFrom]}:{})});state.enemies.splice(state.enemies.indexOf(enemy),1);
     if(critterDying)critterDeath(state,enemy,hit,{...ctx,hitEnemyPart},events,owner);}
   return true;
 }
@@ -346,7 +378,7 @@ function breakShield(state,enemy,m,events,golden,shot){
 // foes and throws loose bones.
 function radiantBurst(state,shot,m,ctx,events){
   const R=GOLDEN_PIERCE.radius;
-  for(const e of [...state.enemies])if(e.id!==m.targetId&&e.kind!=='ent'&&dist(partPosition(e,'torso'),m.point)<R)hitEnemyPart(state,e,'torso',GOLDEN_PIERCE.damage,{point:[...m.point],normal:[...m.normal],ownerId:shot.ownerId,side:shot.side,energy:1.2},ctx,events);
+  for(const e of [...state.enemies])if(e.id!==m.targetId&&e.kind!=='ent'&&dist(partPosition(e,'torso'),m.point)<R)hitEnemyPart(state,e,'torso',GOLDEN_PIERCE.damage,{point:[...m.point],normal:[...m.normal],ownerId:shot.ownerId,side:shot.side,energy:1.2,blastFrom:[...m.point]},ctx,events);
   for(const d of state.detachedParts){const off=d.position.map((v,i)=>v-m.point[i]),r=Math.hypot(...off);if(r>R*1.4||d.heldBy)continue;const k=GOLDEN_PIERCE.push*(1-r/(R*1.4))*partMass(d),n=r>1e-4?off.map(v=>v/r):[0,1,0];applyImpulse(state,d,[n[0]*k,(Math.abs(n[1])*.5+.22)*k,n[2]*k],d.position);}
   events.push({kind:'radiant_burst',id:shot.id,position:[...m.point],radius:R});
 }

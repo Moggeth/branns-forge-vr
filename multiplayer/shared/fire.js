@@ -1,7 +1,7 @@
 // One bounded heat/fuel field consumed by all fire sources. Fixed 10 Hz ecology,
 // 60 Hz packet flight remains in combat.js. No renderer or client hit authority.
 import {posLimit,thingLimit,extentLimit} from './world-extent.js';
-import {applyEnemyScorch,partPosition,PARTS,hitEnemyPart} from './combat.js';
+import {applyEnemyScorch,partPosition,PARTS,hitEnemyPart,blastRemains} from './combat.js';
 import {hasTalent} from './hero-progress.js';
 import {entHeight} from './ents.js';
 import {WYRMSPOUT,sprayTuning,stickGlob,stepTank,goutBurst} from './wyrmspout.js';
@@ -83,12 +83,13 @@ export function fireContact(state,shot,hit,ctx){
     if(shot.lit)applyHeat(state,point,bomb?FIREBOMB.radius:1.5,1,ctx);
     events.push({kind:'fuel_spill',id:shot.id,by:shot.ownerId,position:[...point],normal:[...hit.normal],...(shot.lit?{lit:true}:{}),...(tar?{tar:true,radius:TAR_PIT.radius}:{})});
     if(bomb){
+      blastRemains(state,[point[0],ground,point[2]],FIREBOMB.radius*1.3,1);
       const hits=[];
       for(const enemy of [...state.enemies]){
         const dx=enemy.position[0]-point[0],dz=enemy.position[2]-point[2],d=Math.hypot(dx,dz);
         if(d>FIREBOMB.radius||Math.abs(enemy.position[1]-ground)>2.5)continue;
         enemy.burnUntil=state.tick+FIREBOMB.burn;enemy.burnPart='torso';
-        hitEnemyPart(state,enemy,'torso',FIREBOMB.damage,{point:[...point],normal:[0,1,0],ownerId:shot.ownerId,side:shot.side,energy:1.6},ctx,events);
+        hitEnemyPart(state,enemy,'torso',FIREBOMB.damage,{point:[...point],normal:[0,1,0],ownerId:shot.ownerId,side:shot.side,energy:1.6,blastFrom:[point[0],ground,point[2]]},ctx,events);
         hits.push(enemy.id);
         if(state.enemies.includes(enemy)){const k=FIREBOMB.push*(1-d/FIREBOMB.radius*.5),nx=d>1e-3?dx/d:1,nz=d>1e-3?dz/d:0;enemy.position[0]=clamp(enemy.position[0]+nx*k,-49,49);enemy.position[2]=clamp(enemy.position[2]+nz*k,-49,49);enemy.launchTick=state.tick;}
       }
