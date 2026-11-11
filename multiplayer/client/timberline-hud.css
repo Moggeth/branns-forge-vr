@@ -31,11 +31,12 @@
 @media (pointer: coarse) { .timberline-ammo-off, .timberline-ammo-keys { display: none; } }
 /* Seated at the machine nothing sits between the operator and the target (2026-11-11): the hand-weapon bar, its hint
    and supplies, and the floating interaction prompt all step away. The plate above carries ammo, state and Step off.
-   On touch the Sight (special) button and the touch pad stay, since that is how a phone sights and fires. */
+   On touch the Sight (special) button, the Actions drawer (Collect steps off) and the touch pad stay. */
 body.timberline-manned .bf-equip, body.timberline-manned .mui-weapons { visibility: hidden; }
-body.timberline-manned #heroTools .bf-bar, body.timberline-manned #heroTools .bf-sub, body.timberline-manned #heroTools .bf-help,
+body.timberline-manned #heroTools .bf-sub, body.timberline-manned #heroTools .bf-help,
 body.timberline-manned .bf-cue, body.timberline-manned .bf-cue-leader, body.timberline-manned .look-hint, body.timberline-manned #resourceBar { visibility: hidden !important; }
-@media (pointer: fine) { body.timberline-manned #heroTools .bf-special { visibility: hidden; } }
+/* Touch keeps the Actions drawer: its Collect button is how a phone steps off a gate ballista. */
+@media (pointer: fine) { body.timberline-manned #heroTools .bf-special, body.timberline-manned #heroTools .bf-bar { visibility: hidden; } }
 body.timberline-manned #heroTools { background: none !important; border-color: transparent !important; box-shadow: none !important; }
 /* No screen-centre mark while seated: the operator aims with the brass ladder on the machine. */
 body.timberline-manned .mui-reticle, body.timberline-manned .rr-root { visibility: hidden; }
