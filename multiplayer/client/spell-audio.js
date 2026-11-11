@@ -31,6 +31,7 @@ export function createSpellAudio(context) {
     skeleton: (o, t) => { rattle(o, t, 7); tone(o, t + .05, {type: 'triangle', f0: 330, f1: 196, attack: .05, peak: .025, release: .7, vibrato: 6}); },
     squad: (o, t) => { for (let i = 0; i < 4; i++) rattle(o, t + i * .16, 5); tone(o, t, {type: 'triangle', f0: 262, f1: 147, attack: .08, peak: .03, release: 1, vibrato: 5}); },
     golem: (o, t) => { rumble(o, t, 55, 32, 1.4, .16); noise(o, t + .3, {type: 'bandpass', f0: 420, f1: 260, q: 1.5, attack: .2, peak: .05, release: .9}); },
+    rabble: (o, t) => { tone(o, t, {type: 'square', f0: 392, f1: 523, attack: .02, peak: .025, release: .25}); tone(o, t + .14, {type: 'square', f0: 523, f1: 659, attack: .02, peak: .022, release: .35}); noise(o, t + .05, {type: 'highpass', f0: 3200, attack: .01, peak: .04, release: .5}); rattle(o, t + .3, 4); },
     raise: (o, t) => { rumble(o, t, 38, 92, 1.1); noise(o, t + .45, {type: 'bandpass', f0: 600, f1: 300, q: 1, attack: .05, peak: .06, release: .6}); },
     lower: (o, t) => { rumble(o, t, 95, 34, 1.1); for (let i = 0; i < 5; i++) noise(o, t + .3 + i * .09, {type: 'bandpass', f0: 700, q: 3, attack: .005, peak: .04, release: .12}); },
     // Earth lines: the rolling groan comes from crystal-wall-audio (line); these are the casting moments.

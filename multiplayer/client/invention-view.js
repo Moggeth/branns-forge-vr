@@ -65,7 +65,7 @@ export function createInventionView({scene,lightning=null}){
  }
  function update(dt,tick,camera=null,viewportHeight=1080){
   homeBases.update(dt,camera,tick,viewportHeight);homeTown.update(dt);armoury.update(dt);backTown.update(dt);townLife.update(dt,viewportHeight);
-  for(const e of entries.values())if(e.spire)spires.animate(e,tick/60,dt);
+  for(const e of entries.values())if(e.spire)spires.animate(e,tick/60,dt,camera);
   timberFx.update(dt);stuck?.update(snapshot,tick);tracers.begin();
   const ids=new Set();for(const q of snapshot?.inventions?.shots||[]){ids.add(q.id);let v=shots.get(q.id);
    if(!v){if(q.type==='timberline'){if(!assets.timberline_bolts)continue;const pair=createTimberlineBoltPair(assets.timberline_bolts,{castShadow:false,sharedMaterials:assets.timberline_ballista?collectMaterials(assets.timberline_ballista.scene):null});v={root:pair.group,pair};}else {const ball=assets.heavy_launcher&&q.type==='launcher'?assets.heavy_launcher.scene.getObjectByName('Ball'):null;v={root:ball?ball.clone():new THREE.Mesh(shotGeo,shotMat)};if(ball){v.root.position.set(0,0,0);v.start=entries.get(q.structureId)?.launcher?.releasePoint();}}scene.add(v.root);shots.set(q.id,v);}

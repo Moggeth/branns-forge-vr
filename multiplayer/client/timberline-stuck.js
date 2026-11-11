@@ -3,6 +3,7 @@
 // rebuilds the same rest pose with a fixed 60 Hz rope-and-rod integration from the moment of impact, so peers agree.
 // All stuck bolts draw as instanced copies of the deployed bolt meshes, and every wire as one instanced segment
 // batch, so sixty pairs cost a handful of draw calls.
+import {setLiveInstances} from './instance-upload.js';
 import * as THREE from 'three';
 import {createTimberlineBoltPair} from '../assets-source/timberline-twinbolt-20261003/runtime/timberline-bolts.js';
 import {lodOf} from '../assets-source/timberline-twinbolt-20261003/runtime/timberline-ballista.js';
@@ -62,8 +63,8 @@ export function createTimberlineStuck({scene,gltf,sharedMaterials=null,ground}){
    if(e.r.mode==='snag'){wireTo(e.free.L.e,e.anchor,e.free.L.rope);wireTo(e.anchor,e.free.R.e,e.free.R.rope);}
    else{const b=Object.values(e.free)[0];wireTo(e.anchor,b.e,b.rope);}
    i++;}
-  for(const tag of ['L','R'])for(const p of parts[tag]){p.mesh.count=i;p.mesh.instanceMatrix.needsUpdate=true;}
-  wire.count=segs;wire.instanceMatrix.needsUpdate=true;}
+  for(const tag of ['L','R'])for(const p of parts[tag])setLiveInstances(p.mesh,i);
+  setLiveInstances(wire,segs);}
  return {sync,update,
   stats:()=>({pairs:live.size,drawCalls:batches.length+1,sleeping:[...live.values()].filter(e=>Object.values(e.free).every(b=>b.asleep)).length,wireSegments:segs}),
   pose(id){const e=live.get(id);if(!e)return null;return {anchor:e.anchor.toArray(),free:Object.fromEntries(Object.entries(e.free).map(([k,b])=>[k,{eye:b.e.toArray(),nock:b.n.toArray(),asleep:b.asleep}]))};},
