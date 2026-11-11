@@ -4,6 +4,8 @@
 // aim (or follow the operator's own aim at once), and pose changes spring rather than snap. A keep Timberline is the
 // built Timberline's own model and clips (its pair, stuck bolts and tracers draw with every other Timberline shot in
 // invention-view.js), standing on a Dawnhold dais.
+import {setLiveInstances} from './instance-upload.js';
+import {inView} from './view-cull.js';
 import * as THREE from 'three';
 import {HOME_MANNED, KEEP_BALLISTA, homeBallistaYaw, keepMuzzle, keepShotAt, keepSpeed, keepStyle, sunDraw} from '../shared/home-ballista.js';
 import {MANNED} from '../shared/inventions.js';
@@ -247,7 +249,8 @@ export function createKeepBallistaView({root, height = () => 0, timberline = () 
     const mine = localAim.get(data.id), want = mine || {yaw: data.aimYaw || 0, pitch: data.aimPitch || 0}, ease = mine ? 1 : 1 - Math.exp(-dt * 7);
     k.yaw += wrap(want.yaw - k.yaw) * ease; k.pitch += (want.pitch - k.pitch) * ease;
     k.machine.aimImmediate(k.yaw, k.pitch);
-    k.machine.seekCycle(alive ? gateCycleAge(data, tick) : 99, camera, viewport, {ammo: alive});
+    // seekCycle poses from the absolute cycle age, so an off-screen turret can skip it and still be exact when seen.
+    if (inView(camera, k.holder, {radius: 5, lift: 1.5})) k.machine.seekCycle(alive ? gateCycleAge(data, tick) : 99, camera, viewport, {ammo: alive});
     // The inlay glows while a pair sits on the rails and dims through the wind.
     const ready = tick >= (data.readyTick ?? 0);
     k.dais.inlay.emissiveIntensity += ((alive ? (ready ? 1.1 : .35) : 0) - k.dais.inlay.emissiveIntensity) * (1 - Math.exp(-dt * 6));
@@ -322,7 +325,7 @@ export function createKeepBallistaView({root, height = () => 0, timberline = () 
         if (u >= 1) { dropBolt('gnashjaw', r.bolt); retracts.delete(data.id); }
       }
     }
-    links.count = linkCount; links.instanceMatrix.needsUpdate = true;
+    setLiveInstances(links, linkCount);
     // Stuck lances ride their host, then sink away.
     for (let i = stuck.length - 1; i >= 0; i--) {
       const s = stuck[i]; s.age += dt;

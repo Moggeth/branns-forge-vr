@@ -8,6 +8,7 @@ import {queueMeteorReward} from './resources.js';
 import {ENT_SIZES,entSpec,entPartPosition,entPartReach,severEntLimb,dropEntTimber} from './ents.js';
 import {TREE_LIMITS} from './trees.js';
 import {STUMPLING,stumplingParts,dropStumplingLoot} from './stumplings.js';
+import {CRITTER,isCritter,critterParts,createCritter,critterPartPosition,critterValidHit,critterMaterial,critterDamageScale,critterAfterHit,critterDeath,validCritter} from './critters.js';
 import {specialCooldown} from './special-cooldowns.js';
 import {PHOENIX_CARRY,startCarry,carryPose} from './phoenix-carry.js';
 import {WYRMSPOUT,sprayTuning,spendGlob,clingSplash} from './wyrmspout.js';
@@ -78,11 +79,11 @@ function embedDepth(kind,part,measured,targetId){
   return Math.round(clamp(available*.52,kind==='bolt'?.06:.045,kind==='bolt'?.17:.13)*1000)/1000;
 }
 const fail=code=>({ok:false,code,events:[]}), ok=events=>({ok:true,events});
-export function enemyParts(kind='skeleton',size) {if(kind==='stumpling')return stumplingParts();return Object.fromEntries(PARTS.map(part=>[part,kind==='ent'?(ENT_SIZES[size]||ENT_SIZES.elder).parts[part]:kind==='golem'?120:part==='torso'?100:55]));}
+export function enemyParts(kind='skeleton',size) {if(kind==='stumpling')return stumplingParts();if(isCritter(kind))return critterParts(kind);return Object.fromEntries(PARTS.map(part=>[part,kind==='ent'?(ENT_SIZES[size]||ENT_SIZES.elder).parts[part]:kind==='golem'?120:part==='torso'?100:55]));}
 // Save/restore ceilings shared by every creature kind (ents carry their size class).
 export function makeBoss(e,id){e.boss=id;e.hp=enemyMaxHp(e);e.parts=Object.fromEntries(PARTS.map(p=>[p,enemyPartMax(e,p)]));e.armor=BOSS.armor;return e;}
-export const enemyMaxHp=e=>e?.kind==='stumpling'?STUMPLING.hp:e?.kind==='ent'?entSpec(e).hp:e?.kind==='golem'?(e.boss===true?BOSS_HP:320*(e.boss?BOSS.hp:1)):100;
-export const enemyPartMax=(e,part)=>e?.kind==='stumpling'?STUMPLING.part:e?.kind==='ent'?entSpec(e).parts[part]:e?.kind==='golem'?120*(e.boss&&e.boss!==true?BOSS.parts:1):part==='torso'?100:55;
+export const enemyMaxHp=e=>isCritter(e?.kind)?CRITTER[e.kind].hp:e?.kind==='stumpling'?STUMPLING.hp:e?.kind==='ent'?entSpec(e).hp:e?.kind==='golem'?(e.boss===true?BOSS_HP:320*(e.boss?BOSS.hp:1)):100;
+export const enemyPartMax=(e,part)=>isCritter(e?.kind)?CRITTER[e.kind].hp:e?.kind==='stumpling'?STUMPLING.part:e?.kind==='ent'?entSpec(e).parts[part]:e?.kind==='golem'?120*(e.boss&&e.boss!==true?BOSS.parts:1):part==='torso'?100:55;
 export function emptyScorch() {return Object.fromEntries(PARTS.map(part=>[part,0]));}
 export function applyEnemyScorch(enemy,part,amount){
   if(!enemy||!PARTS.includes(part)||!Number.isFinite(amount)||amount<=0)return false;
@@ -90,13 +91,14 @@ export function applyEnemyScorch(enemy,part,amount){
   enemy.scorch[part]=clamp((enemy.scorch[part]||0)+amount,0,1);
   return true;
 }
-export function createEnemy(id,position,kind='skeleton') {return {id,position,kind,yaw:0,hp:kind==='golem'?320:100,parts:enemyParts(kind),missingParts:[],...(kind==='golem'?{armor:3}:{}),attackTick:-1000};}
+export function createEnemy(id,position,kind='skeleton') {if(isCritter(kind))return createCritter(id,position,kind);return {id,position,kind,yaw:0,hp:kind==='golem'?320:100,parts:enemyParts(kind),missingParts:[],...(kind==='golem'?{armor:3}:{}),attackTick:-1000};}
 const centers={head:[0,1.75,0],torso:[0,1.15,0],leftArm:[.48,1.12,0],rightArm:[-.48,1.12,0],leftLeg:[.2,.48,0],rightLeg:[-.2,.48,0]};
-export function partPosition(enemy,part){if(enemy.kind==='ent')return entPartPosition(enemy,part);if(enemy.kind==='stumpling')return [enemy.position[0],enemy.position[1]+STUMPLING.height*.5,enemy.position[2]];const canonical=centers[part]||centers.torso,a=enemy.kind==='golem'?[-canonical[0],canonical[1],canonical[2]]:canonical,s=enemy.kind==='golem'?1.45*bossScale(enemy):1,c=Math.cos(enemy.yaw),t=Math.sin(enemy.yaw);return [enemy.position[0]+(a[0]*c+a[2]*t)*s,enemy.position[1]+a[1]*s,enemy.position[2]+(-a[0]*t+a[2]*c)*s];}
+export function partPosition(enemy,part){if(isCritter(enemy.kind))return critterPartPosition(enemy,part);if(enemy.kind==='ent')return entPartPosition(enemy,part);if(enemy.kind==='stumpling')return [enemy.position[0],enemy.position[1]+STUMPLING.height*.5,enemy.position[2]];const canonical=centers[part]||centers.torso,a=enemy.kind==='golem'?[-canonical[0],canonical[1],canonical[2]]:canonical,s=enemy.kind==='golem'?1.45*bossScale(enemy):1,c=Math.cos(enemy.yaw),t=Math.sin(enemy.yaw);return [enemy.position[0]+(a[0]*c+a[2]*t)*s,enemy.position[1]+a[1]*s,enemy.position[2]+(-a[0]*t+a[2]*c)*s];}
 export function validPartHit(enemy,part,point) {
   if(!PARTS.includes(part)||enemy.missingParts?.includes(part)||!vec(point))return false;
   if(enemy.kind==='ent')return dist(point,entPartPosition(enemy,part))<=entPartReach(enemy,part);
   if(enemy.kind==='stumpling')return dist(point,partPosition(enemy,part))<=.85; // one rigid body: roots and all
+  if(isCritter(enemy.kind))return critterValidHit(enemy,part,point); // shared/critters.js: one body (and a keg)
   const s=enemy.kind==='golem'?1.45*bossScale(enemy):1,center=partPosition(enemy,part);
   // The shipped 1.7m skeleton skull spans y=1.259..1.724. The historical
   // 1.75m fallback pivot rejected real jaw/face triangles. This is only the
@@ -111,7 +113,7 @@ function detach(state,enemy,part,hit,ctx,events,dying=false){
   if(enemy.missingParts.includes(part))return null;
   // Ent limbs are timber, not carried remains: a branch arm drops as a log, roots and crown splinter.
   if(enemy.kind==='ent'){const e=severEntLimb(state,enemy,part,entContext(state,ctx));if(e)events.push(e);return null;}
-  if(enemy.kind==='stumpling')return null; // a critter is one piece of wood: no carried remains
+  if(enemy.kind==='stumpling'||isCritter(enemy.kind))return null; // a critter is one piece: no carried remains
   if(state.detachedParts.length>=COMBAT_LIMITS.detachedParts){const old=state.detachedParts.find(p=>!p.heldBy);if(old)removeDetached(state,old);else return null;}
   enemy.missingParts.push(part);enemy.parts[part]=0;
   const supplied=hit?.partPoses?.[part]||(hit?.part===part?{position:hit.partPosition,quaternion:hit.partQuaternion,localBounds:hit.localBounds}:null);
@@ -130,14 +132,17 @@ function detach(state,enemy,part,hit,ctx,events,dying=false){
 // How a skeleton's bones come apart when it dies (see ragdoll below and docs in shared/remains-physics.js):
 //   shatter:  a War Hammer blow (swing or slam) bursts it; every joint breaks and the bones scatter from the impact.
 //   headshot: a bolt or arrow to the skull snaps the head back on its neck and throws the body over backwards.
+//   blast:    an explosion (a keg, a bursting Kettlebelly, a firebomb, a dragon fireball, a golden-bolt burst) blows
+//             every joint at once; the bones fly up and away from the centre of the bang, the skull highest of all.
 //   crumple:  anything else; the binding magic lets go, the legs fold out and the rest drops into a heap of bones.
 export function deathStyle(enemy,part,hit,projectile){
   if(enemy?.kind!=='skeleton')return null;
+  if(vec(hit?.blastFrom))return 'blast';
   if(hit?.tool==='hammer')return 'shatter';
   if(projectile&&part==='head')return 'headshot';
   return 'crumple';
 }
-export const BONE_DEATH=Object.freeze({snapAt:16,shatterSpeed:7.5,shatterLift:3.2,shatterSpin:16,headSnap:{bolt:5.2,arrow:3},bodyThrow:{bolt:.95,arrow:.35}});
+export const BONE_DEATH=Object.freeze({blastSpeed:3.6,blastLift:8.5,blastSkull:5,blastSpin:22,blastRemains:2.6,snapAt:16,shatterSpeed:7.5,shatterLift:3.2,shatterSpin:16,headSnap:{bolt:5.2,arrow:3},bodyThrow:{bolt:.95,arrow:.35}});
 const seeded=(id,n)=>{let h=Math.imul([...String(id)].reduce((a,c)=>Math.imul(a^c.charCodeAt(0),0x01000193),0x811c9dc5)^Math.imul(n,0x9e3779b1),0x85ebca6b);h^=h>>>13;h=Math.imul(h,0xc2b2ae35);h^=h>>>16;return (h>>>0)/4294967296;};
 // A dead skeleton stays one body: its parts pin at the neck, shoulders and hips and fall as a ragdoll.
 // Exact bone pivots (from the struck pose) are the joints; without them, the canonical skeleton's joints.
@@ -148,6 +153,7 @@ function ragdoll(state,enemy,parts,hit,style='crumple'){
   for(const d of parts)delete d.posed;
   const e=clamp(Number(hit?.energy)||1,.5,2)*(hit?.golden?2.4:1),forward=[Math.sin(enemy.yaw),0,Math.cos(enemy.yaw)];
   const away=unit(hit?.direction)?hit.direction:unit(hit?.normal)?hit.normal.map(n=>-n):forward.map(n=>-n);
+  if(style==='blast'){blastApart(state,enemy,parts,hit.blastFrom,e,true);return;}
   if(style==='shatter'){
     // The hammer's swing carries through: each bone flies from the impact point, mostly the way the head was going.
     const at=vec(hit?.point)?hit.point:partPosition(enemy,'torso'),B=BONE_DEATH;
@@ -187,6 +193,34 @@ function ragdoll(state,enemy,parts,hit,style='crumple'){
   const slump=[away[2],0,-away[0]],k=1.8+seeded(enemy.id,3)*1.2; // tips the ribcage over the way the blow pushed it
   torso.angularVelocity=torso.angularVelocity.map((w,i)=>w+slump[i]*k+forward[i]*(seeded(enemy.id,4)-.5)*1.2);
 }
+// An explosion under a dying body: every piece leaves on its own arc, out from the centre of the bang and up.
+// Light pieces fly furthest; a skeleton's skull gets an extra pop so it sails over the rest. Seeded per body and
+// piece, so every peer sees the same tumble. Golems use it too (their rocks are heavy, so they mostly tumble).
+function blastApart(state,enemy,parts,at,energy,skeleton){
+  const B=BONE_DEATH,mid=partPosition(enemy,'torso');
+  parts.forEach((d,i)=>{
+    tear(state,d);
+    const off=d.position.map((v,k)=>v-at[k]),r=Math.hypot(off[0],off[2]),fallback=[mid[0]-at[0],0,mid[2]-at[2]],fl=Math.hypot(fallback[0],fallback[2]);
+    const a=(seeded(enemy.id,60+i)-.5)*.9,base=r>.05?[off[0]/r,off[2]/r]:fl>.05?[fallback[0]/fl,fallback[2]/fl]:[Math.sin(enemy.yaw+i*2.4),Math.cos(enemy.yaw+i*2.4)];
+    const dir=[base[0]*Math.cos(a)-base[1]*Math.sin(a),base[0]*Math.sin(a)+base[1]*Math.cos(a)]; // fan out so pieces never fly in step
+    const near=1-.4*clamp(Math.hypot(...off)/5,0,1),light=skeleton?(d.part==='torso'?.8:d.part.endsWith('Leg')?.85:1):(.42/Math.sqrt(partMass(d)/5));
+    const speed=B.blastSpeed*(.75+.5*seeded(enemy.id,70+i))*light*near*clamp(energy,.8,1.6);
+    const lift=(B.blastLift*(.7+.6*seeded(enemy.id,80+i))+(skeleton&&d.part==='head'?B.blastSkull:0))*light*near;
+    d.velocity=[dir[0]*speed,lift,dir[1]*speed].map(v=>clamp(v,-30,30));
+    d.angularVelocity=[0,1,2].map(k=>(seeded(enemy.id,90+i*3+k)-.5)*2*B.blastSpin*(skeleton?(d.part==='torso'?.5:1):.35));
+    wake(d);
+  });
+}
+// The same bang shoves whatever already lies about: old bones skitter, held pieces stay put. Deterministic.
+export function blastRemains(state,at,radius,power=1){
+  if(!vec(at))return;
+  for(const d of state.detachedParts){
+    if(d.heldBy||d.carry)continue;
+    const off=d.position.map((v,i)=>v-at[i]),r=Math.hypot(...off);if(r>radius)continue;
+    const k=BONE_DEATH.blastRemains*power*(1-r/radius)*partMass(d),n=r>1e-4?off.map(v=>v/r):[0,1,0];
+    applyImpulse(state,d,[n[0]*k,(Math.abs(n[1])*.4+.55)*k,n[2]*k],d.position);
+  }
+}
 // Actual detached rock geometry remains the target: two pick strikes salvage a chunk.
 export function mineGolemRemains(state,p,m,ctx){
  const d=state.detachedParts.find(d=>d.id===m.targetId);
@@ -210,6 +244,7 @@ export function hitEnemyPart(state,enemy,part,amount,hit,ctx,events,{projectile=
   // Limbsplitter (axe talent): a swing that lands on a limb or head takes it clean off (armour still turns it).
   if(!projectile&&!armored&&hit?.tool==='axe'&&part!=='torso'&&enemy.kind!=='stumpling'&&hasTalent(owner,'axe','limbsplitter'))amount=Math.max(amount,enemy.parts[part]);
   if((enemy.kind==='ent'||enemy.kind==='stumpling')&&hit?.tool==='axe')amount*=2; // the axe was made for wood
+  if(isCritter(enemy.kind))amount*=critterDamageScale(enemy,state.tick); // a curled Bramblehog turns blows; a dizzy one is soft
   if(armored){if(hit?.tool==='pick'){enemy.armor=Math.max(0,(enemy.armor??3)-1);events.push({kind:'armor_break',position:[...(hit.point||enemy.position)],id:enemy.id});}amount*=.45;}
   enemy.hurtTick=state.tick;enemy.parts[part]=Math.max(0,enemy.parts[part]-amount);
   // A cracked skeleton arm or leg gives way before it is worn right down, so bones come off while it still fights.
@@ -222,16 +257,19 @@ export function hitEnemyPart(state,enemy,part,amount,hit,ctx,events,{projectile=
   if(owner?.stats)owner.stats.contribution=Math.min(1e9,owner.stats.contribution+creditedDamage);
   if(owner?.role==='hero'&&owner.hp>0&&itemBonus(owner,'lifesteal')>0)owner.hp=Math.min(heroMaxHp(owner),owner.hp+creditedDamage*itemBonus(owner,'lifesteal')); // Leech in a Jar
   enemy.hp-=headshot?enemy.hp:amount;
-  events.push({kind:headshot?'headshot':'hit',position:[...(hit?.point||enemy.position)],id:enemy.id,part,material:enemy.kind==='golem'?'stone':enemy.kind==='ent'||enemy.kind==='stumpling'?'wood':'bone',normal:unit(hit?.normal)?[...hit.normal]:[0,1,0],energy:hit?.tool==='hammer'?1.8:1,damage:creditedDamage,resisted:armored});
+  events.push({kind:headshot?'headshot':'hit',position:[...(hit?.point||enemy.position)],id:enemy.id,part,material:isCritter(enemy.kind)?critterMaterial(enemy,part):enemy.kind==='golem'?'stone':enemy.kind==='ent'||enemy.kind==='stumpling'?'wood':'bone',normal:unit(hit?.normal)?[...hit.normal]:[0,1,0],energy:hit?.tool==='hammer'?1.8:1,damage:creditedDamage,resisted:armored});
   // Melee takes any limb off; an arrow or bolt snaps a skeleton's arm or leg off too (a skull shot is a headshot).
   if(part!=='torso'&&enemy.parts[part]===0&&(!projectile||enemy.kind==='skeleton'&&part!=='head'))detach(state,enemy,part,hit,ctx,events);
   if(part==='head'&&enemy.missingParts.includes('head'))enemy.hp=0;
-  if(enemy.hp<=0){if(owner?.stats)owner.stats.kills=Math.min(1e9,owner.stats.kills+1);grantXp(state,owner,killXp(enemy),events,enemy.position);payKillGold(state,owner,enemy,events);noteKill(state,owner,enemy,hit,events);if(owner?.role==='hero'&&!enemy.battleRun)addBloom(state,enemy.kind==='golem'?BLOOM.golem:BLOOM.skeleton,events,enemy.position);if(enemy.meteorBorn)queueMeteorReward(state,enemy,ctx,events);else if(enemy.kind==='ent')dropEntTimber(state,enemy,entContext(state,ctx),events,entSpec(enemy).trunkLogs);else if(enemy.kind==='stumpling')dropStumplingLoot(state,enemy,entContext(state,ctx),events);else if(!enemy.battleRun)dropSkeletonSalvage(state,enemy,ctx,events,owner);const fallen=[];for(const limb of PARTS){const d=detach(state,enemy,limb,hit,ctx,events,true);if(d)fallen.push(d);}
+  if(isCritter(enemy.kind))critterAfterHit(state,enemy,part,hit,ctx,events); // a punctured Kettlebelly leaks; a struck keg goes off
+  let critterDying=false;
+  if(enemy.hp<=0){if(owner?.stats)owner.stats.kills=Math.min(1e9,owner.stats.kills+1);grantXp(state,owner,killXp(enemy),events,enemy.position);payKillGold(state,owner,enemy,events);noteKill(state,owner,enemy,hit,events);if(owner?.role==='hero'&&!enemy.battleRun)addBloom(state,enemy.kind==='golem'?BLOOM.golem:BLOOM.skeleton,events,enemy.position);if(enemy.meteorBorn)queueMeteorReward(state,enemy,ctx,events);else if(enemy.kind==='ent')dropEntTimber(state,enemy,entContext(state,ctx),events,entSpec(enemy).trunkLogs);else if(enemy.kind==='stumpling')dropStumplingLoot(state,enemy,entContext(state,ctx),events);else if(isCritter(enemy.kind))critterDying=true;else if(!enemy.battleRun)dropSkeletonSalvage(state,enemy,ctx,events,owner);const fallen=[];for(const limb of PARTS){const d=detach(state,enemy,limb,hit,ctx,events,true);if(d)fallen.push(d);}
     // Detachment remaps arrows onto physical remains. Wooden creatures have no torso remains,
     // so discard any contacts still attached to the dead actor before saves validate their targets.
     state.embeds=state.embeds.filter(e=>e.targetId!==enemy.id);
     clingSplash(state,enemy,ctx,events);
-    const style=deathStyle(enemy,part,hit,projectile);if(enemy.kind==='skeleton')ragdoll(state,enemy,fallen,hit,style);events.push({kind:'death',position:[...enemy.position],id:enemy.id,creature:enemy.kind,part,normal:unit(hit?.normal)?[...hit.normal]:[0,1,0],energy:hit?.tool==='hammer'?1.8:1,...(style?{style}:{}),...(style&&vec(hit?.point)?{point:[...hit.point]}:{}),...(style==='headshot'&&unit(hit?.direction)?{direction:[...hit.direction],shot:hit.shot}:style==='shatter'&&unit(hit?.direction)?{direction:[...hit.direction]}:{})});state.enemies.splice(state.enemies.indexOf(enemy),1);}
+    const style=deathStyle(enemy,part,hit,projectile);if(enemy.kind==='skeleton')ragdoll(state,enemy,fallen,hit,style);else if(enemy.kind==='golem'&&vec(hit?.blastFrom)&&fallen.length)blastApart(state,enemy,fallen,hit.blastFrom,clamp(Number(hit?.energy)||1,.5,2),false);events.push({kind:'death',position:[...enemy.position],id:enemy.id,creature:enemy.kind,part,normal:unit(hit?.normal)?[...hit.normal]:[0,1,0],energy:hit?.tool==='hammer'?1.8:1,...(style?{style}:{}),...(style&&vec(hit?.point)?{point:[...hit.point]}:{}),...(style==='headshot'&&unit(hit?.direction)?{direction:[...hit.direction],shot:hit.shot}:style==='shatter'&&unit(hit?.direction)?{direction:[...hit.direction]}:style==='blast'?{from:[...hit.blastFrom]}:{})});state.enemies.splice(state.enemies.indexOf(enemy),1);
+    if(critterDying)critterDeath(state,enemy,hit,{...ctx,hitEnemyPart},events,owner);}
   return true;
 }
 // Skeleton equipment and a golem's forged iron bracers are useful Iron immediately (golem stone comes from mining
@@ -340,7 +378,7 @@ function breakShield(state,enemy,m,events,golden,shot){
 // foes and throws loose bones.
 function radiantBurst(state,shot,m,ctx,events){
   const R=GOLDEN_PIERCE.radius;
-  for(const e of [...state.enemies])if(e.id!==m.targetId&&e.kind!=='ent'&&dist(partPosition(e,'torso'),m.point)<R)hitEnemyPart(state,e,'torso',GOLDEN_PIERCE.damage,{point:[...m.point],normal:[...m.normal],ownerId:shot.ownerId,side:shot.side,energy:1.2},ctx,events);
+  for(const e of [...state.enemies])if(e.id!==m.targetId&&e.kind!=='ent'&&dist(partPosition(e,'torso'),m.point)<R)hitEnemyPart(state,e,'torso',GOLDEN_PIERCE.damage,{point:[...m.point],normal:[...m.normal],ownerId:shot.ownerId,side:shot.side,energy:1.2,blastFrom:[...m.point]},ctx,events);
   for(const d of state.detachedParts){const off=d.position.map((v,i)=>v-m.point[i]),r=Math.hypot(...off);if(r>R*1.4||d.heldBy)continue;const k=GOLDEN_PIERCE.push*(1-r/(R*1.4))*partMass(d),n=r>1e-4?off.map(v=>v/r):[0,1,0];applyImpulse(state,d,[n[0]*k,(Math.abs(n[1])*.5+.22)*k,n[2]*k],d.position);}
   events.push({kind:'radiant_burst',id:shot.id,position:[...m.point],radius:R});
 }
@@ -514,7 +552,7 @@ export function validateCombat(saved,ids){
   const held=new Set();
   for(const d of saved.detachedParts||[])if(!d||!unique(d.id)||typeof d.sourceId!=='string'||!['skeleton','golem'].includes(d.kind)||!PARTS.includes(d.part)||!vec(d.position)||!quat(d.quaternion)||d.localBounds!==undefined&&!bounds(d.localBounds)||!vec(d.velocity,100)||!vec(d.angularVelocity,30)||!tick(d.bornTick)||(d.miningHits!==undefined&&(d.kind!=='golem'||!Number.isInteger(d.miningHits)||d.miningHits<0||d.miningHits>1))||(d.heldBy!==null&&(!saved.players.some(p=>p.id===d.heldBy&&p.role==='hero')||held.has(d.heldBy)))||(d.throwerSide!==undefined&&!['party','rivals'].includes(d.throwerSide))||(d.throwerId!==undefined&&d.throwerId!==null&&typeof d.throwerId!=='string')||(d.hitIds!==undefined&&(!Array.isArray(d.hitIds)||d.hitIds.length>64||!d.hitIds.every(q=>typeof q==='string'&&q.length<=64))))throw Error('Invalid detached part');else if(d.heldBy)held.add(d.heldBy);
   for(const e of saved.embeds||[])if(!e||!unique(e.id)||!['arrow','bolt'].includes(e.kind)||(e.golden!==undefined&&(e.golden!==true||e.kind!=='bolt'))||!PARTS.includes(e.part)||!validContact(e)||(e.surface==='shield'&&(!['leftArm','rightArm'].includes(e.part)||(saved.enemies.find(q=>q.id===e.targetId)||saved.detachedParts?.find(q=>q.id===e.targetId))?.kind!=='skeleton'))||!(e.targetId==='world'||e.targetId==='terrain'||saved.enemies.some(q=>q.id===e.targetId)||saved.detachedParts?.some(q=>q.id===e.targetId)))throw Error('Invalid embed');
-  for(const e of saved.enemies)if(e.kind!==undefined&&!['skeleton','golem','ent','stumpling'].includes(e.kind)||e.armor!==undefined&&(!Number.isInteger(e.armor)||e.armor<0||e.armor>(typeof e.boss==='string'?BOSS.armor:3))||e.parts!==undefined&&(!e.parts||!PARTS.every(p=>Number.isFinite(e.parts[p])&&e.parts[p]>=0&&e.parts[p]<=enemyPartMax(e,p)))||e.missingParts!==undefined&&(!Array.isArray(e.missingParts)||e.missingParts.length>6||new Set(e.missingParts).size!==e.missingParts.length||!e.missingParts.every(p=>PARTS.includes(p)&&e.parts?.[p]===0))||e.shield!==undefined&&(e.kind!=='skeleton'||!Number.isInteger(e.shield)||e.shield<1||e.shield>skeletonShield(e.id).hp||e.shieldBroken)||e.shieldBroken!==undefined&&(e.shieldBroken!==true||e.kind!=='skeleton')||e.flinchTick!==undefined&&(!Number.isSafeInteger(e.flinchTick)||e.flinchTick<0||e.flinchTick>saved.tick)||e.scorch!==undefined&&(!e.scorch||typeof e.scorch!=='object'||Object.keys(e.scorch).length!==PARTS.length||!PARTS.every(p=>Number.isFinite(e.scorch[p])&&e.scorch[p]>=0&&e.scorch[p]<=1)))throw Error('Invalid enemy anatomy');
+  for(const e of saved.enemies)if(e.kind!==undefined&&!['skeleton','golem','ent','stumpling','kettlebelly','bramblehog','kegtoter'].includes(e.kind)||!validCritter(e,saved.tick)||e.armor!==undefined&&(!Number.isInteger(e.armor)||e.armor<0||e.armor>(typeof e.boss==='string'?BOSS.armor:3))||e.parts!==undefined&&(!e.parts||!PARTS.every(p=>Number.isFinite(e.parts[p])&&e.parts[p]>=0&&e.parts[p]<=enemyPartMax(e,p)))||e.missingParts!==undefined&&(!Array.isArray(e.missingParts)||e.missingParts.length>6||new Set(e.missingParts).size!==e.missingParts.length||!e.missingParts.every(p=>PARTS.includes(p)&&e.parts?.[p]===0))||e.shield!==undefined&&(e.kind!=='skeleton'||!Number.isInteger(e.shield)||e.shield<1||e.shield>skeletonShield(e.id).hp||e.shieldBroken)||e.shieldBroken!==undefined&&(e.shieldBroken!==true||e.kind!=='skeleton')||e.flinchTick!==undefined&&(!Number.isSafeInteger(e.flinchTick)||e.flinchTick<0||e.flinchTick>saved.tick)||e.scorch!==undefined&&(!e.scorch||typeof e.scorch!=='object'||Object.keys(e.scorch).length!==PARTS.length||!PARTS.every(p=>Number.isFinite(e.scorch[p])&&e.scorch[p]>=0&&e.scorch[p]<=1)))throw Error('Invalid enemy anatomy');
 }
 
 // Only known fields survive a user-imported checkpoint. Validation above checks

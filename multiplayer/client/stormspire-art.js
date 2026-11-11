@@ -251,7 +251,7 @@ export function createStormspireArt({lightning = null} = {}) {
       lightning.burst(hop, {count: 14, speed: 2});
     }
   }
-  function animate(e, time, dt) {
+  function animate(e, time, dt, camera = null) {
     const s = e.spire; if (!s) return;
     animatePacks(time, dt);
     const b = e.data, working = !!b.arc, target = Math.max(0, Math.min(1, (b.charge || 0) / STORMREEL.maxCharge));
@@ -270,7 +270,7 @@ export function createStormspireArt({lightning = null} = {}) {
       else if (m.name === 'Window') m.emissiveIntensity = base * (.35 + .75 * fill) * (CALM ? 1 : .93 + .07 * flicker(time * .6, 3));
     }
     if (s.nodes.Capacitor_Crystal) s.nodes.Capacitor_Crystal.rotation.y = time * (.4 + .8 * s.work);
-    s.crew?.update(time, dt);
+    s.crew?.update(time, dt, camera);
     // Terminal badges glow with the flow: faint at idle, hot while a pack is worn or the circuit runs.
     for (const [colour, {badge, flare}] of Object.entries(s.badges)) {
       const worn = !!b[colour === 'red' ? 'operator' : 'operator2'], k = (fill > .02 ? .35 : .12) + (worn ? .3 : 0) + (working ? .45 : 0) + .2 * s.flash;

@@ -1,3 +1,4 @@
+import {setLiveInstances} from './instance-upload.js';
 import {applyCrystalMaterial} from './material-refinements.js';
 import {PICK_WALL,SUNDER_SETTLE_DISTANCE,terrainFrameKey,wallSpec} from '../shared/terrain.js';
 import {isRichMineral} from '../shared/weapon-specials.js';
@@ -356,7 +357,7 @@ export function createCrystalWall({THREE:T,scene,height,quality='high'}){
     // ore chips tumble as blocky chunks; glass shards as splinters
     if(q.mineral)dummy.s.set(s*.9,s*1.3,s*.9);else dummy.s.set(s*.45,s*2.8,s*.45);dummy.m.compose(q.p,q.q,dummy.s);mesh.setMatrixAt(n,dummy.m);
     if(q.mineral)mesh.setColorAt(n,oreColor(oreTint,.4+1.2*k,q.mineral));else{white.setScalar(.6+2.4*k);mesh.setColorAt(n,white);}n++;}
-   mesh.count=n;mesh.visible=n>0||mesh===shardMesh;mesh.instanceMatrix.needsUpdate=true;if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;}
+   setLiveInstances(mesh,n);mesh.visible=n>0||mesh===shardMesh;}
   for(const pool of [sparks,dust]){const pos=pool.mesh.geometry.attributes.position,col=pool.mesh.geometry.attributes.aColor,size=pool.mesh.geometry.attributes.aSize;let live=0;
    for(let i=0;i<pool.count;i++){const p=pool.live[i];if(p.age>=p.life){size.array[i]=0;continue;}live++;p.age+=dt;const drag=Math.exp(-p.drag*dt);p.vx*=drag;p.vz*=drag;p.vy=p.vy*drag-p.grav*dt;
     p.x+=p.vx*dt;p.y+=p.vy*dt;p.z+=p.vz*dt;const k=1-p.age/p.life,a=pool===dust?k*(1-k)*2:k*k;

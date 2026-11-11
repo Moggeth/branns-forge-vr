@@ -2,6 +2,9 @@ import * as THREE from 'three';
 import {rigSkeleton, poseSkeletonBody, placeFeet, orientFoot, gaitProfile, SKELETON_STRIDE, FORGELING_GAIT} from './skeleton-motion.js';
 import {skeletonKindIndex} from '../shared/skeleton-kinds.js';
 import {EMERGE_TICKS, FLINCH_TICKS} from '../shared/enemy-behaviour.js';
+import {GOLEM_CYCLE, golemSignals, applyGolemPose, golemRigInfo, NOTICE_SECONDS, NOTICE_BEATS, golemFidget} from './golem-motion.js';
+import {isCritter} from '../shared/critters.js';
+export {GOLEM_CYCLE} from './golem-motion.js';
 const FLINCH_SHOW = Math.round(FLINCH_TICKS * 1.4); // the reel outlasts the AI pause a little
 
 // Enemy presentation polish layered AFTER AnimationMixer.update() and BEFORE
@@ -23,9 +26,8 @@ const FLINCH_SHOW = Math.round(FLINCH_TICKS * 1.4); // the reel outlasts the AI 
 
 export const TICK_RATE = 60;
 export const STRIKE_TICK = 18; // shared/simulation.js: damage at attackTick + 18.
-// Golem gait: one full L+R cycle per GOLEM_CYCLE metres travelled (stride-locked, so feet never skate),
-// rigid legs swing about the hip and the body drops by the chord so both soles stay on the ground.
-export const GOLEM_CYCLE = 1.75, GOLEM_SWING = .36, GOLEM_HIP = 1.18;
+// Golem gait and body language live in golem-motion.js: one full L+R cycle per GOLEM_CYCLE metres travelled
+// (stride-locked, so feet never skate), rigid legs swinging about the hips, the weight rolling over each planted foot.
 
 // ---------------------------------------------------------------------------
 // Pure deterministic math (no THREE, no Math.random, no wall clock).
@@ -77,17 +79,19 @@ export function traits(id, kind = 'skeleton') {
 // a harder slam landing exactly at 18 and a long, heavy recovery.
 // Returns {coil, strike, impact, phase}; coil/strike in [0,1], impact in [-1,1].
 export function attackEnvelope(age, kind = 'skeleton', out = {coil: 0, strike: 0, impact: 0, phase: 'none'}) {
-  out.coil = 0; out.strike = 0; out.impact = 0; out.phase = 'none';
+  out.coil = 0; out.strike = 0; out.impact = 0; out.heave = 0; out.phase = 'none';
   if (!(age >= 0)) return out;
   if (kind === 'golem') {
+    // Wind-up, a straining hold, the drive down, fists stuck in the ground for a beat, a heave to pull them free.
     if (age < 11) { out.coil = smooth(age / 11); out.phase = 'telegraph'; }
     else if (age < 15.5) { out.coil = 1; out.phase = 'hold'; }
     else if (age < STRIKE_TICK) { const t = smooth((age - 15.5) / (STRIKE_TICK - 15.5)); out.coil = 1 - t; out.strike = t; out.phase = 'slam'; }
     else if (age < 64) {
-      const t = (age - STRIKE_TICK) / 46;
-      out.strike = 1 - smooth(t);
-      const u = age - STRIKE_TICK; out.impact = Math.sin(u * .9) * Math.exp(-u / 5) * (1 - smooth(t));
-      out.phase = 'recover';
+      const u = age - STRIKE_TICK;
+      out.strike = 1 - smooth((age - 27) / 33);
+      out.impact = Math.sin(u * .9) * Math.exp(-u / 5);
+      out.heave = age > 26 ? Math.sin(Math.PI * smooth((age - 26) / 22)) : 0;
+      out.phase = age < 27 ? 'stuck' : 'recover';
     }
     return out;
   }
@@ -124,7 +128,7 @@ export function solveTwoBone(a, b, d) {
 // drop: fraction of leg length, sideShift/lunge/bodyLift: world metres.
 export function poseSignals(s, out) {
   const {kind, tr, t, attack, recoil, missing, moving} = s;
-  const heavy = kind === 'golem';
+  if (kind === 'golem') return golemSignals(s, out);
   out.torsoPitch = 0; out.torsoYaw = 0; out.torsoRoll = 0;
   out.headPitch = 0; out.headYaw = 0; out.headRoll = 0;
   out.armL = 0; out.armR = 0; out.elbow = 0; out.armSwingL = 0; out.armSwingR = 0;
@@ -134,43 +138,20 @@ export function poseSignals(s, out) {
   // Idle personality: breath, slouch, look-around, weight shift.
   const breath = Math.sin(t * tr.breathHz * Math.PI * 2 + tr.breathPhase);
   const calm = 1 - Math.max(attack.coil, attack.strike, Math.abs(recoil.value));
-  out.torsoPitch += tr.slouch + breath * (heavy ? .008 : .018);
-  out.headPitch -= breath * (heavy ? .004 : .012);
-  out.headYaw += noise1(tr.seed, 1, t * tr.lookRate) * (heavy ? .18 : .32) * calm;
+  out.torsoPitch += tr.slouch + breath * .018;
+  out.headPitch -= breath * .012;
+  out.headYaw += noise1(tr.seed, 1, t * tr.lookRate) * .32 * calm;
   out.headRoll += tr.headTilt + noise1(tr.seed, 2, t * tr.lookRate * .7) * .05 * calm;
-  if (!heavy && tr.jitter > .55) out.headYaw += noise1(tr.seed, 3, t * 7) * .025 * calm; // bony twitch
+  if (tr.jitter > .55) out.headYaw += noise1(tr.seed, 3, t * 7) * .025 * calm; // bony twitch
   out.sideShift += noise1(tr.seed, 4, t * .23) * tr.swayAmp * (moving ? .3 : 1);
   out.drop += tr.crouch * .65; // fraction of leg length; adapter scales
 
-  // Attack layer.
-  const {coil, strike, impact} = attack;
-  if (heavy) {
-    // Gait: stride-locked rigid-leg walk. walk is a smoothed 0..1 weight, gait the stride phase (radians).
-    const w = s.walk || 0, ph = s.gait || 0, swing = Math.sin(ph) * GOLEM_SWING * w;
-    out.legL += swing; out.legR -= swing;
-    out.bodyLift -= (1 - Math.cos(swing)) * GOLEM_HIP + Math.pow(Math.abs(Math.sin(ph)), 6) * .035 * w; // chord drop + footfall settle
-    out.bodyRoll += -Math.cos(ph) * .05 * w;          // weight rolls over the stance leg, lifting the swing foot
-    out.bodyPitch += .07 * w;                         // leans into the walk
-    out.armSwingL -= Math.sin(ph - .35) * .3 * w; out.armSwingR += Math.sin(ph - .35) * .3 * w; // heavy, lagging counter-swing
-    out.headRoll += Math.cos(ph) * .03 * w; out.headPitch -= .05 * w;
-    // Idle weight: slow breath lifts the shoulders, the body settles side to side.
-    out.bodyLift += breath * .014 * (1 - w); out.armL -= breath * .025; out.armR -= breath * .025;
-    out.bodyRoll += noise1(tr.seed, 11, t * .12) * .025 * (1 - w) * calm;
-    // Slam: arms overhead with bent elbows and a back-leaning brace, then the whole body drives both fists down.
-    const raise = coil * 2.5 + strike * .82;
-    out.armL += raise; out.armR += raise;
-    out.elbow += coil * .7 - strike * .12;
-    out.bodyPitch += -coil * .16 + strike * .3;
-    out.bodyLift += coil * .05 - strike * .15 + impact * .05;
-    out.headPitch += -coil * .26 + strike * .16;
-    out.legL += (coil + strike) * .16; out.legR -= (coil + strike) * .1; // stagger the stance
-    if (attack.phase === 'hold') { const q = noise1(tr.seed, 9, t * 22) * .045; out.armL += q; out.armR -= q; out.bodyLift += q * .3; } // straining tremble
-  } // skeleton attack, guard and gait are posed in skeleton-motion.js from the same envelope
+  // Attack, guard and gait are posed in skeleton-motion.js from the same envelope.
 
   // Hit recoil, local to struck part. dir = actor-space push (x right, z back).
   const r = recoil.value, px = recoil.pushX, pz = recoil.pushZ, part = recoil.part;
   if (r) {
-    const amp = heavy ? .55 : 1;
+    const amp = 1;
     const back = pz * r * amp, side = px * r * amp;
     if (part === 'head') { out.headPitch -= back * .55; out.headRoll += side * .5; out.torsoPitch -= back * .1; }
     else if (part === 'leftArm') { out.armSwingL -= back * .7; out.torsoYaw += side * .15 + back * .12; }
@@ -179,31 +160,21 @@ export function poseSignals(s, out) {
       out.drop += Math.abs(r) * .09 * amp; out.sideShift += Math.abs(r) * .04 * amp * (part === 'leftLeg' ? -1 : 1); // buckle onto struck leg
       out.torsoPitch += Math.abs(r) * .12 * amp; out.torsoRoll += (part === 'leftLeg' ? -1 : 1) * Math.abs(r) * .1 * amp;
     } else { out.torsoPitch -= back * .32; out.torsoRoll += side * .22; out.headPitch -= back * .2; out.drop += Math.abs(r) * .03 * amp; }
-    if (heavy) { out.bodyPitch -= back * .2; out.bodyRoll += side * .14; out.bodyLift -= Math.abs(r) * .05; }
   }
 
   // Missing limbs: hobble over the remaining leg, drag with none.
   const legL = missing.leftLeg, legR = missing.rightLeg;
-  if (!heavy && legL !== legR) {
+  if (legL !== legR) {
     const sign = legL ? 1 : -1; // lean over the surviving leg
     const limp = Math.abs(Math.sin(s.stride * Math.PI));
     out.torsoRoll += sign * (.16 + limp * .06);
     out.sideShift += sign * .05;
     out.drop += .1 + limp * .04;
     out.torsoPitch += .12;
-  } else if (!heavy && legL && legR) {
+  } else if (legL && legR) {
     out.drop += 1; // adapter clamps to leg length: torso rests at ground
     out.torsoPitch += .55 + Math.sin(s.stride * Math.PI * 2) * .06;
     out.headPitch -= .35;
-  }
-  if (heavy && legL !== legR) {                     // one leg: lurch over the survivor, hip sags on the stump side
-    const limp = Math.abs(Math.sin(s.gait || 0)) * (s.walk || 0);
-    out.bodyRoll += (legL ? 1 : -1) * (.1 + limp * .06);
-    out.bodyLift -= .1 + limp * .07; out.bodyPitch += .08;
-  } else if (heavy && legL && legR) {               // no legs: chest on the ground, hauling itself by the arms
-    const pull = Math.sin((s.gait || 0) * 2) * (s.walk || 0);
-    out.bodyLift -= GOLEM_HIP * .82; out.bodyPitch += .5; out.headPitch -= .4;
-    out.armL += 1.1 + pull * .5; out.armR += 1.1 - pull * .5;
   }
   if (missing.head) { out.headPitch = 0; out.headYaw = 0; out.headRoll = 0; }
   if (missing.leftArm) { out.armL = 0; out.armSwingL = 0; }
@@ -320,7 +291,7 @@ export function noteEnemyHit(entry, event, fallbackTick) {
 // entry: {root, visual, data}; ctx: {tick: float interpolated sim tick, height(x,z), dt}
 export function applyEnemyMotion(entry, ctx) {
   const visual = entry.visual, data = entry.data;
-  if (!visual || visual.userData.placeholder || !data || !entry.root || data.kind === 'ent' || visual.userData.ent || data.kind === 'stumpling' || visual.userData.stumpling || visual.userData.released) return null; // ents pose in ent-view
+  if (!visual || visual.userData.placeholder || !data || !entry.root || data.kind === 'ent' || visual.userData.ent || data.kind === 'stumpling' || visual.userData.stumpling || visual.userData.critter || isCritter(data.kind) || visual.userData.released) return null; // ents pose in ent-view
   const kind = data.kind === 'golem' ? 'golem' : 'skeleton';
   let st = states.get(visual);
   if (!st || st.kind !== kind) {
@@ -344,10 +315,15 @@ export function applyEnemyMotion(entry, ctx) {
     // Presentation speed from the rendered root; smoothed so network jitter and stops never pop the stride.
     const speed = teleport || !st.init ? 0 : travel / Math.max(dt, 1e-3);
     st.speed = (st.speed || 0) + (speed - (st.speed || 0)) * (1 - Math.exp(-dt / .12));
-    const want = st.speed > .2 ? 1 : 0;
+    // Turning on the spot steps too: a heavy pivot walks its feet round instead of sliding them.
+    const yaw = Math.atan2(-aF.x, -aF.z), dyaw = st.init && !teleport ? Math.abs(Math.atan2(Math.sin(yaw - st.prevYaw), Math.cos(yaw - st.prevYaw))) : 0;
+    st.prevYaw = yaw;
+    const pivot = Math.min(dyaw, .2) * .55, turnRate = dyaw / Math.max(dt, 1e-3);
+    st.turn = (st.turn || 0) + (turnRate - (st.turn || 0)) * (1 - Math.exp(-dt / .15));
+    const want = st.speed > .2 || st.turn > .7 ? 1 : 0;
     st.walk = (st.walk || 0) + (want - (st.walk || 0)) * (1 - Math.exp(-dt / (want ? .2 : .35)));
     visual.getWorldScale(_ws);
-    if (!teleport) st.gait = ((st.gait || 0) + travel / (GOLEM_CYCLE * Math.max(.2, _ws.y / 1.24)) * Math.PI * 2) % (Math.PI * 4096);
+    if (!teleport) st.gait = ((st.gait || 0) + (travel + pivot) / (GOLEM_CYCLE * Math.max(.2, _ws.y / 1.24)) * Math.PI * 2) % (Math.PI * 4096);
     // Unweighted, the legs keep easing toward the nearest planted pose rather than freezing mid-swing.
     if (st.walk < .5 && !teleport) { const target = Math.round(st.gait / Math.PI) * Math.PI; st.gait += (target - st.gait) * (1 - Math.exp(-dt / .25)); }
   } else {
@@ -402,12 +378,13 @@ export function applyEnemyMotion(entry, ctx) {
   for (const p of PARTS5) missingSig[p] = !!data.missingParts?.includes(p);
   attackEnvelope(tick - (data.attackTick ?? -1000), kind, envelope);
   sigIn.kind = kind; sigIn.tr = st.traits; sigIn.t = t; sigIn.moving = moving; sigIn.stride = st.stride; sigIn.walk = st.walk || 0; sigIn.gait = st.gait || 0;
+  if (kind === 'golem') golemInputs(st, ctx, data, tick, t, dt, teleport);
   poseSignals(sigIn, sig);
   secondaryMotion(st, kind, ctx, dt, teleport);
 
   visual.getWorldScale(_ws); const scale = _ws.y;
-  if (kind === 'golem') applyGolem(st, ctx);
-  if (kind === 'golem') golemEvents(st, data, tick);
+  if (kind === 'golem') applyGolemPose(st, sig, frameAxes, golemOps, ctx, missingSig);
+  if (kind === 'golem') golemEvents(st, data, tick, t);
   else applySkeleton(st, ctx, scale, teleport, dt, tick, data);
   commit(st);
   st.init = true;
@@ -442,53 +419,46 @@ function secondaryMotion(st, kind, ctx, dt, teleport) {
   st.lookPitch = spring(st.lookPs ||= {x: 0, v: 0}, clamp(pitch, -.45, .35) * want, dt, heavy ? 3.5 : 7, .8);
   if (heavy) {
     sig.bodyPitch += st.lagF * .55; sig.bodyRoll -= st.lagR * .35;
-    sig.armSwingL -= st.lagF * 1.1; sig.armSwingR -= st.lagF * 1.1;
-    sig.headYaw += st.lookYaw * (1 - envelope.coil); sig.headPitch += st.lookPitch * .6;
+    if (!missingSig.leftArm) sig.raiseL -= st.lagF * 1.1; if (!missingSig.rightArm) sig.raiseR -= st.lagF * 1.1;
+    const attending = (1 - envelope.coil) * (1 - golemFidgetWeight(st)); // a fidget's own look-around wins while it lasts
+    sig.headYaw += st.lookYaw * attending; sig.headPitch += st.lookPitch * .6 * attending;
+    sig.torsoYaw += st.lookYaw * .25 * attending;
   }
 }
 
-function applyHead(N) {
-  if (!N.head || missingSig.head) return;
-  rotateWorld(N.head.node, aU, sig.headYaw);
-  rotateWorld(N.head.node, aR, -sig.headPitch);
-  rotateWorld(N.head.node, aF, sig.headRoll);
-}
-
-function applyGolem(st, ctx) {
-  const N = st.nodes;
-  // Whole-body lean/drop goes on the authored GLB node `Golem` (below
-  // entry.root and the canonical normalization; untouched by the mixer).
-  if (N.body) {
-    let roll = sig.bodyRoll;
-    if (N.footL && N.footR && ctx.height) {
-      N.footL.node.getWorldPosition(_v); N.footR.node.getWorldPosition(_v2);
-      const hL = ctx.height(_v.x, _v.z), hR = ctx.height(_v2.x, _v2.z);
-      const y0 = st.lastPos.y;
-      if (Number.isFinite(hL) && Number.isFinite(hR) && Math.abs(hL - y0) < .5 && Math.abs(hR - y0) < .5) {
-        const span = Math.max(.2, Math.hypot(_v.x - _v2.x, _v.z - _v2.z));
-        // Which authored leg is actor-left is read from world positions, not assumed.
-        const lIsActorLeft = _v3.copy(_v).sub(_v2).dot(aR) < 0;
-        const leftMinusRight = lIsActorLeft ? hL - hR : hR - hL;
-        roll += clamp(Math.atan2(leftMinusRight, span), -.08, .08); // settle toward the lower side
-      }
-    }
-    _v.copy(aU).multiplyScalar(sig.bodyLift); offsetWorld(N.body.node, _v);
-    rotateWorld(N.body.node, aR, -sig.bodyPitch);
-    rotateWorld(N.body.node, aF, roll);
+// ---- golem inputs: rig side (read once), the footfall jolt spring and the chest-beat on first sight of a Hero.
+const frameAxes = {aR, aU, aF}, golemOps = {rotateWorld, offsetWorld}, fidgetProbe = {};
+function golemFidgetWeight(st) { golemFidget(st.traits.seed, sigIn.t, fidgetProbe); return fidgetProbe.w * (1 - (st.walk || 0)); }
+function golemInputs(st, ctx, data, tick, t, dt, teleport) {
+  if (!st.golemSide) {
+    st.golemSide = golemRigInfo(st, aR);
+    const v = st.visual; st.shoulderL = trackMesh(st, v, 'ShoulderL'); st.shoulderR = trackMesh(st, v, 'ShoulderR');
+    if (st.nodes.footL) { st.nodes.footL.node.getWorldPosition(_v); st.golemLegLen = Math.max(.3, _v.y - st.lastPos.y); }
   }
-  if (N.torso) rotateWorld(N.torso.node, aR, -sig.torsoPitch * .5);
-  applyHead(N);
-  if (N.armL && !missingSig.leftArm) rotateWorld(N.armL.node, aR, sig.armL + sig.armSwingL);
-  if (N.armR && !missingSig.rightArm) rotateWorld(N.armR.node, aR, sig.armR + sig.armSwingR);
-  // Legs carry the gait; +bodyPitch keeps them planted vertically while the body above tips.
-  if (N.footL && !missingSig.leftLeg) rotateWorld(N.footL.node, aR, sig.legL + sig.bodyPitch * .8);
-  if (N.footR && !missingSig.rightLeg) rotateWorld(N.footR.node, aR, sig.legR + sig.bodyPitch * .8);
-  if (sig.elbow) { if (N.elbowL && !missingSig.leftArm) rotateWorld(N.elbowL.node, aR, sig.elbow); if (N.elbowR && !missingSig.rightArm) rotateWorld(N.elbowR.node, aR, sig.elbow); }
+  // Each footfall kicks a stiff spring: the body squashes, the head nods and the arms jiggle, then it settles.
+  const stomp = st.stompS ||= {x: 0, v: 0};
+  if (teleport) { stomp.x = 0; stomp.v = 0; }
+  const half = Math.floor((st.gait || 0) / Math.PI + .5);
+  if (st.init && st.stompHalf !== undefined && half !== st.stompHalf && (st.walk || 0) > .45) stomp.v -= 2.4 * (st.walk || 0);
+  st.stompHalf = half;
+  spring(stomp, 0, dt, 15, .32);
+  sigIn.stomp = clamp(stomp.x * 6, -1.2, 1.2);
+  // Notice: a Hero stepping up after a quiet spell gets a chest beat (Dawnhold's own forged golems never do).
+  let near = Infinity;
+  for (const h of ctx.threats || []) near = Math.min(near, Math.hypot(h[0] - st.lastPos.x, h[2] - st.lastPos.z));
+  if (data.side === 'party' || data.meteorBorn && tick - (data.unfurlTick ?? -1e9) < 120) st.golemCalm = 0;
+  else if (near > 13) st.golemCalm = (st.golemCalm || 0) + dt;
+  else if (near < 10 && (st.golemCalm ?? 9) > 4 && st.init && !(tick - (data.attackTick ?? -1000) < 64)) { st.golemNoticeAt = t; st.golemCalm = 0; }
+  else if (near < 13) st.golemCalm = 0;
+  const since = Number.isFinite(st.golemNoticeAt) ? t - st.golemNoticeAt : -1;
+  sigIn.notice = since >= 0 && since < NOTICE_SECONDS ? since / NOTICE_SECONDS : -1;
+  sigIn.side = st.golemSide;
 }
+function trackMesh(st, visual, name) { const n = visual.getObjectByName(name); return n ? track(st, n) : null; }
 
 // Presentation cues for golem-presentation.js (dust, sound, rumble, crystal light). Cleared every frame; each cue fires
 // once per crossing of the shared tick/stride, so every peer sees the same beats and late joiners get no stale replay.
-function golemEvents(st, data, tick) {
+function golemEvents(st, data, tick, t) {
   const ev = st.events || (st.events = []); ev.length = 0;
   const half = Math.floor((st.gait || 0) / Math.PI + .5);           // footfalls land at sin(gait) = +-1
   if (st.init && st.half !== undefined && half !== st.half && st.walk > .45 && !(missingSig.leftLeg && missingSig.rightLeg))
@@ -498,6 +468,14 @@ function golemEvents(st, data, tick) {
   if (st.init && prev < 0 && age >= 0 && age < 8) ev.push({type: 'telegraph'});
   if (st.init && prev < STRIKE_TICK && age >= STRIKE_TICK && age < STRIKE_TICK + 8) ev.push({type: 'slam'});
   st.attackAge = age;
+  // Chest beats and head knocks: a hollow stone knock on each blow (a fist meeting its own body).
+  const u = sigIn.notice, pu = st.noticeU ?? -1;
+  if (u >= 0) for (const b of NOTICE_BEATS) if (pu < b && u >= b && pu >= 0) ev.push({type: 'thump', strength: 1});
+  st.noticeU = u;
+  golemFidget(st.traits.seed, t, fidgetProbe);
+  const k = fidgetProbe.type === 'knock' ? fidgetProbe.u : -1, pk = st.knockU ?? -1;
+  if (k >= 0 && pk >= 0 && (st.walk || 0) < .3) for (const b of [.44, .6]) if (pk < b && k >= b) ev.push({type: 'knock', strength: .5});
+  st.knockU = k;
   st.telegraph = envelope.coil; st.recoil = Math.abs(recoilSig.value);
 }
 
