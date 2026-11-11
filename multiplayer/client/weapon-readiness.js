@@ -23,7 +23,7 @@ export const READINESS_TIMINGS = Object.freeze({
 });
 
 export const ANCHORS = Object.freeze({
-  axe: ['CuttingEdge_Mid', 'Head_Blade'], pick: ['Grip', 'Shaft'], hammer: ['04 Oxblood leather'],
+  axe: ['CuttingEdge_Mid', 'Head_Blade'], pick: ['Grip', 'Shaft'], hammer: ['SunStud0'],
   crossbow: ['GripAnchor', 'Body'], bow: ['Grip', 'RiserMesh'], wyrmspout: ['GripAnchor', 'Neck_Scales'],
   flask: ['NeckCollar', 'Glass'], limb: [],
 });
@@ -271,18 +271,13 @@ const BUILD = {
     const luminance = createPickLuminance(owner, host, find); if (luminance) owner.cleanup.push(luminance.dispose);
     return {special: new Strip(owner, gem, glowMaterial({color: 0x24435e, metalness: .1, roughness: .18}), gems, steps, PALETTES.crystal), luminance};
   },
-  // Copper collar sleeve above the grip; four raised rings warm upward as the slam recharges.
+  // Sunfall Sledge: the gold stud at the end of each long sun ray is a lamp. Both cheeks light their six studs
+  // clockwise from the top as the heart re-warms for the slam (the vents and stones glow with it: sunfall-sledge.js).
   hammer(owner, host, find) {
-    const grip = find('04 Oxblood leather'), all = collectPoints(host, [host]);
-    const g = boundsIn(host, grip), base = g.max.y + .012, axis = new THREE.Vector3(0, 1, 0), center = new THREE.Vector3((g.min.x + g.max.x) / 2, 0, (g.min.z + g.max.z) / 2);
-    // Measure the plain haft above the grip's brass band so the sleeve hugs wood, not trim.
-    const r = radiusAt(all, center, axis, base + .03, base + .1, .07, .04), height = .086;
-    const sleeveGeometry = named(new THREE.CylinderGeometry(r + .0016, r + .0016, height, 28, 1, true), 'hammer-sleeve');
-    const sleeve = new THREE.Mesh(sleeveGeometry, new THREE.MeshStandardMaterial({color: 0x9a5530, metalness: .88, roughness: .42, side: THREE.DoubleSide}));
-    sleeve.position.copy(center).setY(base + height / 2); owner.add(sleeve, sleeveGeometry, sleeve.material);
-    const ring = named(new THREE.TorusGeometry(r + .0034, .0034, 6, 32).rotateX(Math.PI / 2), 'hammer-ring'), rings = [], steps = [];
-    for (let i = 0; i < 4; i++) { rings.push([center.clone().setY(base + .012 + i * .0207), new THREE.Quaternion()]); steps.push(i); }
-    return {special: new Strip(owner, ring, glowMaterial({color: 0x8a4422, metalness: .9, roughness: .36}), rings, steps, PALETTES.copper)};
+    const lamps = [], steps = [];
+    for (let i = 0; i < 12; i++) { const stud = find(`SunStud${i}`); if (!stud) continue; lamps.push([hostPosition(host, stud), stud.quaternion.clone()]); steps.push(i % 6); }
+    const dome = named(new THREE.SphereGeometry(.0052, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2).rotateX(Math.PI / 2), 'hammer-stud');
+    return {special: new Strip(owner, dome, glowMaterial({color: 0x8a5a1c, metalness: .85, roughness: .3}), lamps, steps, PALETTES.amber)};
   },
   // Small brass dial on the stock's left plate: ten ticks light clockwise and a steel needle sweeps.
   crossbow(owner, host, find) {

@@ -1,0 +1,45 @@
+<!doctype html><meta charset="utf-8"><title>Sunfall Sledge review</title>
+<style>body{margin:0;background:#9fb4c0}canvas{display:block}</style>
+<script type="module">
+// Review page for the Sunfall Sledge (client/sunfall-sledge.js + public/assets/hammer.glb). Drive it from the console
+// or Playwright: await review.ready; review.held({charge, time, night}); review.slam([times]) -> data URLs.
+import * as T from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {createSunfallSledge} from '../client/sunfall-sledge.js';
+const q = new URLSearchParams(location.search), W = +(q.get('w') || 1280), H = +(q.get('h') || 720);
+const renderer = new T.WebGLRenderer({antialias: true, preserveDrawingBuffer: true}); renderer.setSize(W, H); renderer.setPixelRatio(1);
+renderer.toneMapping = T.ACESFilmicToneMapping; document.body.append(renderer.domElement);
+const scene = new T.Scene(), pm = new T.PMREMGenerator(renderer);
+scene.environment = pm.fromScene(new RoomEnvironment(), .04).texture; scene.environmentIntensity = .5;
+const night = q.has('night');
+scene.background = new T.Color(night ? 0x141c2c : 0xa9c3d3); scene.fog = new T.Fog(scene.background, 14, 40);
+scene.add(new T.HemisphereLight(night ? 0x405070 : 0xf0f4ff, 0x5a5030, night ? .5 : 1.6));
+const sun = new T.DirectionalLight(night ? 0x8090c0 : 0xffedcb, night ? .4 : 2.8); sun.position.set(5, 12, 7); scene.add(sun);
+const ground = (x, z) => .25 * Math.sin(x * .45) * Math.cos(z * .38);
+const g = new T.PlaneGeometry(60, 60, 120, 120).rotateX(-Math.PI / 2), p = g.attributes.position;
+for (let i = 0; i < p.count; i++) p.setY(i, ground(p.getX(i), p.getZ(i)));
+g.computeVertexNormals(); scene.add(new T.Mesh(g, new T.MeshStandardMaterial({color: 0x6f7a45, roughness: 1})));
+const camera = new T.PerspectiveCamera(45, W / H, .02, 120);
+const fx = createSunfallSledge({scene, realLight: !q.has('phone'), height: ground});
+const gltf = await new GLTFLoader().loadAsync('/assets/hammer.glb');
+const model = gltf.scene; scene.add(model);
+function shot() { renderer.render(scene, camera); return renderer.domElement.toDataURL('image/jpeg', .88); }
+window.review = {
+  ready: true,
+  held({charge = 1, time = 3, night: n = night ? 1 : 0, view = 'three'} = {}) {
+    model.visible = true; model.position.set(0, ground(0, 0) + .05, 0); model.rotation.set(0, .5, -.12);
+    fx.attach(model); fx.update({time: time - .1, dt: .016, charge, shown: true, night: n}); fx.update({time, dt: .016, charge, shown: true, night: n});
+    const views = {three: [[1.25, 1.2, 1.35], [0, .8, 0]], cheek: [[.25, .95, .85], [0, .83, 0]], crown: [[.45, 1.45, .55], [0, .9, 0]]};
+    const [eye, at] = views[view]; camera.position.set(...eye); camera.lookAt(...at); return shot();
+  },
+  slam(times = [.05, .15, .3, .6, 1.2, 2.4], {eye = [5.5, 3.6, 6.5], radius} = {}) {
+    model.visible = false; fx.attach(null);
+    camera.position.set(...eye); camera.lookAt(0, 0, 0);
+    fx.impact([0, 0, 0], radius); let t = 0; const out = [];
+    for (const target of times) { while (t < target) { const dt = Math.min(1 / 60, target - t); t += dt; fx.update({time: 10 + t, dt, shown: false}); } out.push(shot()); }
+    return out;
+  },
+  stats: () => fx.stats(),
+};
+</script>
