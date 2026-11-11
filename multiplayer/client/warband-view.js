@@ -2,6 +2,7 @@
 // one's own march point, health bars from above, and a ripple where an order lands. Everything is pooled (at most
 // six Forgelings, four ripples), drawn every frame from the interpolated actor roots, and costs a handful of draws.
 // The landing drop is presentation too: a Forgeling falls down its shaft of forge-light for WARBAND.landTicks.
+// Gatherers carry their load where you can see it: a log on the shoulder, a lump of iron ore or a crystal shard.
 import * as THREE from 'three';
 import {WARBAND} from '../shared/warband.js';
 
@@ -27,6 +28,15 @@ export function createWarbandView({scene, heightAt}) {
   ring.name = `WarbandSelect${i}`; return {ring, ticks, pin, bar, fill};
  });
  const ripples = Array.from({length: 4}, () => { const move = mats.move.clone(), attack = mats.attack.clone(), m = new THREE.Mesh(ripple, move); fills.push(move, attack); m.visible = false; m.renderOrder = 6; root.add(m); return {mesh: m, move, attack, age: 9, target: null, at: new THREE.Vector3()}; });
+ // Loads: one pooled mesh per kind per carrier (every player's Forgelings, so a haul is never invisible).
+ const CARRY_MAX = 12;
+ const loadGeo = {wood: new THREE.CylinderGeometry(.13, .15, 1.05, 7), ironOre: new THREE.DodecahedronGeometry(.2, 0), gems: new THREE.OctahedronGeometry(.18, 0)};
+ loadGeo.wood.rotateX(Math.PI / 2); loadGeo.gems.scale(.8, 1.5, .8);
+ const loadMat = {wood: new THREE.MeshStandardMaterial({color: 0x8a5a32, roughness: .85}),
+  ironOre: new THREE.MeshStandardMaterial({color: 0x8c5a44, roughness: .7, metalness: .35, flatShading: true}),
+  gems: new THREE.MeshStandardMaterial({color: 0xb68cff, emissive: 0x6a3ccf, emissiveIntensity: .9, roughness: .25, flatShading: true})};
+ const loads = Object.fromEntries(Object.keys(loadGeo).map(k => [k, Array.from({length: CARRY_MAX}, () => { const m = new THREE.Mesh(loadGeo[k], loadMat[k]); m.visible = false; m.castShadow = false; root.add(m); return m; })]));
+ const offset = new THREE.Vector3();
  let next = 0, time = 0;
 
  /** Landing: the root falls from DROP metres to the ground over the first WARBAND.landTicks of its life. */
@@ -44,8 +54,17 @@ export function createWarbandView({scene, heightAt}) {
   * units: [{entry, data, selected}] for the viewer's own Forgelings; god: true in the strategy view.
   * actorOf(id) returns an actor entry (for ripples that follow a target).
   */
- function update({units, god, camera, dt, actorOf}) {
+ function update({units, god, camera, dt, actorOf, carriers = []}) {
   time += dt;
+  const used = {wood: 0, ironOre: 0, gems: 0};
+  for (const c of carriers) {
+   const kind = c.data.warband?.cargo?.kind, pool = loads[kind]; if (!pool || used[kind] >= CARRY_MAX || c.entry?.root.visible === false) continue;
+   const m = pool[used[kind]++], r = c.entry.root;
+   // Wood rides the right shoulder along the body; ore and crystal are hugged in front of the chest.
+   offset.set(kind === 'wood' ? .24 : 0, kind === 'wood' ? 1.5 : 1.05, kind === 'wood' ? .05 : -.32).applyQuaternion(r.quaternion);
+   m.position.copy(r.position).add(offset); m.quaternion.copy(r.quaternion); m.visible = true;
+  }
+  for (const k of Object.keys(loads)) for (let i = used[k]; i < CARRY_MAX; i++) loads[k][i].visible = false;
   const pulse = .82 + .18 * Math.sin(time * 5);
   slots.forEach((s, i) => {
    const u = units[i];
@@ -75,7 +94,7 @@ export function createWarbandView({scene, heightAt}) {
  }
  return {present, ping, update, dispose() {
   scene.remove(root);
-  for (const g of [selRing, selTicks, pinRing, ripple, barBack, barFill]) g.dispose();
-  for (const m of [...Object.values(mats), ...fills]) m.dispose();
+  for (const g of [selRing, selTicks, pinRing, ripple, barBack, barFill, ...Object.values(loadGeo)]) g.dispose();
+  for (const m of [...Object.values(mats), ...fills, ...Object.values(loadMat)]) m.dispose();
  }};
 }

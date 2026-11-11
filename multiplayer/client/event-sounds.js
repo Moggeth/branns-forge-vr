@@ -47,7 +47,7 @@ export function cueFor(event, {me = null} = {}) {
     case 'forge_result': return {name: event.result === 'defeat' ? 'forge_fail' : 'forge_success'};
     case 'workshop_smelt': case 'refinery_feed': return {name: 'smelt', opts: {key: `smelt:${event.id}`, gap: .3}};
     case 'worker_summon': return {name: 'worker_summon'};
-    case 'worker_delivery': return {name: 'deliver', opts: {key: `deliver:${event.id}`, gap: .3}};
+    case 'worker_delivery': case 'warband_delivery': return {name: 'deliver', opts: {key: `deliver:${event.id}`, gap: .3}};
     case 'talent_learned': return mine ? {name: 'talent', at: null} : null;
     case 'resource_use': return mine ? {name: 'resource_use'} : null;
     // Adventure
