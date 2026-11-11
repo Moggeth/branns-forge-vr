@@ -58,7 +58,8 @@ import { rewardBanner } from './client/reward-moments.js';
 import {createPatchNotes} from './client/patch-notes.js';
 import {PATCH_NOTE_ENTRIES} from './client/patch-notes-data.js';
 import './client/patch-notes.css';
-import {createHeroProgressUI} from './client/hero-progress-ui.js';
+import {createHeroProgressUI, defaultOwns} from './client/hero-progress-ui.js';
+import {atForge} from './shared/weapon-temper.js';
 import {createQuartermasterUI} from './client/quartermaster-ui.js';
 import {insideTavern} from './shared/taverns.js';
 import './client/hero-progress.css';
@@ -652,7 +653,7 @@ function onSnapshot(snapshot) {
       if(chip.title!==title)chip.title=title;}}
     const weaponText={flockwright:'Flockwright · click to fire a heavy bolt · right click to aim down the ring sight · the crew reloads',staff:'Sunthread · hold click for a sun-thread · Q Radiant Nova',axe:'Axe · click to chop · Q sundering strike',pick:'Stonewhisper · click to mine · hold Q to aim crystal wall',hammer:'Sunfall · click to strike · Q ground slam',crossbow:`Siegebird · click to fire · songbirds bring each bolt · golden bird ${(siegebirdGoldenChance(self.siegebird?.hits||0,!!self.talents?.crossbow?.includes('flock'))*100).toFixed(1)}%`,bow:'Emberwing · hold attack to draw, release to fire · right click then aim to curve · Q phoenix flare',limb:'Bone · click to strike · G drop · X throw',wyrmspout:`Wyrmspout · hold to spray sticky fire · Q: Gout · Tank ${Math.round((1-(self.heat||0))*100)}%${self.overheatUntil>snapshot.tick?' · Refilling':''}`,stormreel:'Stormreel · hold to charge, release to fire · + and \u2212 bolts in one foe close the circuit · G spikes it · Q reels in',flask:mobile?.enabled?'Emberdew · attack: hurl a lit bottle · Special: Cinder Cluster':'Emberdew · click to toss fuel · hold right click to light and aim · hold Q for Cinder Cluster'}[self.tool||'axe'];if($('weaponHint'))setText($('weaponHint'),weaponText);
     meter('hp', self.hp, self.maxHp ?? self.hpMax ?? self.maxHealth ?? 100);
-    heroProgress.update(self, {role: currentRole});
+    heroProgress.update(self, {role: currentRole, atForge: atForge(snapshot, self), owns: (p, w) => weaponOwned(snapshot, p, w) && (w !== 'flask' || defaultOwns(p, w))});
     quartermaster.update(self, {role: currentRole, tavern: insideTavern(snapshot, self.position), tick: snapshot.tick ?? 0});
     meter('mana', self.mana, self.maxMana ?? self.manaMax ?? 100);
   }
@@ -1038,7 +1039,7 @@ refreshFieldModel();
 // ---------------------------------------------------------------- keyboard & pointer
 // Hero levels and weapon talents (client/hero-progress-ui.js): badge + XP beside health, N opens the Talents panel.
 const heroProgress=createHeroProgressUI({hudSelf:document.querySelector('.hud-self'),mount:body,
-  onLearn:(weapon,talent)=>command('action',{action:'talent',weapon,talent}),onReset:()=>command('action',{action:'talent',reset:true}),
+  onLearn:(weapon,talent)=>command('action',{action:'talent',weapon,talent}),onTemper:tool=>command('action',{action:'temper',tool}),onReset:()=>command('action',{action:'talent',reset:true}),
   onOpen:()=>{talentsOpen=true;closeQuickBuild();holdOverlays?.close();game?.clearControls();if(document.pointerLockElement)document.exitPointerLock?.();syncActive();},
   onClose:()=>{talentsOpen=false;syncActive();}});
 // The keep Quartermaster (client/quartermaster-ui.js): E at the shop counter opens it; V or the vitals chip drinks a draught.

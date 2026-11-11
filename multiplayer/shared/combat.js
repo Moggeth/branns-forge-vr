@@ -17,6 +17,7 @@ import {EMBERDEW,cinderLaunch,cinderVelocities} from './emberdew.js';
 export const FLARE=Object.freeze({speed:30,loft:6,fuse:48});
 import {skeletonShield} from './skeleton-kinds.js';
 import {damageScale,grantXp,killXp,hasTalent,talentRank,byRank,heroMaxHp} from './hero-progress.js';
+import {temperScale} from './weapon-temper.js';
 import {itemBonus} from './hero-items.js';
 import {payKillGold} from './home-shop.js';
 import {tavernSafe} from './taverns.js';
@@ -258,7 +259,7 @@ export function hitEnemyPart(state,enemy,part,amount,hit,ctx,events,{projectile=
   const armored=enemy.kind==='golem'&&(enemy.armor??3)>0;
   const owner=state.players.find(p=>p.id===hit?.ownerId);
   if(owner&&tavernSafe(state,owner))return false; // nobody fights from inside a tavern
-  amount*=damageScale(owner); // +20% per hero level
+  amount*=damageScale(owner)*temperScale(owner,hit?.tool); // +20% per hero level, +15% per forge temper of that weapon
   // Limbsplitter (axe talent): a swing that lands on a limb or head takes it clean off (armour still turns it).
   const lopping=!projectile&&!armored&&hit?.tool==='axe'&&part!=='torso'&&enemy.kind!=='stumpling'&&hasTalent(owner,'axe','limbsplitter');
   if(lopping)amount=Math.max(amount,enemy.parts[part]);
@@ -390,7 +391,7 @@ function strikeEnemy(state,shot,enemy,m,ctx,events){
   // Siegebird mastery: every bolt that lands on a foe makes the golden bird a little more likely.
   const owner=shot.kind==='bolt'&&!shot.heavy&&state.players.find(p=>p.id===shot.ownerId);if(owner?.siegebird)owner.siegebird.hits=Math.min(SIEGEBIRD.hitCap,owner.siegebird.hits+1);
   const speed=vec(shot.velocity,100)?Math.hypot(...shot.velocity):0,direction=speed>1e-6?shot.velocity.map(v=>v/speed):undefined;
-  hitEnemyPart(state,enemy,m.part,shot.kind==='bolt'?(shot.heavy?FLOCKWRIGHT.damage:SIEGEBIRD.damage*(shot.golden?SIEGEBIRD.goldenMultiplier:1)):38,{...m,ownerId:shot.ownerId,side:shot.side,shot:shot.kind,...(direction?{direction}:{}),...(shot.golden?{golden:true}:{})},ctx,events,{projectile:true});
+  hitEnemyPart(state,enemy,m.part,shot.kind==='bolt'?(shot.heavy?FLOCKWRIGHT.damage:SIEGEBIRD.damage*(shot.golden?SIEGEBIRD.goldenMultiplier:1)):38,{...m,ownerId:shot.ownerId,side:shot.side,shot:shot.kind,tool:shot.kind==='arrow'?'bow':shot.heavy?'flockwright':'crossbow',...(direction?{direction}:{}),...(shot.golden?{golden:true}:{})},ctx,events,{projectile:true});
   // Phoenix headshot: the bird tears the skull off the ragdoll it just dropped and tries to fly away with it (phoenix-carry.js).
   const skull=shot.kind==='arrow'&&Math.hypot(...shot.curve)>.000001&&enemy.kind==='skeleton'&&m.part==='head'&&!state.enemies.includes(enemy)&&state.detachedParts.find(d=>d.sourceId===enemy.id&&d.part==='head'&&!d.heldBy);
   if(skull&&state.detachedParts.filter(d=>d.carry).length<PHOENIX_CARRY.maxActive){
