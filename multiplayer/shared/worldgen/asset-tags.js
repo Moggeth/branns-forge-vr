@@ -14,10 +14,14 @@
 //   danger    optional: [minTier, maxTier] (rarer kit deeper in the wilds)
 //   lod       render distance band: 'near' (<45 m), 'mid' (<160 m), 'far' (whole view)
 export const ASSET_TAGS = Object.freeze([
-  // Choppable trees (shared/trees.js variants 0..2). Weights pick species per biome.
-  {asset: 'tree', purpose: 'tree', variant: 0, biomes: {meadow: 6, forest: 4, marsh: 1, steppe: 1}, slope: [0, .6], footprint: .45, spacing: 3.2, scale: [.85, 1.25], lod: 'far'},
-  {asset: 'tree_b', purpose: 'tree', variant: 1, biomes: {forest: 4, pine: 6, marsh: 4, tundra: 1}, slope: [0, .65], footprint: .45, spacing: 3.4, scale: [.85, 1.3], lod: 'far'},
-  {asset: 'tree_young', purpose: 'tree', variant: 2, biomes: {meadow: 3, forest: 2, pine: 4, steppe: 3, tundra: 4, beach: 1}, slope: [0, .7], footprint: .25, spacing: 2.4, scale: [.8, 1.15], lod: 'far'},
+  // Choppable trees (shared/trees.js VARIANTS). Weights pick species per biome: apple meadows, oak and maple woods,
+  // birch by the water, cherry blossom in the open, firs climbing the pine slopes and the tundra.
+  {asset: 'tree', purpose: 'tree', variant: 0, biomes: {meadow: 5, forest: 2, marsh: 1, steppe: 1}, slope: [0, .6], footprint: .45, spacing: 3.2, scale: [.85, 1.25], lod: 'far'},
+  {asset: 'tree_b', purpose: 'tree', variant: 1, biomes: {forest: 4, marsh: 2, meadow: 1, pine: 1}, slope: [0, .65], footprint: .45, spacing: 3.4, scale: [.85, 1.3], lod: 'far'},
+  {asset: 'tree_young', purpose: 'tree', variant: 2, biomes: {meadow: 2, forest: 2, marsh: 3, steppe: 2, tundra: 1, beach: 1}, slope: [0, .7], footprint: .25, spacing: 2.4, scale: [.8, 1.15], lod: 'far'},
+  {asset: 'tree_fir', purpose: 'tree', variant: 3, biomes: {pine: 9, tundra: 5, forest: 1.5, rock: .5}, slope: [0, .8], footprint: .4, spacing: 3, scale: [.8, 1.25], lod: 'far'},
+  {asset: 'tree_maple', purpose: 'tree', variant: 4, biomes: {forest: 3, meadow: 1.2, steppe: .6}, slope: [0, .6], footprint: .45, spacing: 3.6, scale: [.85, 1.2], lod: 'far'},
+  {asset: 'tree_blossom', purpose: 'tree', variant: 5, biomes: {meadow: 1.6, marsh: .6, forest: .5, beach: .4}, slope: [0, .5], footprint: .35, spacing: 3.6, scale: [.85, 1.2], lod: 'far'},
   // Mineable deposits (shared/material-catalog.js kinds), tiered by geology and danger.
   {asset: 'stone', purpose: 'resource', biomes: {rock: 5, tundra: 3, steppe: 2, pine: 2, meadow: 1, forest: 1, beach: 1}, slope: [0, 1.2], footprint: .95, spacing: 9, near: 'cliff'},
   {asset: 'iron', purpose: 'resource', biomes: {rock: 4, pine: 2, tundra: 2, steppe: 1}, slope: [.12, 1.2], footprint: .95, spacing: 16, near: 'cliff'},

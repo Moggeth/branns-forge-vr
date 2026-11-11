@@ -9,6 +9,7 @@ import {hash01, hashInts} from './random.js';
 import {TREE_TAGS, RESOURCE_TAGS, DECOR_TAGS} from './asset-tags.js';
 import {BIOME_NAMES, atanQ2} from './generate.js';
 import {DEPOSIT_CATALOG} from '../material-catalog.js';
+import {TREE_PROFILES, VARIANTS} from '../trees.js';
 
 export const CHUNK = 64;
 export const ACTIVE_RADIUS = 80;   // metres around a Hero whose trees/rocks are live in the simulation
@@ -59,7 +60,7 @@ export function chunkContent(world, cx, cz) {
     const tag = pickWeighted(TREE_TAGS, biome, hash01(seed, 13, cx, cz, i, j));
     if (!tag || slope > tag.slope[1] || blocked(world, x, z, 1.5) || nearCrag(x, z, 1.2)) continue;
     const s = tag.scale[0] + (tag.scale[1] - tag.scale[0]) * hash01(seed, 14, cx, cz, i, j);
-    const base = tag.variant === 2 ? 4.1 : tag.variant === 1 ? 6.3 : 6;
+    const base = [6, 6.3, 4.1][tag.variant] ?? TREE_PROFILES[VARIANTS[tag.variant]]?.height ?? 6; // first three keep their saved-world numbers
     trees.push({id: `wt${cx}_${cz}_${trees.length}`, x: +x.toFixed(3), z: +z.toFixed(3), height: +(base * s).toFixed(2), variant: tag.variant});
   }
   // Deposits: a few tries per chunk; geology (slope, cliffs, altitude) and danger decide the kind.
