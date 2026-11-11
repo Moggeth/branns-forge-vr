@@ -2,6 +2,7 @@
 // one's own march point, health bars from above, and a ripple where an order lands. Everything is pooled (at most
 // six Forgelings, four ripples), drawn every frame from the interpolated actor roots, and costs a handful of draws.
 // The landing drop is presentation too: a Forgeling falls down its shaft of forge-light for WARBAND.landTicks.
+// Gatherers carry their load where you can see it: a log on the shoulder, a lump of iron ore or a crystal shard.
 import * as THREE from 'three';
 import {WARBAND} from '../shared/warband.js';
 
@@ -11,7 +12,7 @@ const DROP = 4; // metres: what a 0.9 s fall from rest covers
 function ringGeometry(inner, outer, segments = 40) { const g = new THREE.RingGeometry(inner, outer, segments); g.rotateX(-Math.PI / 2); return g; }
 const glow = color => new THREE.MeshBasicMaterial({color, transparent: true, opacity: .9, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, toneMapped: false});
 
-export function createWarbandView({scene, heightAt}) {
+export function createWarbandView({scene, heightAt, makeLoad}) {
  const root = new THREE.Group(); root.name = 'WarbandView'; scene.add(root);
  const selRing = ringGeometry(.62, .78), selTicks = ringGeometry(.86, .94, 12), pinRing = ringGeometry(.16, .3, 16), ripple = ringGeometry(.86, 1, 48);
  const barBack = new THREE.PlaneGeometry(.9, .1), barFill = new THREE.PlaneGeometry(1, .07); barFill.translate(.5, 0, 0);
@@ -27,6 +28,11 @@ export function createWarbandView({scene, heightAt}) {
   ring.name = `WarbandSelect${i}`; return {ring, ticks, pin, bar, fill};
  });
  const ripples = Array.from({length: 4}, () => { const move = mats.move.clone(), attack = mats.attack.clone(), m = new THREE.Mesh(ripple, move); fills.push(move, attack); m.visible = false; m.renderOrder = 6; root.add(m); return {mesh: m, move, attack, age: 9, target: null, at: new THREE.Vector3()}; });
+ // Loads: authored resource art (makeLoad(kind) -> Object3D or null while assets stream in), pooled per kind for
+ // every player's carriers, so a haul is never invisible and never a stand-in primitive.
+ const CARRY_MAX = 12, loads = {wood: [], ironOre: [], gems: []};
+ const loadAt = (kind, i) => { const pool = loads[kind]; if (!pool[i]) { const m = makeLoad?.(kind); if (!m) return null; m.visible = false; root.add(m); pool[i] = m; } return pool[i]; };
+ const offset = new THREE.Vector3();
  let next = 0, time = 0;
 
  /** Landing: the root falls from DROP metres to the ground over the first WARBAND.landTicks of its life. */
@@ -44,8 +50,17 @@ export function createWarbandView({scene, heightAt}) {
   * units: [{entry, data, selected}] for the viewer's own Forgelings; god: true in the strategy view.
   * actorOf(id) returns an actor entry (for ripples that follow a target).
   */
- function update({units, god, camera, dt, actorOf}) {
+ function update({units, god, camera, dt, actorOf, carriers = []}) {
   time += dt;
+  const used = {wood: 0, ironOre: 0, gems: 0};
+  for (const c of carriers) {
+   const kind = c.data.warband?.cargo?.kind; if (!loads[kind] || used[kind] >= CARRY_MAX || c.entry?.root.visible === false) continue;
+   const m = loadAt(kind, used[kind]); if (!m) continue; used[kind]++; const r = c.entry.root;
+   // Wood rides the right shoulder along the body; ore and crystal are hugged in front of the chest.
+   offset.set(kind === 'wood' ? .24 : 0, kind === 'wood' ? 1.5 : 1.05, kind === 'wood' ? .05 : -.32).applyQuaternion(r.quaternion);
+   m.position.copy(r.position).add(offset); m.quaternion.copy(r.quaternion); m.visible = true;
+  }
+  for (const k of Object.keys(loads)) for (let i = used[k]; i < loads[k].length; i++) loads[k][i].visible = false;
   const pulse = .82 + .18 * Math.sin(time * 5);
   slots.forEach((s, i) => {
    const u = units[i];
@@ -76,6 +91,6 @@ export function createWarbandView({scene, heightAt}) {
  return {present, ping, update, dispose() {
   scene.remove(root);
   for (const g of [selRing, selTicks, pinRing, ripple, barBack, barFill]) g.dispose();
-  for (const m of [...Object.values(mats), ...fills]) m.dispose();
+  for (const m of [...Object.values(mats), ...fills]) m.dispose(); // loads share the world's resource art and templates: not ours to dispose
  }};
 }

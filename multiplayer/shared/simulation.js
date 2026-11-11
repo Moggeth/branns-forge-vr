@@ -61,7 +61,7 @@ import {worldFor, restoreWorldDescriptor} from './worldgen/registry.js';
 import {thingLimit, extentLimit, posLimit, withWorld} from './world-extent.js';
 import {newWildsState, stepWilds, restoreWilds, wildsDepositKnown, wildsOrigin, wildsFacing} from './wilds.js';
 import {worldMode} from './world-modes.js';
-import {WARBAND,warbandAction,musterWarband,rallyWarband,warbandRoom,validWarband,restoreWarband} from './warband.js';
+import {WARBAND,warbandAction,musterWarband,rallyWarband,warbandRoom,validWarband,restoreWarband,stepWarbandWork,warbandStrike} from './warband.js';
 import {treeIdSet} from './world-content.js';
 // Deposits a world may hold at once (generated worlds keep a live window of rocks around every Hero).
 const depositCap = state => state?.world ? 192 : 80;
@@ -304,7 +304,7 @@ function instantiate(state) {
         if (message.action === 'collectTarget') return collectTarget(state,p,message,{terrainHeight,combatAction,combatContext});
         if (message.action === 'talent') return talentAction(state,p,message);
         if (message.action === 'temper') { const r = temperAction(state,p,message); if (r.ok) rememberProgress(state,p); return r; }
-        if (message.action === 'warband') return warbandAction(state,p,message,{terrainHeight,clamp:v=>clamp(v,-thingLimit(),thingLimit()),reach:thingLimit()});
+        if (message.action === 'warband') {treeIndex.update(state);return warbandAction(state,p,message,{terrainHeight,clamp:v=>clamp(v,-thingLimit(),thingLimit()),reach:thingLimit(),trees:treeIndex});}
         if (p.role !== 'hero') return fail('invalid_action');
         if (message.action === 'craftWeapon') return craftWeapon(state,p,message);
         if (message.action === 'mount' || message.action === 'dismount') return mountAction(state,p,message,{takeApple:h=>{const f=state.fruit,i=f?.drops?.findIndex(d=>d.heldBy===h.id)??-1;if(i<0)return false;f.drops.splice(i,1);return true;}});
@@ -534,10 +534,11 @@ function instantiate(state) {
       stepCrystalWalls(state,combatContext,hitEnemyPart,events);
       forgeY=terrainHeight(state,0,0,false); // Starfall may have changed the ground.
       stepBattle(state,{createEnemy,terrainHeight,nextId,damageHero,damageEnemy:(enemy,n,ev,side,ownerId)=>hitEnemyPart(state,enemy,'torso',n,ownerId?{side,ownerId}:{side},{nextId,terrainHeight,damageHero,damageStructure:(s,id,amount,events)=>damageInvention(s,id,amount,null,events)},ev)},events);
+      stepWarbandWork(state,{trees:treeIndex,terrainHeight},events);
       stepEnemies(state,{
         ground:(x,z)=>inventionFloor(state,x,z,forgeFloor(x,z,forgeY,terrainHeight(state,x,z))),
         resolve:(position,radius=.28,height=1.65)=>{if(inUnderway(position[0],position[2]))return resolveUnderway(state,position,radius);resolveForge(position,forgeY,radius,height);resolveInventions(state,position,radius,height);if(state.landmarks)resolveStartingWorld(position,(x,z)=>terrainHeight(state,x,z),radius,height);resolveTrees(position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z),radius,height);resolveDeposits(state,position,radius,(x,z)=>terrainHeight(state,x,z));resolveHomeStructures(state,position,radius);if(state.world)resolvePlaces(worldFor(state),position,radius);else{resolveBackTowns(state,position,radius);resolveCoveLakes(position,radius);resolveMapExtras(position,radius);}resolveTerrainBoundary(position,radius);return position;},
-        damageHero,damageEnemy:(enemy,n,ev,side,ownerId)=>hitEnemyPart(state,enemy,'torso',n,ownerId?{side,ownerId,by:'warband'}:{side},{nextId,terrainHeight},ev),damageBase:(id,n,side)=>damageBattleBase(state,id,n,side,events),damageStructure:(id,n,ev,side)=>damageInvention(state,id,n,null,ev,side),events
+        damageHero,damageEnemy:(enemy,n,ev,side,ownerId)=>hitEnemyPart(state,enemy,'torso',n,ownerId?{side,ownerId,by:'warband'}:{side},{nextId,terrainHeight},ev),damageBase:(id,n,side)=>damageBattleBase(state,id,n,side,events),damageStructure:(id,n,ev,side)=>damageInvention(state,id,n,null,ev,side),warbandStrike:(e,ev)=>warbandStrike(state,e,{trees:treeIndex,terrainHeight,chopTree,collapseMinedWall},ev),events
       });
       for(const e of state.enemies)if(e.hp>0&&e.battleRun!==undefined)resolveHomeDomes(state,e.position,e.side,.4);
       for(const e of state.enemies)if(e.hp>0)resolveTaverns(state,e.position,.5); // monsters are shooed out of every tavern

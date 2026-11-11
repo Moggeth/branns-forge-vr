@@ -597,7 +597,15 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   yield;
   const spellVisual=createSpellPresentation({scene,terrainGrid:true,tickSeconds:1/60,getTerrainTick:()=>{const t=terrainShownTick();return Number.isFinite(t)?t:snapshot.tick??0;},height:(x,z)=>heightAt(x,z,snapshot.edits),quality:globalThis.matchMedia?.('(pointer: coarse)').matches?'medium':'high',reducedMotion:!!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches});
   // The Warband (shared/warband.js): Forgelings the God musters, selects and orders from above, and who escort the Hero.
-  const warbandView=createWarbandView({scene,heightAt:(x,z)=>heightAt(x,z,snapshot.edits)});
+  // A Forgeling's load uses the same authored art as the world: the tree kit's log, the ore and crystal pickups.
+  function warbandLoad(kind){
+    if(kind==='wood'){const src=templates.get('log')?.scene;if(!src)return null;const log=src.clone(true),drop=[];log.traverse(n=>{if(n.name.toLowerCase().includes('colonly'))drop.push(n);});for(const n of drop)n.removeFromParent();
+      const size=new THREE.Box3().setFromObject(log).getSize(new THREE.Vector3()),long=Math.max(size.x,size.y,size.z)||1,g=new THREE.Group();log.scale.setScalar(1.05/long);
+      if(size.y===long)log.rotation.x=Math.PI/2;else if(size.x===long)log.rotation.y=Math.PI/2; // lie it along the body, front to back
+      g.add(log);return g;}
+    const art=heldResourceArt.pickup(kind==='gems'?'crystal':kind);if(art)art.scale.setScalar(HELD_SCALE*1.4);return art;
+  }
+  const warbandView=createWarbandView({scene,heightAt:(x,z)=>heightAt(x,z,snapshot.edits),makeLoad:warbandLoad});
   const warbandSelected=new Set();let warbandCommanding=false,warbandRightDown=null;
   const warbandHud=createWarbandHud({mount:document.body,onPress:()=>warbandPress()});
   function myWarband(){return (snapshot.enemies||[]).filter(e=>e.warband?.owner===playerId&&e.hp>0).sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0);}
@@ -619,7 +627,8 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     const units=myWarband(),live=new Set(units.map(e=>e.id));for(const id of warbandSelected)if(!live.has(id))warbandSelected.delete(id);
     if(warbandCommanding&&!warbandSelected.size)stopCommand();
     const god=role==='god'&&!renderer.xr.isPresenting;
-    warbandView.update({units:units.map(e=>({data:e,entry:actors.get(`e:${e.id}`),selected:god&&warbandSelected.has(e.id)})).filter(u=>u.entry),god,camera,dt,actorOf:key=>actors.get(key)});
+    const carriers=[];for(const e of snapshot.enemies||[])if(e.warband?.cargo&&e.hp>0){const entry=actors.get(`e:${e.id}`);if(entry)carriers.push({data:e,entry});}
+    warbandView.update({units:units.map(e=>({data:e,entry:actors.get(`e:${e.id}`),selected:god&&warbandSelected.has(e.id)})).filter(u=>u.entry),god,camera,dt,actorOf:key=>actors.get(key),carriers});
     warbandHud.update({n:renderer.xr.isPresenting?0:units.length,role,commanding:god&&warbandCommanding,hurt:units.some(e=>e.hp<50)});
   }
   /** A God's click on the land: true when the Warband used it (so no spell is cast). */
@@ -1331,6 +1340,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     if(!event?.position||event.fire)return;
     const woodSound=!!woodAudio?.handles(event);if(woodSound&&!predictedImpact)woodAudio.play(event,listenerPose());if(event.kind==='ent_wake'||event.kind==='ent_root')rootRumble(event);
     const materialSound=!!materialAudio?.handles(event);if(materialSound&&!predictedImpact)materialAudio.play(event,listenerPose(),snapshot.tick);
+    if(event.kind==='warband_order'&&event.by===playerId&&event.order==='gather')report(`Your Forgelings set to work: ${({wood:'felling Timber',iron:'quarrying Iron',gems:'cutting Crystal'})[event.job]||'gathering'}. They haul each load to the Forge${role==='hero'?' or to you':''}.`);
     if(event.kind==='warband_muster'&&event.by===playerId)report(touchEnabled?'Your Forgelings have landed. Tap the Warband button, then tap the land to send them.':'Your Forgelings have landed. Press G (or click one) to command them; right-click to send them.');
     if(event.kind==='spell'){spellVisual.play(event);spellAudio?.play(event,earXZ(),role==='god');if((event.spell==='wall'||event.spell==='sunder')&&event.rupture)earthLineFeel(event);}
     // God spells feed the Heroes (shared/god-boons.js): a blue resonance marks each gift; boons spark on the Hero.
