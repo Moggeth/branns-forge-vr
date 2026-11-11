@@ -60,7 +60,10 @@ function scanRocks(job, world) {
 function findHint(snapshot, me, key) {
   if (key === 'wood') return 'Fell any tree: three axe cuts in one spot bring it down.';
   const world = worldFor(snapshot.world); if (!world) return '';
-  const [x, , z] = me.position, cell = `${key}:${Math.round(x / 24)}:${Math.round(z / 24)}:${snapshot.wilds?.spent?.length || 0}:${snapshot.wilds?.cleared?.length || 0}`;
+  const [x, , z] = me.position, spentList = snapshot.wilds?.spent || [], clearedList = snapshot.wilds?.cleared || [];
+  // Both lists only grow within a room; their length plus newest entry identifies the depletion state, so another
+  // room on the same seed (which shares the cached world) never reuses a stale hint.
+  const cell = `${key}:${Math.round(x / 24)}:${Math.round(z / 24)}:${spentList.length}:${spentList.at(-1)?.[0] ?? ''}:${clearedList.length}:${clearedList.at(-1) ?? ''}`;
   let memo = findMemo.get(world); if (!memo) findMemo.set(world, memo = new Map());
   let job = memo.get(cell);
   if (!job) {
