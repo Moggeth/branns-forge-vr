@@ -22,7 +22,7 @@ for (const b of buttons) assert.equal(b.school, SPELLS.find(s => s.id === b.id).
 const game = readFileSync(new URL('../client/game.js', import.meta.url), 'utf8');
 const keys = Object.fromEntries([...game.match(/const spellKeys=\{([^}]+)\}/)[1].matchAll(/(\w+):'(\w+)'/g)].map(m => [m[2], m[1]]));
 assert.deepEqual(Object.keys(keys).sort(), [...ids].sort(), 'every spell has a key');
-const rows = {grow: /^Digit[1-6]$/, summon: /^(Digit[7-90]|Minus)$/, shape: /^Key[QERTYU]$/, sky: /^Key[ZXCV]$/};
+const rows = {grow: /^Digit[1-6]$/, summon: /^(Digit[7-90]|Minus|Equal)$/, shape: /^Key[QERTYU]$/, sky: /^Key[ZXCV]$/};
 for (const s of SPELLS) assert.match(keys[s.id], rows[s.school], `${s.id} key on the ${s.school} row`);
 for (const code of ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyB']) assert.ok(!Object.values(keys).includes(code), `${code} stays free`);
 console.log('spell-schools: four schools cover all spells, bar order and keyboard rows match');

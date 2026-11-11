@@ -292,6 +292,13 @@ export function createSpellTargeting({ scene, height, quality = 'high', reducedM
       for (let i = 0; i < 4; i++) { const a = Math.PI / 4 + (i * Math.PI) / 2; aS(vertical(Math.cos(a) * R * 0.9, Math.sin(a) * R * 0.9, 0, 0.7), 0.14, PAL.stone, { flow: 0 }); }
       cross(R * 0.45); moteField(12, R * 0.9, PAL.amber, 0.7, 0.2, 9);
     },
+    rabble(R) { // a rowdy brass ring: riveted rim, three spoked spark marks for the three critters that might answer
+      gS(circ(R), 0.1, PAL.gold, { flow: 0.5 }); gS(circ(R * 0.86), 0.05, PAL.amber, { dash: 0.9, flow: -0.8, fine: true });
+      for (let i = 0; i < 16; i++) { const a = (i * TAU) / 16; gS(circ(0.06, 6, 0, TAU, Math.cos(a) * R * 0.93, Math.sin(a) * R * 0.93), 0.04, PAL.amber, { fine: true }); }
+      for (let i = 0; i < 3; i++) { const a = (i * TAU) / 3 + Math.PI / 2, x = Math.cos(a) * R * 0.5, z = Math.sin(a) * R * 0.5;
+        for (let k = 0; k < 4; k++) { const b = a + (k * Math.PI) / 4, cb = Math.cos(b), sb = Math.sin(b); gS(seg(x + cb * 0.12, z + sb * 0.12, x + cb * 0.36, z + sb * 0.36), 0.05, PAL.gold, OK()); } }
+      cross(R * 0.4); moteField(14, R * 0.85, PAL.gold, 0.9, 0.16, 7);
+    },
     raise(R) { // exact footprint, lifted topo contours, profile spokes, +2 m peak gauge, translucent mound
       const h = SPELL_SHAPES.raise.h, off = (x, z) => h * smooth(clamp(1 - Math.hypot(x, z) / R));
       gS(circ(R, 96), 0.12, PAL.gold, { flow: 0.3 }); gS(circ(R * 1.04, 96), 0.04, PAL.amber, { dash: 0.8, flow: -0.6, fine: true });
