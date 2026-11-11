@@ -213,7 +213,7 @@ export function createHeroProgressUI({hudSelf, mount = document.body, owns = def
     if (!hero && open) close();
     // Rebuild only when something shown changes.
     const r = next?.resources || {};
-    const key = `${next?.xp || 0}|${JSON.stringify(next?.talents || {})}|${JSON.stringify(next?.temper || {})}|${open ? next?.tool : ''}|${atForge}|${r.wood}|${r.iron}|${r.gems}|${o ? TEMPER_TOOLS.map(t => +o(next || {}, t)).join('') : ''}`;
+    const key = `${next?.xp || 0}|${JSON.stringify(next?.talents || {})}|${JSON.stringify(next?.temper || {})}|${open ? next?.tool : ''}|${atForge}|${r.wood}|${r.iron}|${r.ironOre}|${r.gems}|${o ? TEMPER_TOOLS.map(t => +o(next || {}, t)).join('') : ''}`;
     player = next || {}; forgeHere = atForge;
     if (key === shownKey) return; shownKey = key;
     model = progressModel(player, {owns: ownsNow, atForge: forgeHere}); render();
