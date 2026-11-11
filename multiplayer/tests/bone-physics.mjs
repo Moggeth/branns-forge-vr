@@ -2,12 +2,13 @@
 // (hinged elbows/knees/jaw, splinters), checked on the shipped skeleton model.
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import {createEnemy, hitEnemyPart, stepCombat, combatAction, deathStyle, BONE_DEATH} from '../shared/combat.js';
+import {createEnemy, hitEnemyPart, stepCombat, combatAction, deathStyle, BONE_DEATH, blastRemains} from '../shared/combat.js';
 import {prepareAsset} from '../client/asset-pose.js';
 import {snapshotDetachedPart} from '../client/combat-view.js';
 import {stepHinges, HINGE_LIMITS} from '../client/bone-articulation.js';
 import {createBoneShards, SHARDS} from '../client/bone-shards.js';
 import {cueFor} from '../client/event-sounds.js';
+import {createBlastFx, BLAST_FX} from '../client/blast-fx.js';
 import {loadGlb} from './glb-node.mjs';
 
 const began = performance.now();
@@ -68,6 +69,38 @@ assert.equal(deathStyle({kind: 'golem'}, 'torso', {tool: 'hammer'}, false), null
   assert.equal(cueFor(death).name, 'skull_thunk');
 }
 assert.equal(cueFor({kind: 'death', creature: 'skeleton', style: 'shatter'}).name, 'bone_shatter');
+
+// ---- blast: an explosion blows every joint; bones go up and away from the bang, the skull highest ------------------
+assert.equal(deathStyle({kind: 'skeleton'}, 'torso', {tool: 'hammer', blastFrom: [0, 0, 0]}, false), 'blast', 'a bang beats a hammer');
+{
+  const {w, death, parts} = kill('torso', {point: [0, 1, 0], normal: [1, 0, 0], energy: 1.8, blast: true, blastFrom: [-1.5, 0, 0]}, false);
+  assert.equal(death.style, 'blast'); assert.deepEqual(death.from, [-1.5, 0, 0]);
+  assert.ok(parts.length === 6 && parts.every(d => !d.joint), 'every joint blows');
+  const start = new Map(parts.map(d => [d.part, d.position[1]])), peak = new Map(parts.map(d => [d.part, 0]));
+  for (let i = 0; i < 360; i++) { step(w, 1); for (const d of parts) peak.set(d.part, Math.max(peak.get(d.part), d.position[1])); }
+  assert.ok(parts.every(d => peak.get(d.part) - start.get(d.part) > .5), `every bone goes up (${parts.map(d => `${d.part} +${(peak.get(d.part) - start.get(d.part)).toFixed(1)}`)})`);
+  assert.equal([...peak.entries()].sort((a, b) => b[1] - a[1])[0][0], 'head', 'the skull flies highest');
+  assert.ok(parts.filter(d => d.position[0] > .3).length >= 4, 'mostly away from the bang (+x)');
+  assert.ok(parts.every(d => d.rest > 0), 'and the bones settle');
+  assert.equal(cueFor(death).name, 'bone_shatter');
+  const again = kill('torso', {point: [0, 1, 0], normal: [1, 0, 0], energy: 1.8, blast: true, blastFrom: [-1.5, 0, 0]}, false);
+  step(again.w, 360);
+  assert.deepEqual(again.parts.map(d => d.position), parts.map(d => d.position), 'deterministic: every peer sees the same tumble');
+  // A second bang throws the bones already lying there.
+  const spread = parts.map(d => flatDist(d.position, [0, 0, 0]));
+  assert.ok(Math.max(...spread) > 2 && Math.max(...spread) < 7.5, `a big scatter that stays in view (${spread.map(v => v.toFixed(1))} m)`);
+  const mid = parts.reduce((m, d) => m.map((v, k) => v + d.position[k] / parts.length), [0, 0, 0]);
+  const before = parts.map(d => [...d.position]); blastRemains(w.state, [mid[0] - 1, 0, mid[2]], 6, 1.2); step(w, 30);
+  assert.ok(parts.some((d, i) => Math.hypot(d.position[0] - before[i][0], d.position[2] - before[i][2]) > .4), 'loose bones skitter from a later blast');
+}
+// Golems blown up scatter their rocks instead of dropping them in a pile.
+{
+  const w = world(), g = createEnemy('g1', [0, 0, 0], 'golem'); g.hp = 1; g.armor = 0; w.state.enemies.push(g);
+  hitEnemyPart(w.state, g, 'torso', 999, {point: [0, 1.5, 0], normal: [1, 0, 0], energy: 1.8, blast: true, blastFrom: [-2, 0, 0]}, w.ctx, []);
+  const rocks = w.state.detachedParts; assert.ok(rocks.length >= 5, 'the golem comes apart');
+  let peak = 0; for (let i = 0; i < 300; i++) { step(w, 1); peak = Math.max(peak, ...rocks.map(d => d.position[1] - (d.part === 'head' ? 3 : 0))); }
+  assert.ok(rocks.filter(d => d.position[0] > .5).length >= 3, 'rocks thrown away from the bang');
+}
 assert.equal(cueFor({kind: 'death', creature: 'skeleton', style: 'crumple'}).name, 'death_bone');
 
 // ---- bones break off a skeleton that keeps fighting ----------------------------------------------------------------
@@ -185,5 +218,16 @@ for (const part of ['leftArm', 'rightArm', 'leftLeg', 'rightLeg', 'head']) {
   assert.equal(high.active(), 0, 'and shrink away');
   assert.ok(high.object.children.every(m => m.count === 0));
   high.dispose(); low.dispose();
+}
+// ---- explosion effect: pooled, capped, and gone when it is over ---------------------------------------------------
+{
+  const scene = new THREE.Scene(), fx = createBlastFx({scene, height: () => 0});
+  const meshes = scene.children.length;
+  for (let i = 0; i < 6; i++) fx.blast([i, 0, 0], i % 2 ? 'kettle' : 'keg', 4);
+  assert.equal(scene.children.length, meshes, 'a chain of blasts adds no meshes');
+  assert.equal(fx.stats().live, BLAST_FX.pool); assert.equal(fx.stats().recycled, 2, 'the oldest blasts recycle');
+  for (let i = 0; i < 9 * 30; i++) fx.update(1 / 30);
+  assert.equal(fx.stats().live, 0); assert.ok(scene.children.every(m => !m.visible), 'nothing drawn once the smoke clears');
+  fx.dispose();
 }
 console.log(`bone-physics: shatter, crumple, headshot, live limb snaps, buried-limb safety, hinged bones and splinters (${((performance.now() - began) / 1000).toFixed(2)}s)`);

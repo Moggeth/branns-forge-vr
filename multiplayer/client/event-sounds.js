@@ -12,7 +12,7 @@ export function cueFor(event, {me = null} = {}) {
     case 'death':
       if (event.id === me) return {name: 'hero_down', opts: {mine: true}};
       if (!event.creature) return {name: 'death_soft'};
-      if (event.creature === 'skeleton') return {name: event.style === 'shatter' ? 'bone_shatter' : event.style === 'headshot' ? 'skull_thunk' : 'death_bone'};
+      if (event.creature === 'skeleton') return {name: event.style === 'shatter' || event.style === 'blast' ? 'bone_shatter' : event.style === 'headshot' ? 'skull_thunk' : 'death_bone'};
       return {name: event.creature === 'golem' ? null : 'death_soft'};
     case 'respawn': return event.id === me ? {name: 'respawn', opts: {mine: true}} : null;
     case 'hit': return event.id === me && event.material === 'flesh' ? {name: 'hurt', opts: {mine: true, gap: .12}} : null;
