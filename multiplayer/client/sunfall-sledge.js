@@ -1,5 +1,5 @@
 // The Sunfall Sledge: presentation for the held sledge and for every slam (assets-source/sunfall-sledge, hammer.glb).
-// Everything here is local and per frame on the presentation clock; the shared simulation owns the slam (5 m) and
+// Everything here is local and per frame on the presentation clock; the shared simulation owns the slam (5 m, wider with Earthshaker) and
 // its cooldown.
 //
 // The sledge's head is cast hollow round a sunstone heart: heat that goes in comes out as light (mechanical coherence).
@@ -15,10 +15,12 @@
 //     slam for its flash, then comes home. Phones rely on the emissive vents and the additive ground light.
 // Budget: 1 light, at most 4 draws while a slam plays (sparks/embers, dust, debris, ground), 1 when idle; no textures.
 import * as THREE from 'three';
+import {HAMMER_SLAM} from '../shared/combat.js';
 
 export const SUNFALL = Object.freeze({
   slam: {raise: .26, drive: .085, hold: .2, back: .34},   // s; the special is sent at the end of `drive`
-  reach: 5,                                              // m, the shared slam radius (shared/combat.js)
+  reach: HAMMER_SLAM.radius[0],                          // m, the shared slam radius; Earthshaker ranks widen it
+  maxReach: HAMMER_SLAM.radius[HAMMER_SLAM.radius.length - 1],
   ring: {time: .46},
   crack: {radius: 2.7, life: 3.2},
   debris: 26, pool: 120,
@@ -131,7 +133,7 @@ const DUST = new THREE.Color(.62, .55, .45);
 /**
  * createSunfallSledge({scene, realLight, reducedMotion, height(x, z)}) ->
  *   {attach(model|null), update(frame), beginSlam(now) -> bool, pose(now) -> {offset, quaternion} | null,
- *    slamming(now), takeImpact(now) -> bool, cancelSlam(), impact(position), stats(), dispose()}
+ *    slamming(now), takeImpact(now) -> bool, cancelSlam(), impact(position, radius?), stats(), dispose()}
  * frame: {time, dt, charge: 0..1 (special readiness), shown, swinging, night: 0..1}
  */
 export function createSunfallSledge({scene, realLight = true, reducedMotion = false, height = () => 0} = {}) {
@@ -172,9 +174,9 @@ export function createSunfallSledge({scene, realLight = true, reducedMotion = fa
   const _e = new THREE.Euler();
 
   // ---- the ground decal: two draped discs, recycled
-  const GRID = 26;
+  const GRID = 34;
   function groundDisc() {
-    const geometry = new THREE.PlaneGeometry(2 * SUNFALL.reach + .4, 2 * SUNFALL.reach + .4, GRID, GRID).rotateX(-Math.PI / 2);
+    const geometry = new THREE.PlaneGeometry(2 * SUNFALL.maxReach + .4, 2 * SUNFALL.maxReach + .4, GRID, GRID).rotateX(-Math.PI / 2);
     const material = new THREE.ShaderMaterial({vertexShader: GROUND_VERTEX, fragmentShader: GROUND_FRAGMENT, transparent: true, depthWrite: false,
       polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
       uniforms: {uAge: {value: 0}, uSeed: {value: 0}, uReach: {value: SUNFALL.reach}, uCrack: {value: SUNFALL.crack.radius}, uLife: {value: SUNFALL.crack.life}, uRing: {value: SUNFALL.ring.time}}});
@@ -240,7 +242,8 @@ export function createSunfallSledge({scene, realLight = true, reducedMotion = fa
 
   // ---- a slam lands somewhere in the world
   const _p = new THREE.Vector3();
-  function impact(position) {
+  function impact(position, radius) {
+    const reach = Math.min(SUNFALL.maxReach, Number.isFinite(radius) && radius > 0 ? radius : SUNFALL.reach);
     const [x, y0, z] = position; const y = height(x, z) ?? y0;
     const centre = new THREE.Vector3(x, y, z);
     // ground: drape the older disc over the terrain here
@@ -248,7 +251,8 @@ export function createSunfallSledge({scene, realLight = true, reducedMotion = fa
     const pos = g.mesh.geometry.attributes.position;
     for (let i = 0; i < pos.count; i++) { const lx = g.flat[i * 3], lz = g.flat[i * 3 + 2]; pos.setY(i, (height(x + lx, z + lz) ?? y) - y + .04); }
     pos.needsUpdate = true; g.mesh.geometry.computeBoundingSphere();
-    g.mesh.position.copy(centre); g.material.uniforms.uSeed.value = Math.random() * 10; g.age = 0; g.mesh.visible = true;
+    g.mesh.position.copy(centre); g.material.uniforms.uSeed.value = Math.random() * 10; g.material.uniforms.uReach.value = reach;
+    g.material.uniforms.uRing.value = SUNFALL.ring.time * Math.sqrt(reach / SUNFALL.reach); g.age = 0; g.mesh.visible = true;
     // flash
     flashPending = true; flashPos.copy(centre).y += .7;
     // the flash itself: a white-hot bloom where the face met the ground

@@ -1290,7 +1290,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
       if(event.id===playerId){const ms=(event.durationTicks||50)/.06,steps=[];for(let t=0;t<ms;t+=110)steps.push({at:t,amplitude:.55-.35*t/ms,duration:38});steps.push({at:ms+60,amplitude:.7,duration:60});feedback.pattern?.(steps);
         if(touchEnabled&&!renderer.xr.isPresenting)try{navigator.vibrate?.([30,60,22,60,16,90,45]);}catch{}}}
     // The persistent crystal wall owns its growth effect. Replaying the older Crystal spell here doubled its geometry.
-    if(event.kind==='hammer_slam'&&Array.isArray(event.position))sunfall.impact(event.position); // the Sunfall's own ground-cracking slam (it raises no earth)
+    if(event.kind==='hammer_slam'&&Array.isArray(event.position))sunfall.impact(event.position,event.radius); // the Sunfall's own ground-cracking slam (it raises no earth)
     // The axe cleave releases its edge light as one sweeping crescent; hits and felled trees arrive as their own events.
     if(talentFx.handle(event))talentFeel(event);
     // Emberdew: smashing glass and splashing dew, a whump when lit, a cork pop when Cinder Cluster's jug bursts.

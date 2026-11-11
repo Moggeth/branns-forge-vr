@@ -33,10 +33,10 @@ window.review = {
     const views = {three: [[1.25, 1.2, 1.35], [0, .8, 0]], cheek: [[.25, .95, .85], [0, .83, 0]], crown: [[.45, 1.45, .55], [0, .9, 0]]};
     const [eye, at] = views[view]; camera.position.set(...eye); camera.lookAt(...at); return shot();
   },
-  slam(times = [.05, .15, .3, .6, 1.2, 2.4], {eye = [5.5, 3.6, 6.5]} = {}) {
+  slam(times = [.05, .15, .3, .6, 1.2, 2.4], {eye = [5.5, 3.6, 6.5], radius} = {}) {
     model.visible = false; fx.attach(null);
     camera.position.set(...eye); camera.lookAt(0, 0, 0);
-    fx.impact([0, 0, 0]); let t = 0; const out = [];
+    fx.impact([0, 0, 0], radius); let t = 0; const out = [];
     for (const target of times) { while (t < target) { const dt = Math.min(1 / 60, target - t); t += dt; fx.update({time: 10 + t, dt, shown: false}); } out.push(shot()); }
     return out;
   },
