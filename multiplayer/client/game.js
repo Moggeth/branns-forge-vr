@@ -147,6 +147,8 @@ import {siegebirdMechanism, siegebirdCues, SIEGEBIRD_RELOAD, siegebirdPlumage} f
 import {createFlockwrightRigs, FLOCKWRIGHT_POSE} from './flockwright.js';
 import {FLOCKWRIGHT} from '../shared/combat.js';
 import {armouryStand, hasFlockwright, ARMOURY_RULES} from '../shared/armoury.js';
+import {weaponShelved, WEAPON_NAMES} from '../shared/arsenal.js';
+import {labsOn} from './labs.js';
 import {createSiegebirdWind, SIEGEBIRD_WIND} from './siegebird-wind.js';
 import {specialCooldown} from '../shared/special-cooldowns.js';
 import {createTalentFx,playTalentSound} from './talent-fx.js';
@@ -737,6 +739,8 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   const WEAPON_HEIGHTS = {axe:.7,pick:.75,hammer:.95,crossbow:.48,bow:1.25,wyrmspout:.4,stormreel:.5,staff:1.6,flockwright:.25};
   // The Armoury's Flockwright (client/flockwright.js): every copy plays the model's own Idle/Fire/Reload clips.
   const flockRigs=createFlockwrightRigs();let flockTaken=false,flockAds=0;const flockAim=new THREE.Vector3();
+  const toolAllowed=t=>!weaponShelved(t,{labs:labsOn()}); // scope: shelved weapons stay off the hotbar (shared/arsenal.js)
+  let shelvedPutAway=false;
   const ownsFlockwright=()=>flockTaken||hasFlockwright(snapshot?.players?.find(p=>p.id===playerId));
   // Remote Hero equipment: a canonical clone of an already-loaded template (shared geometry/materials); hero-view poses it
   // in the WeaponGrip socket with the local XR contract. null while loading; hero-view retries and never disposes templates.
@@ -1316,6 +1320,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     if(tool==='crossbow'){siegebirdSight=createSiegebirdSight(THREE,axeModel);siegebirdAim=createSiegebirdAim({anchor:weaponAnchor,weapon:axeModel,camera,sight:siegebirdSight});resumeSiegebird();}
   }
   async function equip(next) {if(!active||role!=='hero'||!equipment.includes(next))return;
+    if(!toolAllowed(next)){report(`${WEAPON_NAMES[next]||next} is resting in the Labs for now.`);return;}
     if(next==='flockwright'&&!ownsFlockwright()){report('The Flockwright rests on its stand in the Armoury, just outside Dawnhold\'s gate. Walk up and press E to take one.');return;}
     const request=++equipRequest;
     if(STREAMED_WEAPONS.has(next)&&!weaponModels.has(next)){
@@ -1780,7 +1785,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
         for (const action of actions) {
           if (action === 'menu') { weapons.cancel(); presses.invalidate(); void renderer.xr.getSession()?.end().then(onMenu); }
           else if (action === 'jump') jumpPending = true;
-          else if (action === 'cycle') { const choices=hotbarSlots.filter(t=>t!=='flockwright'||ownsFlockwright()); equip(choices[(choices.indexOf(tool)+1)%choices.length]); }
+          else if (action === 'cycle') { const choices=hotbarSlots.filter(t=>(t!=='flockwright'||ownsFlockwright())&&toolAllowed(t)); equip(choices[(choices.indexOf(tool)+1)%choices.length]); }
           else if (action === 'hand') { if (holdingLoose()) release(false, index); else grab(index); }
           else if (action === 'bridge') onAction('buildBridge');
           else if (action === 'interact') interact();
@@ -2166,6 +2171,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
       const self = snapshot.players.find(player => player.id === playerId);
       if(previousSelf && self?.castTick>previousSelf.castTick && pendingCastPreview){spellVisual.commitTarget(pendingCastPreview);pendingCastPreview=null;}
       if (self) {
+        if(self.role==='hero'&&self.tool&&!toolAllowed(self.tool)){if(!shelvedPutAway){shelvedPutAway=true;onAction('equip',{tool:'axe'});}}else shelvedPutAway=false; // a save holding a shelved weapon draws the axe
         if(!STREAMED_WEAPONS.has(self.tool)||weaponModels.has(self.tool))startup.restoringTool=null;
         if(self.tool && self.tool!==tool&&!weaponSwap.busy){
           if(STREAMED_WEAPONS.has(self.tool)&&!weaponModels.has(self.tool)){
