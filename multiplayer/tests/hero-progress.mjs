@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {createSimulation,loadSimulation,terrainHeight} from '../shared/simulation.js';
-import {createEnemy,siegebirdGoldenChance,SIEGEBIRD,GOLDEN_FLOCK,projectileContact} from '../shared/combat.js';
-import {HERO_LEVEL,XP_MAX,XP_REWARD,TALENTS,heroLevel,xpForLevel,heroMaxHp,damageScale,talentPoints,grantXp,hasTalent} from '../shared/hero-progress.js';
+import {createEnemy,siegebirdGoldenChance,SIEGEBIRD,GOLDEN_FLOCK,BONEBREAKER,projectileContact} from '../shared/combat.js';
+import {HERO_LEVEL,XP_MAX,XP_REWARD,TALENTS,RANK_LEVEL,heroLevel,xpForLevel,heroMaxHp,damageScale,talentPoints,grantXp,hasTalent,talentRank,maxRank} from '../shared/hero-progress.js';
 import {cleaveSpec,WHIRLWIND,AXE_CLEAVE} from '../shared/axe-cleave.js';
 import {specialCooldown} from '../shared/special-cooldowns.js';
 import {fireContact,FIREBOMB} from '../shared/fire.js';
@@ -11,7 +11,8 @@ import {progressModel} from '../client/hero-progress-ui.js';
 assert.equal(heroLevel(0),1);assert.equal(heroLevel(29),1);assert.equal(heroLevel(30),2);assert.equal(xpForLevel(3),80);
 assert.equal(heroLevel(XP_MAX),HERO_LEVEL.max);assert.equal(heroLevel(XP_MAX*5),HERO_LEVEL.max);
 assert.ok(2*XP_REWARD.skeleton>=xpForLevel(2),'two skeletons reach level 2');
-assert.equal(heroMaxHp({xp:0}),100);assert.equal(heroMaxHp({xp:XP_MAX}),280);
+assert.equal(heroMaxHp({xp:0}),100);assert.equal(heroMaxHp({xp:xpForLevel(10)}),280);assert.equal(heroMaxHp({xp:XP_MAX}),330,'levels past 10 add a quarter step each');
+assert.equal(HERO_LEVEL.max,20);assert.equal(XP_MAX,3990);
 assert.equal(damageScale({role:'hero',xp:xpForLevel(4)}),1.6);assert.equal(damageScale({role:'god',xp:XP_MAX}),1,'god casting never scales');
 assert.equal(talentPoints({xp:xpForLevel(4),talents:{axe:['whirlwind']}}),2);
 
@@ -45,11 +46,12 @@ const learned=act(s,{action:'talent',weapon:'axe',talent:'whirlwind'});
 assert.equal(learned.ok,true);assert.equal(learned.events[0].kind,'talent_learned');
 assert.deepEqual(hero(s).talents,{axe:['whirlwind']});
 assert.equal(act(s,{action:'talent',weapon:'axe',talent:'limbsplitter'}).code,'no_talent_points');
-assert.equal(act(s,{action:'talent',weapon:'axe',talent:'whirlwind'}).code,'already_learned');
+assert.equal(act(s,{action:'talent',weapon:'axe',talent:'whirlwind'}).code,'rank_level_required','rank II waits for level 6');
 assert.equal(act(s,{action:'talent',reset:true}).ok,true);assert.deepEqual(hero(s).talents,{});
 assert.equal(act(s,{action:'talent',reset:true}).code,'not_needed');
-assert.ok(Object.hasOwn(TALENTS.axe,'limbsplitter')&&Object.keys(TALENTS).length===6&&Object.values(TALENTS).every(t=>Object.keys(t).length===2),'two specialties for each of six weapons');
-assert.ok(!('hammer' in TALENTS),'hammer stays out for now');
+assert.ok(Object.hasOwn(TALENTS.axe,'limbsplitter')&&Object.keys(TALENTS).length===7&&Object.values(TALENTS).every(t=>Object.keys(t).length===2),'two specialties for each of seven weapons');
+assert.ok(Object.hasOwn(TALENTS.hammer,'earthshaker')&&Object.hasOwn(TALENTS.hammer,'bonebreaker'),'the hammer has its specialties');
+for(const [w,list] of Object.entries(TALENTS))for(const [id,t] of Object.entries(list))assert.ok(Array.isArray(t.ranks)&&t.ranks.length===(w==='flask'?1:3)&&maxRank(w,id)===t.ranks.length,`${w}.${id} rank lines`);
 
 // Rejoining (or a resumed save with new peer ids) picks progress back up by name, never twice at once.
 s.removePlayer('h');s.addPlayer({id:'h2',name:'Mitch'});
@@ -122,13 +124,13 @@ const half=act(s,{action:'fire',origin:[10,terrainHeight(s.checkpoint(),10,10)+1
 assert.equal(half.ok,true);assert.equal(half.events[0].volley,undefined,'a partial draw is a single arrow');
 
 // Motherlode: a fresh seam breaks one strike sooner and pays double.
-const mine=talents=>{const t=fixture({tool:'pick',xp:xpForLevel(2),talents});const c=t.checkpoint();
+const mine=talents=>{const t=fixture({tool:'pick',xp:xpForLevel(12),talents});const c=t.checkpoint();
   const ore={id:'oreT',x:10,z:8.6,kind:'stone',hits:0,maxHits:3,depleted:false};c.deposits.push(ore);const u=loadSimulation(c);let strikes=0;
   const y=terrainHeight(c,10,8.6);
   while(!u.snapshot().deposits.find(d=>d.id==='oreT').depleted&&strikes<5){for(let i=0;i<30;i++)u.step();u.command('h',{type:'action',seq:10+strikes,action:'strike',targetId:'oreT',point:[10,y+.3,8.6],normal:[0,0,1]});strikes++;}
   return {strikes,amount:u.snapshot().pickups.filter(q=>Math.hypot(q.x-10,q.z-8.6)<.5).reduce((n,q)=>n+q.amount,0),xp:u.snapshot().players[0].xp};};
 const plain=mine({}),rich=mine({pick:['motherlode']});
-assert.equal(rich.strikes,plain.strikes-1);assert.equal(rich.amount,plain.amount*2);assert.ok(plain.xp>xpForLevel(2),'breaking ore grants XP');
+assert.equal(rich.strikes,plain.strikes-1);assert.equal(rich.amount,plain.amount*2);assert.ok(plain.xp>xpForLevel(12),'breaking ore grants XP');
 
 // Firebomb: a lit flask bursts, hurts and throws every foe nearby.
 s=fixture({tool:'flask',xp:xpForLevel(2),talents:{flask:['firebomb']},foes:[3,3.8]});
@@ -150,11 +152,82 @@ const burst=third.events.find(e=>e.kind==='geode_burst');
 assert.ok(burst&&burst.hits.includes('geodeFoe'),'burst catches the foe beside the replaced wall');
 assert.ok((w.enemies.find(e=>e.id==='geodeFoe')?.hp??0)<100);
 
-// Panel model: six weapons, every specialty learnable (Wyrmspout's arrived with its uplift).
+// Panel model: the rail lists the hero's weapons (Emberdew stays out unless it already has points), ranks show as a ladder.
 const model=progressModel({xp:xpForLevel(3),talents:{pick:['geode']}});
-assert.equal(model.level,3);assert.equal(model.points,1);assert.equal(model.weapons.length,6);
+assert.equal(model.level,3);assert.equal(model.points,1);assert.deepEqual(model.weapons.map(w=>w.id),['axe','pick','hammer','crossbow','bow','wyrmspout']);
 assert.equal(model.weapons.find(w=>w.id==='wyrmspout').talents.every(t=>t.ready),true);
-assert.equal(model.weapons.find(w=>w.id==='pick').talents.find(t=>t.id==='geode').learned,true);
+const geodeView=model.weapons.find(w=>w.id==='pick').talents.find(t=>t.id==='geode');
+assert.equal(geodeView.learned,true);assert.equal(geodeView.rank,1);assert.equal(geodeView.state,'waiting','rank II waits for level 6');assert.equal(geodeView.opensAt,6);
+assert.equal(model.weapons.find(w=>w.id==='axe').talents[0].state,'available');assert.equal(model.nextGate,6);
+assert.ok(progressModel({xp:0,talents:{flask:['tar']}}).weapons.some(w=>w.id==='flask'),'a hero with Emberdew points still sees them');
+assert.deepEqual(progressModel({},{owns:(p,w)=>['axe','pick'].includes(w)}).weapons.map(w=>w.id),['axe','pick'],'the rail follows the weapons you own');
+assert.equal(progressModel({xp:XP_MAX}).bonus,230);
 assert.ok(hasTalent({talents:{pick:['geode']}},'pick','geode'));
 void grantXp;void projectileContact;
 console.log('hero progress ok');
+
+// Ranks: a specialty is learned up to three times; rank II opens at level 6 and rank III at level 12.
+assert.deepEqual(RANK_LEVEL,[2,6,12]);
+s=fixture({xp:xpForLevel(5)});
+assert.equal(act(s,{action:'talent',weapon:'axe',talent:'whirlwind'}).ok,true);
+assert.equal(act(s,{action:'talent',weapon:'axe',talent:'whirlwind'}).code,'rank_level_required','rank II needs level 6');
+s=fixture({xp:xpForLevel(12)});
+for(let r=1;r<=3;r++){const res=act(s,{action:'talent',weapon:'hammer',talent:'earthshaker'});assert.equal(res.ok,true);assert.equal(res.events[0].rank,r);}
+assert.equal(act(s,{action:'talent',weapon:'hammer',talent:'earthshaker'}).code,'already_learned','rank III is the top');
+assert.equal(talentRank(hero(s),'hammer','earthshaker'),3);assert.equal(talentPoints(hero(s)),8);
+assert.equal(act(s,{action:'talent',weapon:'flask',talent:'tar'}).ok,true);assert.equal(act(s,{action:'talent',weapon:'flask',talent:'tar'}).code,'already_learned','lab specialties stop at rank I');
+loadSimulation(JSON.parse(JSON.stringify(s.checkpoint())));
+// Saves: ranks above the level allows, or past the top, are refused; old one-rank saves still load.
+const badRank=JSON.parse(JSON.stringify(fixture({xp:xpForLevel(5)}).checkpoint()));badRank.players[0].talents={axe:['whirlwind','whirlwind']};
+assert.throws(()=>loadSimulation(badRank),/player/);
+const overTop=JSON.parse(JSON.stringify(fixture({xp:XP_MAX}).checkpoint()));overTop.players[0].talents={axe:['whirlwind','whirlwind','whirlwind','whirlwind']};
+assert.throws(()=>loadSimulation(overTop),/player/);
+const oldOne=JSON.parse(JSON.stringify(fixture({xp:xpForLevel(4)}).checkpoint()));oldOne.players[0].talents={axe:['whirlwind','limbsplitter'],pick:['geode']};
+assert.equal(loadSimulation(oldOne).snapshot().players[0].talents.axe.length,2);
+
+// Whirlwind and Firestorm ranks: more reach, quicker recharge.
+assert.equal(cleaveSpec({talents:{axe:['whirlwind','whirlwind','whirlwind']}}).reach,AXE_CLEAVE.reach*1.5);
+assert.equal(specialCooldown('axe',{talents:{axe:['whirlwind','whirlwind']}}),210);
+assert.equal(specialCooldown('bow',{talents:{bow:['firestorm','firestorm','firestorm']}}),180);
+assert.equal(specialCooldown('hammer',{talents:{hammer:['earthshaker']}}),210);assert.equal(specialCooldown('hammer'),240);
+// Golden Flock ranks.
+assert.equal(siegebirdGoldenChance(0,2),SIEGEBIRD.goldenBase*4);assert.equal(siegebirdGoldenChance(1e6,3),.5);
+
+// Earthshaker: the slam reaches a foe 7 m away only with the talent.
+const slam=talents=>{const t=fixture({tool:'hammer',xp:xpForLevel(12),talents,foes:[8.4]});const r=t.command('h',{type:'action',seq:1,action:'special'});assert.equal(r.ok,true);return t.snapshot().enemies[0]?.hp??0;};
+assert.equal(slam({}),100,'out of reach without Earthshaker');assert.ok(slam({hammer:['earthshaker','earthshaker']})<100,'rank II reaches 7.5 m');
+
+// Bonebreaker: the hammer hits golems harder (same level both ways, a sturdy golem so nothing dies).
+const hammerGolem=talents=>{const t=fixture({tool:'hammer',xp:xpForLevel(2),talents,foes:[]});const c=t.checkpoint();
+  const g=createEnemy('g',[10,terrainHeight(c,10,8.4),8.4],'golem');g.armor=0;c.enemies=[g];const u=loadSimulation(c),hp=g.hp;
+  const r=u.command('h',{type:'action',seq:1,action:'strike',targetId:'g',point:[10,terrainHeight(c,10,8.4)+1.2,8.4],normal:[0,0,1],part:'torso'});assert.equal(r.ok,true);return hp-u.snapshot().enemies[0].hp;};
+{const base=hammerGolem({}),br=hammerGolem({hammer:['bonebreaker']});assert.ok(base>0&&Math.abs(br/base-1.5)<1e-6,'rank I: golems take 50% more from the hammer');assert.deepEqual(BONEBREAKER,[1,1.5,1.75,2]);}
+{const t=fixture({tool:'hammer',xp:xpForLevel(2),talents:{hammer:['bonebreaker']},foes:[]});const c=t.checkpoint();const g=createEnemy('g',[10,terrainHeight(c,10,8.4),8.4],'golem');g.armor=3;c.enemies=[g];const u=loadSimulation(c);
+ const r=u.command('h',{type:'action',seq:1,action:'strike',targetId:'g',point:[10,terrainHeight(c,10,8.4)+1.2,8.4],normal:[0,0,1],part:'torso'});assert.ok(r.events.some(e=>e.kind==='armor_break'),'the hammer cracks armour with Bonebreaker');}
+
+// Limbsplitter rank II heals for each lopped limb.
+{const t=fixture({xp:xpForLevel(6),talents:{axe:['limbsplitter','limbsplitter']},foes:[1.6]});const w=t.adventureWorld();w.players[0].hp=50;const e=t.snapshot().enemies[0];
+ t.command('h',{type:'action',seq:1,action:'strike',targetId:'foe0',point:[e.position[0]-.48,e.position[1]+1.12,e.position[2]],normal:[0,0,1],part:'rightArm'});
+ assert.equal(t.snapshot().players[0].hp,54);}
+
+// Skewer rank III: through five bodies.
+s=fixture({tool:'crossbow',xp:xpForLevel(12),talents:{crossbow:['skewer','skewer','skewer']},foes:[4,5,6,7,8,9]});
+act(s,{action:'fire',origin:[10,terrainHeight(s.checkpoint(),10,10)+1.4,10],direction:[0,0,-1]});s.step();
+{const live=s.adventureWorld(),bolt=live.projectiles[0];let n=0;
+ for(const e of [...live.enemies]){const point=[e.position[0],e.position[1]+1.15,e.position[2]];bolt.trail=[[point[0],point[1],point[2]+.5],[point[0],point[1],point[2]-.5]];
+  const r=s.projectileContact({projectileId:bolt.id,targetId:e.id,part:'torso',point,normal:[0,0,1],localPoint:[0,0,0],localQuaternion:[0,0,0,1]});if(r.events.some(q=>q.kind==='pierce'))n++;if(!live.projectiles.includes(bolt))break;}
+ assert.equal(n,5);}
+// A checkpoint taken mid-flight after the fourth body still loads.
+s=fixture({tool:'crossbow',xp:xpForLevel(12),talents:{crossbow:['skewer','skewer','skewer']},foes:[4,5,6,7,8,9]});
+act(s,{action:'fire',origin:[10,terrainHeight(s.checkpoint(),10,10)+1.4,10],direction:[0,0,-1]});s.step();
+{const live=s.adventureWorld(),bolt=live.projectiles[0];for(const e of [...live.enemies].slice(0,4)){const point=[e.position[0],e.position[1]+1.15,e.position[2]];bolt.trail=[[point[0],point[1],point[2]+.5],[point[0],point[1],point[2]-.5]];
+  s.projectileContact({projectileId:bolt.id,targetId:e.id,part:'torso',point,normal:[0,0,1],localPoint:[0,0,0],localQuaternion:[0,0,0,1]});}
+ assert.equal(bolt.pierced.length,4);assert.ok(live.projectiles.includes(bolt));loadSimulation(JSON.parse(JSON.stringify(s.checkpoint())));}
+
+// Ember Volley rank III: five arrows from most of a draw.
+s=fixture({tool:'bow',xp:xpForLevel(12),talents:{bow:['volley','volley','volley']}});
+{const v=act(s,{action:'fire',origin:[10,terrainHeight(s.checkpoint(),10,10)+1.4,10],direction:[0,0,-1],draw:.85});assert.equal(v.events[0].volley.length,4);assert.equal(s.adventureWorld().projectiles.length,5);}
+
+// Motherlode rank III: triple ore.
+{const r3=mine({pick:['motherlode','motherlode','motherlode']});assert.equal(r3.amount,Math.min(10,plain.amount*3));assert.ok(r3.strikes<=rich.strikes);}
+console.log('hero-progress ranks ok');

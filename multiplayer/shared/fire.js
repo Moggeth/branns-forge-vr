@@ -2,7 +2,7 @@
 // 60 Hz packet flight remains in combat.js. No renderer or client hit authority.
 import {posLimit,thingLimit,extentLimit} from './world-extent.js';
 import {applyEnemyScorch,partPosition,PARTS,hitEnemyPart,blastRemains} from './combat.js';
-import {hasTalent} from './hero-progress.js';
+import {hasTalent,talentRank} from './hero-progress.js';
 import {entHeight} from './ents.js';
 import {WYRMSPOUT,sprayTuning,stickGlob,stepTank,goutBurst} from './wyrmspout.js';
 import {WORLD_EXTENT} from './keep-sites.js';
@@ -45,11 +45,13 @@ export function quenchFire(state,point,radius){
 export const FLARE_BURST=Object.freeze({radius:3.2,fuelRadius:1.8,fuel:.32,reach:9,burn:240,scorch:.12});
 // Firestorm (Emberwing talent): the blaze covers twice the ground (radius x1.41).
 export const FIRESTORM_BURST=Object.freeze({...FLARE_BURST,radius:4.5,fuelRadius:2.6});
+// Firestorm ranks I, II, III: a bigger blaze each rank (the recharge lives in shared/special-cooldowns.js).
+export const FIRESTORM_RANKS=Object.freeze([FIRESTORM_BURST,Object.freeze({...FLARE_BURST,radius:5.2,fuelRadius:3}),Object.freeze({...FLARE_BURST,radius:6,fuelRadius:3.4})]);
 // Emberdew talents. Firebomb: a lit flask explodes on landing. Tar Pit: far bigger spills that slow foes wading in them.
 export const FIREBOMB=Object.freeze({radius:2.6,damage:45,push:1.4,burn:180});
 export const TAR_PIT=Object.freeze({radius:2.1,slowTicks:30});
 export function flareBurst(state,point,ownerId,ctx){
-  const firestorm=hasTalent(state.players.find(p=>p.id===ownerId),'bow','firestorm'),B=firestorm?FIRESTORM_BURST:FLARE_BURST,ground=ctx.terrainHeight(state,point[0],point[2]),below=[point[0],ground,point[2]];
+  const storm=talentRank(state.players.find(p=>p.id===ownerId),'bow','firestorm'),firestorm=storm>0,B=firestorm?FIRESTORM_RANKS[Math.min(3,storm)-1]:FLARE_BURST,ground=ctx.terrainHeight(state,point[0],point[2]),below=[point[0],ground,point[2]];
   // Only a flare close enough above the ground rains embers that still burn when they land.
   const lit=point[1]-ground<=B.reach;
   if(lit){addFuel(state,below,B.fuelRadius,B.fuel,true);applyHeat(state,below,B.radius,1,ctx);
