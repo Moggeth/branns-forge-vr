@@ -254,7 +254,8 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   // Keep CSS/UI resolution independent from the adaptive 3D drawing buffer.
   renderer.setPixelRatio(1);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  // ?tone=aces|neutral|agx compares tone curves in place (presentation only).
+  renderer.toneMapping = ({neutral: THREE.NeutralToneMapping, agx: THREE.AgXToneMapping, aces: THREE.ACESFilmicToneMapping})[new URLSearchParams(globalThis.location?.search || '').get('tone')] ?? THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
   renderer.localClippingEnabled = true;
   renderer.setOpaqueSort(stateSortOpaque); // fewer program/material switches per frame (render-hygiene.js)
