@@ -60,11 +60,13 @@ assert.equal(order('x', {order: 'follow'}).code, 'no_warband', 'only the owner c
 
 // Attack: they chase a named wild skeleton and break it; the fight ends in a hold where it fell.
 const foe = {...createEnemy('wild1', [8, 0, 32], 'skeleton')}; S.enemies.push(foe);
+const xpBefore = god.xp || 0;
 r = order('g', {order: 'attack', target: 'wild1'});
 assert.equal(r.ok, true, r.code);
 let fell = false;
 for (let i = 0; i < 60 * 30 && !fell; i++) { const ev = sim.step(); fell = ev.some(e => e.kind === 'death' && e.id === 'wild1'); }
 assert.ok(fell, 'the warband broke the skeleton'); steps(2);
+assert.ok((god.xp || 0) > xpBefore, 'warband kills credit the owner\'s Hero progression even from God view');
 assert.ok(warbandOf(S, 'g').every(e => e.warband.order.kind === 'hold'));
 assert.ok(!S.pickups.some(p => p.kind === 'iron' && Math.hypot(p.x - 8, p.z - 32) > 30), 'salvage only drops where foes fall');
 
@@ -101,5 +103,11 @@ const sideless = structuredClone(saved); delete sideless.enemies.find(e => e.war
 assert.throws(() => loadSimulation(sideless));
 const old = structuredClone(saved); old.enemies = old.enemies.filter(e => !e.warband);
 assert.equal(warbandOf(loadSimulation(old).adventureWorld(), 'g').length, 0, 'older saves load without a warband');
+
+// Changing sides at the workshop takes the warband along, so the escort never turns on its owner.
+for (const k of Object.keys(god.resources)) god.resources[k] = 0; god.heldOre = null;
+r = sim.command('g', {type: 'action', seq: ++seq, action: 'inventionSide', side: 'rivals'});
+assert.equal(r.ok, true, r.code);
+assert.ok(warbandOf(S, 'g').every(e => e.side === 'rivals' && !enemyHostileTo(e, 'rivals')));
 
 console.log(JSON.stringify({status: 'pass', units: team.length}));
