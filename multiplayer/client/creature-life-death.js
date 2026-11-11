@@ -1,5 +1,6 @@
 import {setLiveInstances} from './instance-upload.js';
 import * as THREE from 'three';
+import {createBlastFx} from './blast-fx.js';
 
 // Authored creature life and death presentation for the browser client.
 //
@@ -402,6 +403,7 @@ export function createCreatureLifeDeath({scene, height = () => 0} = {}) {
   const group = new THREE.Group(); group.name = 'creature-life-death'; group.userData.ignoreContact = true;
   group.add(dirt.points, magic.points, ...Object.values(decals.meshes));
   scene?.add(group);
+  const heartFx = createBlastFx({scene, height});
   const H = (x, z) => { const g = height(x, z); return Number.isFinite(g) ? g : 0; };
   let frame = 0, lastTick = 0, elapsedSeconds = 0;
 
@@ -874,6 +876,10 @@ totalEmissiveRadiance *= 1. + cldCore;`);
       const col = c.color ? [c.color.r, c.color.g, c.color.b] : [.4, .8, 1];
       const core = v && findAny(v, 'BodyCore'); if (core) core.getWorldPosition(_v2);
       wisps(_v2.x, _v2.y, _v2.z, 30, seed, 402, col, 1.8, 1.1);
+      // The crystal heart gives way: a cold flash and ring, and a spray of glowing shards that arc out and fall.
+      heartFx.blast([_v2.x, _v2.y - .45, _v2.z], 'crystal', 3.2);
+      for (let i = 0; i < 36; i++) { const a = rand(seed, 600 + i) * 6.283, e = .15 + rand(seed, 640 + i) * 1.1, sp = 2.5 + rand(seed, 680 + i) * 4.5;
+        emit(magic, _v2.x, _v2.y, _v2.z, Math.cos(a) * Math.cos(e) * sp, Math.sin(e) * sp + 1.5, Math.sin(a) * Math.cos(e) * sp, col[0] * 1.4 + .2, col[1] * 1.4 + .2, col[2] * 1.4 + .2, .7 + rand(seed, 720 + i) * .8, -9.8, .35); }
       addDecal(decals, 'crack', pivot.x, H(pivot.x, pivot.z), pivot.z, 1.2, 2.2, c.color || 0x66ccff, rand(seed, 3) * 6.28);
     }
     if (st) release(st);
@@ -977,7 +983,7 @@ totalEmissiveRadiance *= 1. + cldCore;`);
   function tick(dt) {
     dt = clamp(Number.isFinite(dt) ? dt : 1 / 60, 0, .1);
     elapsedSeconds += dt;
-    stepParticles(dirt, dt, H); stepParticles(magic, dt, H); stepDecals(decals, dt);
+    stepParticles(dirt, dt, H); stepParticles(magic, dt, H); stepDecals(decals, dt); heartFx.update(dt);
     const g = binds.lines.geometry; g.setDrawRange(0, binds.n * 2); g.attributes.position.needsUpdate = true; g.attributes.color.needsUpdate = true;
     for (const c of [...corpses.values()]) if ((c.age += dt) > COLLAPSE[c.kind].T + .1) endCorpse(c);
     for (const st of [...states.values()]) if (elapsedSeconds - st.seenAt > 3) release(st); // duration independent of display refresh
@@ -988,7 +994,7 @@ totalEmissiveRadiance *= 1. + cldCore;`);
   function dispose() {
     for (const st of [...states.values()]) release(st);
     for (const c of [...corpses.values()]) endCorpse(c);
-    group.removeFromParent();
+    group.removeFromParent(); heartFx.dispose();
     for (const sys of [dirt, magic]) { sys.points.geometry.dispose(); sys.points.material.dispose(); }
     binds.lines.geometry.dispose(); binds.lines.material.dispose();
     for (const o of decals.owned) o.dispose();

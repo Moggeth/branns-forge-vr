@@ -7,7 +7,8 @@ import * as THREE from 'three';
 //   smoke   the same shape in soot and grey, rising and swelling for ~2 s, alpha-blended and soft-edged
 //   ring    a dust-and-heat band racing out along the ground to the blast radius
 //   scorch  a dark burnt disc on the ground under it, fading over a few seconds
-// Style: 'keg' (black powder: orange fire, black smoke) or 'kettle' (a boiler: steam-white flash and white cloud).
+// Style: 'keg' (black powder: orange fire, black smoke), 'kettle' (a boiler: steam-white flash and white cloud) or
+// 'crystal' (a golem's heart: blue-white flash and resonance ring only).
 // Budget: POOL blasts at once (the oldest recycles), four draws each while alive, zero when idle; phones get a lower
 // sphere detail. No lights: the fire is emissive, so it never changes the scene's light count (no shader rebuilds).
 //
@@ -46,6 +47,8 @@ void main(){vec2 p=vUv*2.-1.;float r=length(p),a=atan(p.y,p.x);float edge=.7+.12
 
 const STYLES = {
   keg: {hot: [1, .86, .55], warm: [1, .42, .06], smoke: [.2, .18, .16], ring: [1, .7, .35], scorch: true, size: .32, smokeSize: .3, rise: 2.6},
+  // A golem's crystal heart giving way: a cold blue-white flash and a resonance ring, no smoke and no scorch.
+  crystal: {hot: [.85, .97, 1], warm: [.25, .62, 1], smoke: [0, 0, 0], ring: [.45, .8, 1], scorch: false, smokeless: true, size: .3, smokeSize: 0, rise: 0},
   kettle: {hot: [1, .97, .88], warm: [.9, .62, .35], smoke: [.9, .92, .94], ring: [.95, .97, 1], scorch: false, size: .18, smokeSize: .3, rise: 1.8},
 };
 const smooth = t => { t = Math.min(1, Math.max(0, t)); return t * t * (3 - 2 * t); };
@@ -97,7 +100,7 @@ export function createBlastFx({scene, height = () => 0, quality = 'high'} = {}) 
     }
     // Smoke: takes over from the fire, rolls up and out, then thins.
     const su = a / BLAST_FX.smoke, smoke = b.smoke.material.uniforms;
-    b.smoke.visible = a > .06 && su < 1;
+    b.smoke.visible = !S.smokeless && a > .06 && su < 1;
     if (b.smoke.visible) {
       const k = 1 - (1 - su) ** 2;
       b.smoke.position.set(b.x, b.y + .5 + S.rise * k, b.z);
