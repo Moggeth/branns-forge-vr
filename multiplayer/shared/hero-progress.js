@@ -28,6 +28,7 @@ export const TALENTS = Object.freeze({
   axe: Object.freeze({
     limbsplitter: Object.freeze({name: 'Limbsplitter', text: 'Every swing that lands on an arm, leg or head lops it clean off.', ranks: ['Lop off arms, legs and heads in one swing.', 'Each limb you lop heals you 4 health.', 'Each limb you lop heals you 8 health.']}),
     whirlwind: Object.freeze({name: 'Whirlwind', text: 'Your cleave becomes a full spin with 30% more reach, and recharges in 4 seconds instead of 6.', ranks: ['Full spin, 30% more reach, 4 s recharge.', '40% more reach, 3.5 s recharge.', '50% more reach, 3 s recharge.']}),
+    timber: Object.freeze({name: 'Timber!', text: 'A tree you fell crushes every foe it lands on and throws them clear.', ranks: ['Falling trees hit for 60.', 'A wider crash that hits for 90.', 'The widest crash, hitting for 130.']}),
   }),
   pick: Object.freeze({
     motherlode: Object.freeze({name: 'Motherlode', text: 'Ore cracks one strike sooner and drops twice as much.', ranks: ['One strike sooner, double ore.', 'Two strikes sooner on a fresh seam.', 'Triple ore.']}),

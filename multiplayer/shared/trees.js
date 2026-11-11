@@ -283,7 +283,8 @@ export function restoreHarvested(saved, treeIds) {
   seen.add(h.id);
   // Pre-log saves already awarded the 3-wood pickup at the final chop: treat them as landed so timber is never duplicated.
   out.push({id: h.id, cuts: h.cuts, cutHeight: h.cutHeight, felledTick: h.felledTick, fallYaw: h.fallYaw, landed: h.cuts === 3 ? (h.landed ?? true) : false,
-   ...(h.notches ? {notches: h.notches.map(n => ({cutHeight: n.cutHeight, fallYaw: n.fallYaw, cuts: n.cuts}))} : {})});
+   ...(h.notches ? {notches: h.notches.map(n => ({cutHeight: n.cutHeight, fallYaw: n.fallYaw, cuts: n.cuts}))} : {}),
+   ...(h.cuts === 3 && h.landed === false && typeof h.by === 'string' && h.by.length <= 64 ? {by: h.by} : {})}); // who felled a falling tree (Timber! talent)
  }
  return out;
 }

@@ -49,6 +49,7 @@ import {CRITTER_KINDS,CRITTER_FIELDS,isCritter,rabbleKind,setCritterWorld} from 
 import {ENT,ENT_SPELLS,entTargets,createEnt,rememberAwakened,pruneAwakened,stepEntRooting,restoreEntTrees,validEnt} from './ents.js';
 import {hasTalent,talentRank,heroMaxHp,damageScale,adoptProgress,grantXp,talentAction,validProgress,restoreProgress,restoreLedger,rememberProgress,XP_REWARD} from './hero-progress.js';
 import {temperAction, temperScale} from './weapon-temper.js';
+import {timberCrush} from './timber-crush.js';
 import {dragonAction,stepDragons,breakStreak,dismissDragon,validDragonFields} from './dragon-streak.js';
 import {clampToWorld} from './keep-sites.js';
 import {resolveCoveLakes} from './larimar-cove.js';
@@ -250,7 +251,7 @@ function instantiate(state) {
       if (result.ok && message?.type === 'action') for (const e of result.events || []) if (e && e.by === undefined) e.by = id;
       // Harvest XP: felling a tree or breaking ore (kill XP is credited in combat.js where the blow lands).
       if (result.ok && message?.type === 'action' && p?.role === 'hero') for (const e of [...(result.events || [])]) {
-        if (e?.kind === 'tree_fell') grantXp(state, p, XP_REWARD.tree, result.events, p.position);
+        if (e?.kind === 'tree_fell') { grantXp(state, p, XP_REWARD.tree, result.events, p.position); const h = state.harvestedTrees.find(t => t.id === e.id); if (h && !h.landed) h.by = p.id; }
         else if (e?.kind === 'ore_break') grantXp(state, p, state.deposits.find(d => d.id === e.id)?.kind === 'meteor' ? XP_REWARD.meteor : XP_REWARD.ore, result.events, p.position);
       }
       recordSettlementDeaths(state,result.events);
@@ -552,7 +553,7 @@ function instantiate(state) {
       stepCombat(state,combatContext,events);stepDragons(state,dragonContext,events);
       stepFruit(state,{nextId,terrainHeight},events);
       stepFire(state,fireContext,events);
-      stepTrees(state,treeContext,treeIndex,events);
+      {const from=events.length;stepTrees(state,treeContext,treeIndex,events);timberCrush(state,events,from,{trees:treeIndex,hitEnemyPart,combat:combatContext,terrainHeight:(x,z)=>terrainHeight(state,x,z)});}
       stepSettlement(state,{nextId,terrainHeight,damageEnemy,collapseMinedWall,
         ground:(x,z)=>inventionFloor(state,x,z,forgeFloor(x,z,forgeY,terrainHeight(state,x,z))),
         resolve:(position,radius=.24,height=1.65)=>{resolveForge(position,forgeY,radius,height);resolveInventions(state,position,radius,height);if(state.landmarks)resolveStartingWorld(position,(x,z)=>terrainHeight(state,x,z),radius,height);resolveTrees(position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z),radius,height);resolveDeposits(state,position,radius,(x,z)=>terrainHeight(state,x,z));if(state.world)resolvePlaces(worldFor(state),position,radius);else resolveCoveLakes(position,radius);resolveTerrainBoundary(position,radius);return position;}
