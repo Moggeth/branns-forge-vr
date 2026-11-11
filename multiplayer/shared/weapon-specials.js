@@ -3,10 +3,12 @@ import {friendlyEnemyHit} from './battle-mode.js';
 import {terrainHeight,settleTerrainContents,PICK_WALL,createSunderRupture,sunderFront,makeTerrainRoom,wallSpec} from './terrain.js';
 import {axeCleave} from './axe-cleave.js';
 import {specialCooldown} from './special-cooldowns.js';
-import {hasTalent} from './hero-progress.js';
+import {hasTalent,talentRank} from './hero-progress.js';
 import {DEPOSIT_CATALOG,depositReward} from './material-catalog.js';
 // Geode Burst (pick talent): an ending crystal wall bursts into shards that wound and toss foes beside it.
 export const GEODE_BURST=Object.freeze({radius:2.6,damage:70});
+// Geode Burst ranks I, II, III: [radius, damage].
+export const GEODE_RANKS=Object.freeze([[2.6,70],[3.2,90],[3.8,110]]);
 export const SPECIAL_LIMITS=Object.freeze({cooldown:240,edits:64,deposits:80}); // cooldown: pick (see special-cooldowns.js)
 const fail=code=>({ok:false,code,events:[]});
 // Pick of Riches: each segment of a Stonewhisper ridge is a real mineral that the pick's resonance tears up out of the
@@ -95,12 +97,13 @@ export function shatterWall(state,list,ctx,events,reason,hitEnemyPart) {
   events.push({kind:name,cast:r.id,reason,tick:state.tick,position:[mid[0],terrainHeight(state,mid[0],mid[1]),mid[1]],editIds:live.map(e=>e.id)});
   const owner=kind==='pick_wall'&&hitEnemyPart&&state.players.find(q=>q.id===list[0].wall.owner);
   if(owner&&hasTalent(owner,'pick','geode')){
-    const near=e=>live.some(q=>Math.hypot(e.position[0]-q.x,e.position[2]-q.z)<=GEODE_BURST.radius),hits=[];
+    const [radius,damage]=GEODE_RANKS[Math.min(3,talentRank(owner,'pick','geode'))-1];
+    const near=e=>live.some(q=>Math.hypot(e.position[0]-q.x,e.position[2]-q.z)<=radius),hits=[];
     for(const enemy of [...state.enemies])if(near(enemy)&&!friendlyEnemyHit(state,enemy,{ownerId:owner.id})){
-      hitEnemyPart(state,enemy,'torso',GEODE_BURST.damage,{tool:'pick',point:[enemy.position[0],enemy.position[1]+1,enemy.position[2]],ownerId:owner.id},ctx,events);
+      hitEnemyPart(state,enemy,'torso',damage,{tool:'pick',point:[enemy.position[0],enemy.position[1]+1,enemy.position[2]],ownerId:owner.id},ctx,events);
       hits.push(enemy.id);if(state.enemies.includes(enemy))enemy.launchTick=state.tick;
     }
-    events.push({kind:'geode_burst',cast:r.id,by:owner.id,tick:state.tick,position:[mid[0],terrainHeight(state,mid[0],mid[1]),mid[1]],points:live.map(q=>[q.x,terrainHeight(state,q.x,q.z),q.z]),radius:GEODE_BURST.radius,hits});
+    events.push({kind:'geode_burst',cast:r.id,by:owner.id,tick:state.tick,position:[mid[0],terrainHeight(state,mid[0],mid[1]),mid[1]],points:live.map(q=>[q.x,terrainHeight(state,q.x,q.z),q.z]),radius,hits});
   }
 }
 /** Fixed-tick life of timed segments, deterministic, no clocks. The front acts exactly once as it passes:
