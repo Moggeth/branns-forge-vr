@@ -49,7 +49,7 @@ assert.equal(act(s,{action:'talent',weapon:'axe',talent:'limbsplitter'}).code,'n
 assert.equal(act(s,{action:'talent',weapon:'axe',talent:'whirlwind'}).code,'rank_level_required','rank II waits for level 6');
 assert.equal(act(s,{action:'talent',reset:true}).ok,true);assert.deepEqual(hero(s).talents,{});
 assert.equal(act(s,{action:'talent',reset:true}).code,'not_needed');
-assert.ok(Object.hasOwn(TALENTS.axe,'limbsplitter')&&Object.keys(TALENTS).length===7&&Object.values(TALENTS).every(t=>Object.keys(t).length===2),'two specialties for each of seven weapons');
+assert.ok(Object.hasOwn(TALENTS.axe,'limbsplitter')&&Object.keys(TALENTS).length===7&&Object.values(TALENTS).every(t=>Object.keys(t).length>=2&&Object.keys(t).length<=3),'two or three specialties for each of seven weapons');
 assert.ok(Object.hasOwn(TALENTS.hammer,'earthshaker')&&Object.hasOwn(TALENTS.hammer,'bonebreaker'),'the hammer has its specialties');
 for(const [w,list] of Object.entries(TALENTS))for(const [id,t] of Object.entries(list))assert.ok(Array.isArray(t.ranks)&&t.ranks.length===(w==='flask'?1:3)&&maxRank(w,id)===t.ranks.length,`${w}.${id} rank lines`);
 

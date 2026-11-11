@@ -6,6 +6,7 @@ import * as THREE from 'three';
 //   level_up       a golden column of light on the hero, a ring rolling out across the ground, sparks spiralling up
 //   talent_learned a smaller gold flare and spiral on the hero
 //   firebomb       an orange fireball flash, a shock ring at the bomb's radius and flung embers
+//   timber_crush   bark and sawdust bursting up along the felled trunk where it crushed foes
 //   geode_burst    blue crystal shards bursting from each wall segment, with a flash at each
 //   pierce skewer  a short white streak where the bolt punched through
 // Budget (Quest/phone safe): a fixed pool of 8 effects, each at most three draws (column, ring, one Points cloud),
@@ -13,7 +14,8 @@ import * as THREE from 'three';
 
 export const TALENT_FX = Object.freeze({pool: 8, sparks: 56});
 const GOLD = new THREE.Color(1, .78, .3), WHITE_GOLD = new THREE.Color(1, .95, .75), FIRE = new THREE.Color(1, .45, .12),
-  EMBER = new THREE.Color(1, .72, .3), RESONANCE = new THREE.Color(.25, .6, 1), SHARD = new THREE.Color(.75, .92, 1), TAR = new THREE.Color(.55, .38, .2);
+  EMBER = new THREE.Color(1, .72, .3), RESONANCE = new THREE.Color(.25, .6, 1), SHARD = new THREE.Color(.75, .92, 1), TAR = new THREE.Color(.55, .38, .2),
+  SAWDUST = new THREE.Color(.95, .78, .5), BARK = new THREE.Color(.62, .42, .22);
 
 const COLUMN_VERTEX = /* glsl */`
 varying vec2 vUv;
@@ -116,6 +118,12 @@ export function createTalentFx({scene, height = () => 0, heroPosition = () => nu
       start('geode', at(p), {life: 1.1, radius: event.radius || 2.6, ringColor: RESONANCE, sparkColor: SHARD, sparkSize: .17, points});
       return true;
     }
+    // Timber! (axe talent): bark and sawdust burst up along the trunk where it crushed foes.
+    if (kind === 'timber_crush' && Array.isArray(event.from) && Array.isArray(event.to)) {
+      const points = Array.from({length: 7}, (_, i) => { const t = (i + .5) / 7; return [event.from[0] + (event.to[0] - event.from[0]) * t, (event.from[1] + (event.to[1] - event.from[1]) * t), event.from[2] + (event.to[2] - event.from[2]) * t]; });
+      start('geode', at(p), {life: 1, radius: 1.6, ringColor: SAWDUST, sparkColor: BARK, sparkSize: .15, points});
+      return true;
+    }
     if (kind === 'pierce' && event.skewer) { start('skewer', at(p), {life: .35, radius: .6, sparkColor: WHITE_GOLD, sparkSize: .09}); return true; }
     if (kind === 'fuel_spill' && event.tar) { start('tar', at([p[0], NaN, p[2]]), {life: .9, radius: event.radius || 2.1, ringColor: TAR}); return true; }
     return false;
@@ -205,6 +213,7 @@ export function playTalentSound(context, event, gain = 1) {
   else if (kind === 'talent_reset') { tone(659.25, 0, .25, .12); tone(440, .1, .4, .1, 'sine'); }
   else if (kind === 'firebomb') { noise(0, .55, .55, 'lowpass', 700); tone(70, 0, .45, .3, 'sine'); }
   else if (kind === 'geode_burst') { noise(0, .45, .25, 'highpass', 2500); [2093, 2637, 3136].forEach((hz, i) => tone(hz, .02 + i * .04, .5, .07, 'sine')); }
+  else if (kind === 'timber_crush') { noise(0, .5, .45, 'lowpass', 500); tone(55, 0, .5, .32, 'sine'); noise(.03, .25, .18, 'bandpass', 1600); }
   else if (kind === 'pierce') tone(1400, 0, .12, .05, 'sine');
   else { out.disconnect(); return false; }
   setTimeout(() => out.disconnect(), 2500);
