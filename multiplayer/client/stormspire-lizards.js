@@ -722,7 +722,7 @@ export function createLizardCrew() {
         if (!cheering(lounger)) play(lounger.m, nap.awake > 0 ? 'idle' : 'nap', .6);
         if (shown) animateModel(lounger, t, dt, watching(lounger));
       } else { wiggle(lounger.stand, t, 1, .25); lounger.stand.tail.rotation.y += Math.sin(t * .6) * .4; }
-      if (shown) updateSparks(sparks, dt);
+      updateSparks(sparks, dt); // cheap, and a live burst must keep fading even while its crew is culled
       // stand-in hop when cheering
       for (const l of crew) if (l.stand) { const k = l.cheerLeft > 0 ? Math.abs(Math.sin((1.6 - l.cheerLeft) * Math.PI * 2)) * .15 * l.cheerLeft / 1.6 : 0; l.stand.group.position.y = k; }
     },

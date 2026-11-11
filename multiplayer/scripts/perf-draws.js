@@ -7,12 +7,16 @@
   const orig = renderer.renderBufferDirect;
   renderer.renderBufferDirect = function (cam, sc, geo, mat, obj, grp) {
     if (!on) return orig.call(this, cam, sc, geo, mat, obj, grp);
+    // Count only calls that reach the GPU: the empty-draw skip and the compile gate (already installed under this
+    // wrapper) can reject a call, and three counts real draws in info.render.calls.
+    const before = this.info.render.calls, result = orig.call(this, cam, sc, geo, mat, obj, grp);
+    if (this.info.render.calls === before) return result;
     const k = path(obj); let r = rows.get(k); if (!r) rows.set(k, r = {k, main: 0, shadow: 0, objs: new Set(), mats: new Set(), geos: new Set(), moved: 0});
     if (sc) { r.main++; main++; } else { r.shadow++; shadow++; }
     r.objs.add(obj); r.mats.add(mat); r.geos.add(geo);
     const e = obj.matrixWorld.elements, s = e[12] + e[13] * 7 + e[14] * 13 + e[0] * 3, prev = seen.get(obj);
     if (prev !== undefined && Math.abs(prev - s) > 1e-6) r.moved++; seen.set(obj, s);
-    return orig.call(this, cam, sc, geo, mat, obj, grp);
+    return result;
   };
   // With --nopath, sample the views the bench path passes through (spawn turn, glide end, overview); else the live view.
   const h = window.brannHarness, me = h.snapshot().players.find(p => p.id === h.state().playerId), [x, y, z] = me?.position || [0, 0, 0];
