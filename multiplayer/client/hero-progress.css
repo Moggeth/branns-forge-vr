@@ -100,6 +100,23 @@ body[data-role="god"] .meter.hp-xp { display: none; }
 .hp-ico { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 12px; flex: none; color: var(--brass-hi, #ecd29a); background: rgba(201, 164, 92, .14); }
 .hp-ico svg { width: 30px; height: 30px; }
 .hp-empty { color: var(--muted, #b9aa8e); }
+/* Forge strip: temper the weapon itself (Timber, Iron, Crystal at the forge). Forge-orange to tell it apart from talents. */
+.hp-forge { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; align-items: center; gap: 10px; margin-bottom: 12px; padding: 10px 12px; border-radius: 14px;
+  border: 1px solid rgba(255, 150, 70, .28); background: linear-gradient(90deg, rgba(255, 120, 40, .12), rgba(255, 120, 40, .03)); }
+.hp-forge-anvil { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 10px; color: #ffb36b; background: rgba(255, 130, 50, .14); }
+.hp-forge-anvil svg { width: 24px; height: 24px; }
+.hp-forge-text { display: grid; gap: 2px; min-width: 0; }
+.hp-forge-title { display: flex; align-items: center; gap: 8px; font: 600 1rem/1.2 var(--serif, Georgia, serif); color: var(--parchment, #f2e6cd); }
+.hp-forge-status { font-size: .8rem; color: var(--muted, #c4b597); }
+.hp-pip-forge { border-color: rgba(255, 170, 100, .6); }
+.hp-pip-forge[data-on="1"] { background: linear-gradient(135deg, #ffe2b8, #ff9a4a 55%, #c2521c); border-color: #ffd4a0; box-shadow: 0 0 8px rgba(255, 140, 60, .75); }
+.hp-temper { min-height: 44px; padding: 8px 12px; border-radius: 11px; font: 700 .82rem/1.2 var(--sans, system-ui); cursor: pointer; max-width: 260px;
+  color: var(--muted, #b9aa8e); background: rgba(255, 255, 255, .05); border: 1px solid rgba(255, 160, 90, .25); -webkit-tap-highlight-color: transparent;
+  transition: transform .12s ease, filter .15s ease, box-shadow .15s ease; }
+.hp-temper[data-state="available"] { color: #2a1206; border-color: #ffd9ab; background: linear-gradient(180deg, #ffe0b5, #ffa75a 60%, #e0782f); box-shadow: 0 4px 14px rgba(0, 0, 0, .3), 0 0 16px rgba(255, 140, 60, .3); }
+.hp-temper[data-state="available"]:hover, .hp-temper[data-state="available"]:focus-visible { transform: translateY(-1px); filter: brightness(1.06); outline: none; box-shadow: 0 0 0 2px rgba(255, 190, 130, .6), 0 6px 18px rgba(0, 0, 0, .35); }
+.hp-temper[data-state="max"] { color: #ffd2a0; background: rgba(255, 140, 60, .14); }
+.hp-temper:disabled { cursor: default; }
 .hp-talents { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; align-items: start; }
 .hp-talent { display: grid; gap: 8px; padding: 12px; border-radius: 14px;
   background: linear-gradient(180deg, rgba(255, 235, 200, .05), rgba(255, 235, 200, .015)); border: 1px solid rgba(201, 164, 92, .18); }
@@ -143,6 +160,7 @@ body[data-role="god"] .meter.hp-xp { display: none; }
   .hp-tab-ico { width: 30px; height: 30px; } .hp-tab-count { display: none; }
   .hp-tab[data-can-learn="1"]::after { left: 28px; }
   .hp-scroll { padding: 12px; } .hp-talents { grid-template-columns: 1fr; gap: 10px; }
+  .hp-forge { grid-template-columns: 32px minmax(0, 1fr); } .hp-forge-anvil { width: 32px; height: 32px; } .hp-temper { grid-column: 1 / -1; max-width: none; }
   .hp-foot { padding: 8px 14px 12px; } .hp-foot-note { font-size: .74rem; }
 }
 /* Phone sideways: short screen. Icon-only rail on the left, compact header, two specialties side by side. */
@@ -158,6 +176,8 @@ body[data-role="god"] .meter.hp-xp { display: none; }
   .hp-scroll { padding: 8px 12px 10px; }
   .hp-weapon-head { margin-bottom: 8px; } .hp-weapon-head .hp-ico { width: 36px; height: 36px; } .hp-weapon-head h3 { font-size: 1.1rem; }
   .hp-talents { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .hp-forge { margin-bottom: 8px; padding: 6px 10px; gap: 8px; grid-template-columns: 30px minmax(0, 1fr) auto; } .hp-forge-anvil { width: 30px; height: 30px; }
+  .hp-forge-status { font-size: .72rem; } .hp-temper { min-height: 38px; padding: 6px 10px; font-size: .76rem; }
   .hp-talent { padding: 9px; gap: 6px; } .hp-talent-text { font-size: .76rem; } .hp-rank { padding: 3px 6px; font-size: .72rem; }
   .hp-learn { min-height: 40px; padding: 6px 10px; }
   .hp-foot { padding: 5px 12px 6px; } .hp-foot-note { font-size: .72rem; } .hp-reset { min-height: 34px; }

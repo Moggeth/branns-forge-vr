@@ -3,6 +3,7 @@
 import {posLimit,thingLimit,extentLimit} from './world-extent.js';
 import {applyEnemyScorch,partPosition,PARTS,hitEnemyPart,blastRemains} from './combat.js';
 import {hasTalent,talentRank} from './hero-progress.js';
+import {temperScale} from './weapon-temper.js';
 import {entHeight} from './ents.js';
 import {WYRMSPOUT,sprayTuning,stickGlob,stepTank,goutBurst} from './wyrmspout.js';
 import {WORLD_EXTENT} from './keep-sites.js';
@@ -110,7 +111,7 @@ export function fireContact(state,shot,hit,ctx){
     stickGlob(state,enemy,hit.part||'torso',shot.ownerId,spray.burnTicks);
     applyEnemyScorch(enemy,hit.part||'torso',W.scorch);
     events.push({kind:'goo_stick',id:enemy.id,by:shot.ownerId,part:hit.part||'torso',burn:spray.burnTicks,position:[...point],normal:[...hit.normal]});
-    ctx.damageEnemy(state,enemy,W.damage,events,shot.ownerId);
+    ctx.damageEnemy(state,enemy,W.damage*temperScale(state.players.find(q=>q.id===shot.ownerId),'wyrmspout'),events,shot.ownerId);
     return events;
   }
   if(remains){remains.burnUntil=state.tick+spray.burnTicks;remains.burnPart=remains.part;remains.scorch=clamp((remains.scorch||0)+W.scorch,0,1);}

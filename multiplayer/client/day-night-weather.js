@@ -14,17 +14,17 @@ import {SUNNY, SUNNY_KEYS} from './palette-preview.js';
 const C = hex => new THREE.Color(hex);
 // Palette keyed on sun elevation (sin of the solar angle). Colours sRGB hex -> linear working space via THREE.Color.
 const KEYS = (SUNNY ? SUNNY_KEYS : [
-  {e: -1.0, sun: 0x8ea6ff, hemiSky: 0x2c3f72, hemiGround: 0x100f0c, hemiI: .3, zenith: 0x040918, horizon: 0x14224a, haze: 0x0f1932, hill: 0x0a1121, exposure: 1.32, env: .05, cloud: 0x26314f},
-  {e: -.32, sun: 0x8ea6ff, hemiSky: 0x2c3f72, hemiGround: 0x100f0c, hemiI: .3, zenith: 0x040918, horizon: 0x14224a, haze: 0x0f1932, hill: 0x0a1121, exposure: 1.32, env: .05, cloud: 0x26314f},
+  {e: -1.0, sun: 0x9cb2ff, hemiSky: 0x3a5294, hemiGround: 0x16151a, hemiI: .46, zenith: 0x06102a, horizon: 0x1c2e5e, haze: 0x152242, hill: 0x0e1730, exposure: 1.32, env: .08, cloud: 0x2c3858},
+  {e: -.32, sun: 0x9cb2ff, hemiSky: 0x3a5294, hemiGround: 0x16151a, hemiI: .46, zenith: 0x06102a, horizon: 0x1c2e5e, haze: 0x152242, hill: 0x0e1730, exposure: 1.32, env: .08, cloud: 0x2c3858},
   {e: -.12, sun: 0x96a4e6, hemiSky: 0x46558c, hemiGround: 0x211c18, hemiI: .55, zenith: 0x0d1838, horizon: 0x534a78, haze: 0x2b3152, hill: 0x181d33, exposure: 1.12, env: .09, cloud: 0x4a4466},
   {e: .02, sun: 0xff8746, hemiSky: 0x8f93b6, hemiGround: 0x4a382a, hemiI: .7, zenith: 0x3d5088, horizon: 0xf59a64, haze: 0xd0896c, hill: 0x3f3f52, exposure: 1.08, env: .26, cloud: 0xf2a37a},
   {e: .14, sun: 0xffb26e, hemiSky: 0xb3bccc, hemiGround: 0x5e4a30, hemiI: .85, zenith: 0x5378b0, horizon: 0xf4c088, haze: 0xdcb48c, hill: 0x4f5c4c, exposure: 1.05, env: .36, cloud: 0xffe0bc},
-  {e: .36, sun: 0xffcf8f, hemiSky: 0xc7d6dc, hemiGround: 0x6d5a35, hemiI: .95, zenith: 0x5f8fc0, horizon: 0xf3d39c, haze: 0xe2cb9b, hill: 0x56684f, exposure: 1.02, env: .42, cloud: 0xfff4e2},
-  {e: .75, sun: 0xfff1d6, hemiSky: 0xcfe2ee, hemiGround: 0x625a3e, hemiI: 1.1, zenith: 0x6f9fd0, horizon: 0xd8e2df, haze: 0xd2dcd6, hill: 0x6e8170, exposure: 1.0, env: .5, cloud: 0xffffff},
-  {e: 1.0, sun: 0xfff1d6, hemiSky: 0xcfe2ee, hemiGround: 0x625a3e, hemiI: 1.1, zenith: 0x6f9fd0, horizon: 0xd8e2df, haze: 0xd2dcd6, hill: 0x6e8170, exposure: 1.0, env: .5, cloud: 0xffffff},
+  {e: .36, sun: 0xffd496, hemiSky: 0xc2daea, hemiGround: 0x6d5a35, hemiI: .95, zenith: 0x4f8fd6, horizon: 0xf0dcb0, haze: 0xd8d6c4, hill: 0x5a7058, exposure: 1.02, env: .42, cloud: 0xfff4e2},
+  {e: .75, sun: 0xfff1d6, hemiSky: 0xc4ddf2, hemiGround: 0x625a3e, hemiI: 1.1, zenith: 0x4b92e0, horizon: 0xcfe2ef, haze: 0xc8dbea, hill: 0x6a8a78, exposure: 1.0, env: .5, cloud: 0xffffff},
+  {e: 1.0, sun: 0xfff1d6, hemiSky: 0xc4ddf2, hemiGround: 0x625a3e, hemiI: 1.1, zenith: 0x4b92e0, horizon: 0xcfe2ef, haze: 0xc8dbea, hill: 0x6a8a78, exposure: 1.0, env: .5, cloud: 0xffffff},
 ]).map(k => ({...k, ...Object.fromEntries(['sun', 'hemiSky', 'hemiGround', 'zenith', 'horizon', 'haze', 'hill', 'cloud'].map(n => [n, C(k[n])]))}));
 const COLOR_FIELDS = ['sun', 'hemiSky', 'hemiGround', 'zenith', 'horizon', 'haze', 'hill', 'cloud'];
-const SUN_PEAK = 2.9, MOON_PEAK = .46, MAX_ELEVATION = .6; // a lower sun: long shadows and slanted shafts all day
+const SUN_PEAK = 2.9, MOON_PEAK = .62, MAX_ELEVATION = .6; // a lower sun: long shadows and slanted shafts all day
 const OVERCAST_DAY = C(0x9ea8b0), OVERCAST_NIGHT = C(0x161d2c), FOG_DAY = C(0xb4bec2), STORM_DAY = C(0x5e6873), FOG_NIGHT = C(0x1a2236), SNOW_DAY = C(0xa9b9cf);
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
@@ -166,14 +166,14 @@ export function createDayNightWeather({scene, orchard, quality = 'high', preview
     const fogTint = grey.copy(FOG_DAY).lerp(FOG_NIGHT, night); if (w.snow > .3) fogTint.lerp(SNOW_DAY.clone().lerp(FOG_NIGHT, night), .5);
     env.haze.lerp(fogTint, Math.min(1, overcast * .7 + w.fog * .5)); env.hill.lerp(env.haze, overcast * .35);
     env.hemiSky.lerp(grey, overcast * .4); env.envI *= 1 - overcast * .3; env.exposure *= 1 - overcast * .04;
-    env.fogScale = Math.max(.14, 1 - w.fog * .86 - w.rain * .42 - w.storm * .55 - w.snow * .32);
+    env.fogScale = Math.max(.3, 1 - w.fog * .66 - w.rain * .36 - w.storm * .42 - w.snow * .26);
     // Thick air: the sky near the horizon melts into the same haze so distant mountains never cut a hard silhouette.
     const melt = 1 - env.fogScale; env.horizon.lerp(env.haze, Math.min(1, melt * 1.1)); env.zenith.lerp(env.haze, melt * .55);
     if (rts) env.fogScale = .5 + env.fogScale * .5;
     env.flash = clock.lightning; env.hemiI += clock.lightning * 2.2; env.time = time;
-    // Mood over clarity: a little haze always hangs in the air, thicker in the low light of dawn, dusk and night.
+    // Clarity first (2026-11-11): clear air on a clear day, only a touch more haze in the low light of dawn, dusk and night.
     const lowSun = 1 - smooth(.08, .5, Math.abs(env.skySunDir.y)), dawn = clock.phase < .2 ? 1 - smooth(.04, .2, clock.phase) : 0;
-    env.fogScale *= .86 - lowSun * .14 - night * .1;
+    env.fogScale *= 1 - lowSun * .08 - night * .06;
     orchard.applyEnvironment(env);
     atmosphere({clock, w, e, sunUp, moonUp, overcast, night, lowSun, dawn, dt, time, groundY, rts, shelter});
 
@@ -196,7 +196,7 @@ export function createDayNightWeather({scene, orchard, quality = 'high', preview
       snow.mesh.geometry.setDrawRange(0, Math.ceil(snow.count * Math.min(1, snowW * 1.15)));
     }
     // Night resonance sparks, and by day a sparse drift of fae lights (fewer, softer) so the meadow always feels alive.
-    const dayMotes = (1 - night) * (1 - Math.min(1, rainW * 1.2 + w.storm)) * .5;
+    const dayMotes = (1 - night) * (1 - Math.min(1, rainW * 1.2 + w.storm)) * .14;
     const moteW = (night * (1 - Math.min(1, rainW * .8 + w.fog * .3)) + dayMotes) * (rts ? .6 : 1) * open;
     motes.mesh.visible = moteW > .02;
     if (motes.mesh.visible) {
@@ -224,7 +224,7 @@ export function createDayNightWeather({scene, orchard, quality = 'high', preview
     mistBase = mistBase == null || first ? groundY : approach(mistBase, groundY, step, 6, 6);
     A.bfMistBase.value = Math.min(mistBase, 1.5) - .4;
     A.bfMistHeight.value = 2.2 + w.fog * 2.6 + rainW * 1.2 + (rts ? 1.5 : 0);
-    A.bfMist.value = (.012 + dawn * .042 + lowSun * .014 + night * .016 + w.fog * .085 + rainW * .022 + w.snow * .014) * (rts ? .55 : 1) * Math.max(0, 1 - 4 * (1 - open)); // gone a few steps in
+    A.bfMist.value = (.003 + dawn * .02 + lowSun * .005 + night * .006 + w.fog * .06 + rainW * .014 + w.snow * .01) * (rts ? .55 : 1) * Math.max(0, 1 - 4 * (1 - open)); // gone a few steps in
     A.bfWind.value.set(.35 + w.storm * 1.2, .12 + w.storm * .5);
     const sunSide = e >= 0;
     lightDir.copy(sunSide ? env.skySunDir : env.moonDir);
@@ -233,7 +233,7 @@ export function createDayNightWeather({scene, orchard, quality = 'high', preview
     A.bfSunScatter.value.copy(scatter).multiplyScalar(open);
     // Shafts falling through the crowns: golden in low sun, a faint cool silver under a clear moon, gone under cloud.
     const clear = (1 - overcast) ** 2;
-    const beamStrength = (sunSide ? sunUp * clear * (.22 + lowSun * .5 + dawn * .2) : moonUp * clear * .1) * open;
+    const beamStrength = (sunSide ? sunUp * clear * (.08 + lowSun * .3 + dawn * .12) : moonUp * clear * .06) * open;
     if (sunSide) beamColor.copy(env.skySun); else beamColor.setRGB(.55, .68, 1);
     if (beams && camera_) beams.update({camera: camera_, light: lightDir, strength: beamStrength * (rts ? .5 : 1), color: beamColor, time});
     if (post) {
@@ -241,9 +241,9 @@ export function createDayNightWeather({scene, orchard, quality = 'high', preview
       lift.setRGB(.008 + .004 * lowSun, .01, .018 + .03 * night);
       gain.setRGB(1 + .05 * lowSun * sunUp, 1, 1 - .05 * lowSun * sunUp + .03 * night);
       // Under rock the salt's own glow blooms instead of sky shafts.
-      post.set({sun: lightDir, rays: (sunSide ? sunUp * (.7 + lowSun * .6) : moonUp * .25) * (1 - overcast * .8) * open, rayColor,
-        bloom: (.3 + night * .22 + w.storm * .1) * open + .4 * (1 - open), bloomThreshold: .95 - .07 * (1 - open), vignette: (.2 + night * .14 + w.fog * .06) * open + .34 * (1 - open),
-        lift, gain, saturation: 1.06 - night * .14 - overcast * .1 + w.snow * .12, contrast: (1.04 + lowSun * .03 + w.snow * .1 + w.fog * .05) * open + 1.12 * (1 - open)});
+      post.set({sun: lightDir, rays: (sunSide ? sunUp * (.4 + lowSun * .5) : moonUp * .2) * (1 - overcast * .8) * open, rayColor,
+        bloom: (.17 + night * .16 + w.storm * .06) * open + .4 * (1 - open), bloomThreshold: 1 - .12 * (1 - open), vignette: (.1 + night * .1 + w.fog * .04) * open + .34 * (1 - open),
+        lift, gain, saturation: 1.1 - night * .1 - overcast * .1 + w.snow * .08, contrast: (1.06 + lowSun * .03 + w.snow * .06 + w.fog * .03) * open + 1.12 * (1 - open)});
     }
   }
   let camera_ = null;

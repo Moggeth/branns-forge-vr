@@ -5,6 +5,7 @@
 // damagePerLevel to every hero weapon hit; each level after that adds a quarter as much (the talents carry the growth
 // from there). Every level earns one talent point to spend on a rank of any weapon's specialty.
 import {itemBonus, validItems} from './hero-items.js';
+import {validTemper, copyTemper} from './weapon-temper.js';
 export const HERO_LEVEL = Object.freeze({max: 20, steep: 10, lateShare: .25, baseHp: 100, healthPerLevel: .2, damagePerLevel: .2, ledger: 64});
 
 // XP to climb from `level` to the next one: 30, 50, 70 … 390 (990 XP to reach level 10, 3,990 to reach level 20).
@@ -101,14 +102,18 @@ function remember(state, p) {
     const drop = Object.entries(ledger).filter(([k]) => !here.has(k)).sort((a, b) => a[1].xp - b[1].xp)[0];
     if (!drop) return; delete ledger[drop[0]];
   }
-  ledger[key] = {xp: p.xp || 0, talents: structuredClone(p.talents || {}), ...(p.items?.length ? {items: [...p.items]} : {})};
+  const temper = copyTemper(p.temper);
+  ledger[key] = {xp: p.xp || 0, talents: structuredClone(p.talents || {}), ...(p.items?.length ? {items: [...p.items]} : {}), ...(Object.keys(temper).length ? {temper} : {})};
 }
+/** Record a hero's progress in the world ledger after a change outside XP and talents (forge tempering). */
+export const rememberProgress = (state, p) => remember(state, p);
 /** A joining hero picks up the progress last recorded under their name, unless someone here already wears it. */
 export function adoptProgress(state, p) {
   const key = ledgerKey(p.name), entry = key && state.heroLedger?.[key];
-  p.xp = 0; p.talents = {}; p.items = [];
+  p.xp = 0; p.talents = {}; p.items = []; delete p.temper;
   if (!entry || state.players.some(q => q !== p && ledgerKey(q.name) === key)) return;
   p.xp = entry.xp; p.talents = structuredClone(entry.talents); p.items = [...(entry.items || [])];
+  if (entry.temper) p.temper = copyTemper(entry.temper);
 }
 
 /** Award XP to a hero. Emits level_up (with the new level) for each level crossed. */
@@ -164,15 +169,15 @@ function validTalents(t, xp) {
 }
 export const validXp = xp => Number.isSafeInteger(xp) && xp >= 0 && xp <= XP_MAX;
 /** Save validation for a player's progress fields (both optional: older saves have neither). */
-export const validProgress = p => (p.xp === undefined || validXp(p.xp)) && (p.talents === undefined || validTalents(p.talents, p.xp || 0)) && (p.items === undefined || validItems(p.items));
-export const restoreProgress = p => ({xp: p.xp || 0, talents: Object.fromEntries(Object.entries(p.talents || {}).filter(([, l]) => l.length).map(([w, l]) => [w, [...l]])), items: [...(p.items || [])]});
+export const validProgress = p => (p.xp === undefined || validXp(p.xp)) && (p.talents === undefined || validTalents(p.talents, p.xp || 0)) && (p.items === undefined || validItems(p.items)) && validTemper(p.temper);
+export const restoreProgress = p => ({xp: p.xp || 0, talents: Object.fromEntries(Object.entries(p.talents || {}).filter(([, l]) => l.length).map(([w, l]) => [w, [...l]])), items: [...(p.items || [])], ...(p.temper && Object.keys(p.temper).length ? {temper: copyTemper(p.temper)} : {})});
 export function restoreLedger(saved) {
   const ledger = saved.heroLedger;
   if (ledger === undefined) return {};
   if (!record(ledger) || Object.keys(ledger).length > HERO_LEVEL.ledger) throw Error('Invalid hero ledger');
   const out = {};
   for (const [key, entry] of Object.entries(ledger)) {
-    if (!key || key.length > 24 || key !== ledgerKey(key) || !record(entry) || !validXp(entry.xp) || !validTalents(entry.talents, entry.xp) || (entry.items !== undefined && !validItems(entry.items))) throw Error('Invalid hero ledger');
+    if (!key || key.length > 24 || key !== ledgerKey(key) || !record(entry) || !validXp(entry.xp) || !validTalents(entry.talents, entry.xp) || (entry.items !== undefined && !validItems(entry.items)) || !validTemper(entry.temper)) throw Error('Invalid hero ledger');
     out[key] = restoreProgress(entry);
   }
   return out;

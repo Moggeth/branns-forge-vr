@@ -721,7 +721,7 @@ export function createOrchardPresentation({scene, renderer, ground, sun, hemisph
       sky.position.copy(camPos);
       const above = Math.max(0, camPos.y - height(camPos.x, camPos.z)), rts = above > 10;
       // Higher views see further: push haze back so the RTS board stays legible; FPS keeps depth haze.
-      fog.near = (rts ? 75 : 50) * fogScale; fog.far = (rts ? 175 : 135) * Math.max(fogScale, .28);
+      fog.near = (rts ? 85 : 62) * fogScale; fog.far = (rts ? 190 : 165) * Math.max(fogScale, .28);
       if (sun.castShadow) {
         setShadowExtent(rts ? 34 : 20);
         if (rts && camDir.y < -.05) { const t = above / -camDir.y; focus.copy(camPos).addScaledVector(camDir, Math.min(t, 80)); }

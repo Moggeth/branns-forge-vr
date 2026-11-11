@@ -13,6 +13,7 @@
 import {addFuel,applyHeat} from './fire.js';
 import {applyEnemyScorch,partPosition} from './combat.js';
 import {hasTalent, talentRank, byRank} from './hero-progress.js';
+import {temperScale} from './weapon-temper.js';
 
 export const WYRMSPOUT = Object.freeze({
   burstTicks: 105,        // a full tank sprays for 1.75 s
@@ -83,7 +84,7 @@ export function goutBurst(state, shot, point, ctx, events) {
     if (d > G.radius) continue;
     stickGlob(state, e, 'torso', shot.ownerId, Math.max(G.burn, tuning.burnTicks)); e.goo = Math.min(WYRMSPOUT.maxGoo, (e.goo || 0) + G.goo - 1);
     applyEnemyScorch(e, 'torso', .2);
-    ctx.damageEnemy(state, e, Math.round(G.damage * (1 - .5 * d / G.radius)), events, shot.ownerId);
+    ctx.damageEnemy(state, e, Math.round(G.damage * (1 - .5 * d / G.radius) * temperScale(state.players.find(p => p.id === shot.ownerId), 'wyrmspout')), events, shot.ownerId);
   }
   events.push({kind: 'gout_burst', id: shot.id, by: shot.ownerId, position: [...point], ground: floor, radius: G.radius});
 }

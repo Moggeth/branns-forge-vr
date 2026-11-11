@@ -149,6 +149,8 @@ import {siegebirdMechanism, siegebirdCues, SIEGEBIRD_RELOAD, siegebirdPlumage} f
 import {createFlockwrightRigs, FLOCKWRIGHT_POSE} from './flockwright.js';
 import {FLOCKWRIGHT} from '../shared/combat.js';
 import {armouryStand, hasFlockwright, ARMOURY_RULES} from '../shared/armoury.js';
+import {TEMPER} from '../shared/weapon-temper.js';
+import {WEAPON_INFO} from './hero-progress-ui.js';
 import {weaponShelved, WEAPON_NAMES, weaponOwned, nextWeapon, costShortfall, nearForge, WEAPON_LADDER} from '../shared/arsenal.js';
 import {materialLabel} from '../shared/material-catalog.js';
 import {labsOn} from './labs.js';
@@ -254,7 +256,8 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   // Keep CSS/UI resolution independent from the adaptive 3D drawing buffer.
   renderer.setPixelRatio(1);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  // ?tone=aces|neutral|agx compares tone curves in place (presentation only).
+  renderer.toneMapping = ({neutral: THREE.NeutralToneMapping, agx: THREE.AgXToneMapping, aces: THREE.ACESFilmicToneMapping})[new URLSearchParams(globalThis.location?.search || '').get('tone')] ?? THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
   renderer.localClippingEnabled = true;
   renderer.setOpaqueSort(stateSortOpaque); // fewer program/material switches per frame (render-hygiene.js)
@@ -1284,7 +1287,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   // Level-up and talent effects: a synthesized cue (full for your own, fading with distance for others) and a buzz on your device.
   function talentFeel(event){
     const mine=event.id===playerId||event.by===playerId,ear=listenerPose().position,near=Math.max(0,1-Math.hypot(event.position[0]-ear[0],event.position[2]-ear[2])/35);
-    if(['talent_learned','talent_reset'].includes(event.kind)&&!mine)return;
+    if(['talent_learned','talent_reset','weapon_tempered'].includes(event.kind)&&!mine)return;
     playTalentSound(audioContext,event,mine?1:near*.8);
     if(!mine)return;
     const level=event.kind==='level_up';
@@ -1317,6 +1320,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     if(event.kind==='mill_crank')homeSound.chord(event.position,[-10,-8],.05,120,.8);
     if(event.kind==='shop_buy'){homeSound.chord(event.position,[12,16,19,24],.07,55,1.2);}
     if(event.kind==='shop_sell')homeSound.chord(event.position,[19,16],.05,60,.8);
+    if(event.kind==='weapon_tempered'&&event.id===playerId){const name=WEAPON_INFO[event.tool]?.name||WEAPON_NAMES[event.tool]||event.tool;say(event.tier>=TEMPER.max?`${name} is a Masterwork! Its hits are ${Math.round(event.tier*TEMPER.damagePerTier*100)}% harder.`:`${name} tempered (${event.tier} of ${TEMPER.max}). Its hits are ${Math.round(event.tier*TEMPER.damagePerTier*100)}% harder.`);}
     if(event.kind==='weapon_forged'){homeSound.chord(event.position,[0,4,7,12,16],.08,90,2.2);if(event.id===playerId){const rung=WEAPON_LADDER[event.rung];say(`The ${WEAPON_NAMES[event.tool]||event.tool} is yours! (${event.rung} of ${event.of})${rung?` Next on the ladder: the ${WEAPON_NAMES[rung.tool]}, for ${costText(rung.cost)}.`:' Every weapon is forged.'}`);setTimeout(()=>equip(event.tool),300);}}
     if(event.kind==='armoury_take'){homeSound.chord(event.position,[0,7,12,16],.05,70,1.2);if(event.id===playerId){flockTaken=true;if(tool!=='flockwright')equip('flockwright');report(event.first?'You lift a Flockwright off the stand. Six goggled birds hop aboard. It lives on key 9 now.':'The crew is already with you: Flockwright in hand.');}}
     if(event.kind==='tavern_ale'){homeSound.chord(event.position,[0,4,7,12],.06,80,1.4);if(event.id===playerId)report('A Hearty Ale! Fully mended, and blows land 20% softer for three minutes.');}
