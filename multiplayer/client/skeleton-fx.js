@@ -64,7 +64,7 @@ export function createSkeletonFx({scene, height = () => 0, audio = () => null}) 
       sp.size[i] = sp.base[i] * (.45 + .55 * u);
     }
     sg.setDrawRange(0, sp.n);
-    for (const name of ['position', 'tint', 'size']) sg.attributes[name].needsUpdate = true;
+    if (sp.n) for (const name of ['position', 'tint', 'size']) { const a = sg.attributes[name]; a.clearUpdateRanges(); a.addUpdateRange(0, sp.n * a.itemSize); a.needsUpdate = true; } // idle sparks send nothing
   }
   // ---- shards ----
   const shardGeo = new THREE.BoxGeometry(1, 1, 1);
