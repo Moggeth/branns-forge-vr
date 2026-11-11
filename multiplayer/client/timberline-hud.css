@@ -34,7 +34,8 @@
    On touch the Sight (special) button and the touch pad stay, since that is how a phone sights and fires. */
 body.timberline-manned .bf-equip, body.timberline-manned .mui-weapons { visibility: hidden; }
 body.timberline-manned #heroTools .bf-bar, body.timberline-manned #heroTools .bf-sub, body.timberline-manned #heroTools .bf-help,
-body.timberline-manned .bf-cue, body.timberline-manned .bf-cue-leader, body.timberline-manned .look-hint { visibility: hidden !important; }
+body.timberline-manned .bf-cue, body.timberline-manned .bf-cue-leader, body.timberline-manned .look-hint, body.timberline-manned #resourceBar { visibility: hidden !important; }
 @media (pointer: fine) { body.timberline-manned #heroTools .bf-special { visibility: hidden; } }
+body.timberline-manned #heroTools { background: none !important; border-color: transparent !important; box-shadow: none !important; }
 /* No screen-centre mark while seated: the operator aims with the brass ladder on the machine. */
 body.timberline-manned .mui-reticle, body.timberline-manned .rr-root { visibility: hidden; }

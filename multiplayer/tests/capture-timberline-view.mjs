@@ -8,7 +8,7 @@ import {makeSave} from '../client/world-saves.js';
 import {launch,BASE,sleep} from './browser-acceptance-lib.mjs';
 import {mkdirSync} from 'node:fs';
 const OUT=process.env.OUT||'tests/captures',PHONE=!!process.env.PHONE,TAG=process.env.TAG||'',VIEW=PHONE?{width:844,height:390}:{width:1280,height:720};mkdirSync(OUT,{recursive:true});
-const sim=createSimulation({room:'SOLO'}),s=sim.adventureWorld();s.tick=1;s.landmarks=false;s.enemies=[];s.pickups=[];s.battle.nextWaveTick=36000;
+const sim=createSimulation({room:'SOLO'}),s=sim.adventureWorld();s.tick=1;s.landmarks=false;s.enemies=[];s.pickups=[];s.battle.nextWaveTick=3600;
 for(const k of Object.keys(s.inventions.stockpiles.party))s.inventions.stockpiles.party[k]=60;
 // Where a lone Hero spawns in this world, worked out with the same rules the game uses.
 const probe=loadSimulation(sim.checkpoint());probe.addPlayer({id:'probe',name:'p',role:'hero'});const spawn=probe.snapshot().players[0].position;
@@ -32,8 +32,7 @@ try{
  console.log('me',await page.evaluate(()=>{const h=window.brannHarness;return h.snapshot().players.find(p=>p.id===h.state().playerId)?.position}),'machine',at);
  for(let i=0;i<5;i++){await page.keyboard.press('e');const ok=await page.waitForFunction(id=>window.brannHarness.snapshot().inventions.structures.find(b=>b.id==='review-timberline')?.operator===id,id,{timeout:40000,polling:500}).then(()=>true,()=>false);if(ok)break;}
  await look(0,-20);await sleep(+(process.env.SETTLE||8000));await shot('seated');
- if(PHONE){const r=await page.evaluate(()=>{const b=document.getElementById('special');if(!b)return null;const q=b.getBoundingClientRect();return {x:q.x+q.width/2,y:q.y+q.height/2};});
-  if(r){const cdp=await page.context().newCDPSession(page);await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:r.x,y:r.y,id:3}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});}}
+ if(PHONE)await page.keyboard.press('q'); // the Sight button and Q both toggle sighting
  else await page.mouse.down({button:'right'});
  await page.waitForFunction(()=>window.brannHarness.controls().timberlineAim?.scope>=1,null,{timeout:120000,polling:300}).catch(()=>console.log('scope wait timed out'));
  await sleep(4000);await shot('sight');
