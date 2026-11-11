@@ -61,7 +61,7 @@ import {worldFor, restoreWorldDescriptor} from './worldgen/registry.js';
 import {thingLimit, extentLimit, posLimit, withWorld} from './world-extent.js';
 import {newWildsState, stepWilds, restoreWilds, wildsDepositKnown, wildsOrigin, wildsFacing} from './wilds.js';
 import {worldMode} from './world-modes.js';
-import {WARBAND,warbandAction,musterWarband,rallyWarband,warbandRoom,validWarband,restoreWarband,stepWarbandWork,warbandStrike} from './warband.js';
+import {WARBAND,FUSEWICK,warbandAction,musterWarband,rallyWarband,warbandRoom,fusewickRoom,validWarband,restoreWarband,stepWarbandWork,warbandStrike} from './warband.js';
 import {treeIdSet} from './world-content.js';
 // Deposits a world may hold at once (generated worlds keep a live window of rocks around every Hero).
 const depositCap = state => state?.world ? 192 : 80;
@@ -424,7 +424,8 @@ function instantiate(state) {
       // Terrain is unlimited: the oldest settled earthworks fold into the baked ground to make room.
       if(['raise','lower','sunder','wall','starfall'].includes(spell))makeTerrainRoom(state,(line?lineCount:1)+state.pendingStarfalls.length);
       if (spell==='muster' && warbandRoom(state,p.id)<=0) return fail('warband_full');
-      if ((['skeleton','squad','golem','rabble','muster'].includes(spell) && state.enemies.length+(spell==='squad'?4:1)>MAX_WORLD) ||
+      if (spell==='sapper' && fusewickRoom(state,p.id)<=0) return fail(warbandRoom(state,p.id)<=0?'warband_full':'fusewick_full');
+      if ((['skeleton','squad','golem','rabble','muster','sapper'].includes(spell) && state.enemies.length+(spell==='squad'?4:1)>MAX_WORLD) ||
           (['grove','ring','wave'].includes(spell) && state.groves.length >= MAX_WORLD) ||
           (['raise','lower','sunder','wall'].includes(spell) && state.edits.length + state.pendingStarfalls.length + (line?lineCount:1) > MAX_WORLD) || (spell==='crystal' && state.deposits.length+state.pendingStarfalls.length>=80) ||
           (spell === 'starfall' && state.edits.length + state.pendingStarfalls.length >= MAX_WORLD) ||
@@ -449,7 +450,7 @@ function instantiate(state) {
       if (spell === 'skeleton'||spell==='golem') state.enemies.push({...createEnemy(idNew,at,spell==='golem'?'golem':'skeleton'),emergeTick:state.tick});
       if(spell==='rabble')state.enemies.push({...createEnemy(idNew,at,rabbleKind(idNew)),emergeTick:state.tick});
       if(spell==='squad')for(let i=0;i<4;i++){const sx=clamp(x+(i%2?1:-1)*1.4,-thingLimit(),thingLimit()),sz=clamp(z+(i<2?-1:1)*1.4,-thingLimit(),thingLimit());state.enemies.push({...createEnemy(`${idNew}_${i}`,[sx,terrainHeight(state,sx,sz),sz]),emergeTick:state.tick});}
-      if(spell==='muster'){const units=musterWarband(state,p,idNew,at,{terrainHeight,clamp:v=>clamp(v,-thingLimit(),thingLimit()),worldRoom:MAX_WORLD-state.enemies.length});events.push({kind:'warband_muster',by:p.id,id:idNew,units:units.map(e=>e.id),position:[...at],tick:state.tick});}
+      if(spell==='muster'||spell==='sapper'){const role=spell==='sapper'?'fusewick':undefined,units=musterWarband(state,p,idNew,at,{terrainHeight,clamp:v=>clamp(v,-thingLimit(),thingLimit()),worldRoom:MAX_WORLD-state.enemies.length},role);events.push({kind:'warband_muster',by:p.id,id:idNew,units:units.map(e=>e.id),position:[...at],tick:state.tick,...(role?{role}:{})});}
       if(spell==='crystal')state.deposits.push({id:idNew,x,z,kind:'crystal',hits:0,maxHits:5,depleted:false});
       if(spell==='heal'||spell==='frost')quenchFire(state,at,7);
       if(spell==='rainfall'){events.push(castRainfall(state,at,p.id));quenchFire(state,at,RAINFALL.quenchRadius);}
@@ -534,7 +535,9 @@ function instantiate(state) {
       stepCrystalWalls(state,combatContext,hitEnemyPart,events);
       forgeY=terrainHeight(state,0,0,false); // Starfall may have changed the ground.
       stepBattle(state,{createEnemy,terrainHeight,nextId,damageHero,damageEnemy:(enemy,n,ev,side,ownerId)=>hitEnemyPart(state,enemy,'torso',n,ownerId?{side,ownerId}:{side},{nextId,terrainHeight,damageHero,damageStructure:(s,id,amount,events)=>damageInvention(s,id,amount,null,events)},ev)},events);
-      stepWarbandWork(state,{trees:treeIndex,terrainHeight},events);
+      stepWarbandWork(state,{trees:treeIndex,terrainHeight,hitEnemyPart:(s,e,part,n,hit,c,ev)=>hitEnemyPart(s,e,part,n,hit,{nextId,terrainHeight},ev),blastRemains,
+        damageStructure:(id,n,ev,side)=>damageInvention(state,id,n,null,ev,side),damageBase:(id,n,side,ev)=>damageBattleBase(state,id,n,side,ev),
+        crater:(x,z,radius,depth)=>{const queued=state.pendingStarfalls?.length||0;if(state.edits.length+queued>=MAX_WORLD)makeTerrainRoom(state,1+queued);if(state.edits.length+queued<MAX_WORLD)state.edits.push({id:nextId(state,'crater'),kind:'keg_crater',x:clamp(x,-thingLimit(),thingLimit()),z:clamp(z,-thingLimit(),thingLimit()),radius,height:-depth});}},events);
       stepEnemies(state,{
         ground:(x,z)=>inventionFloor(state,x,z,forgeFloor(x,z,forgeY,terrainHeight(state,x,z))),
         resolve:(position,radius=.28,height=1.65)=>{if(inUnderway(position[0],position[2]))return resolveUnderway(state,position,radius);resolveForge(position,forgeY,radius,height);resolveInventions(state,position,radius,height);if(state.landmarks)resolveStartingWorld(position,(x,z)=>terrainHeight(state,x,z),radius,height);resolveTrees(position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z),radius,height);resolveDeposits(state,position,radius,(x,z)=>terrainHeight(state,x,z));resolveHomeStructures(state,position,radius);if(state.world)resolvePlaces(worldFor(state),position,radius);else{resolveBackTowns(state,position,radius);resolveCoveLakes(position,radius);resolveMapExtras(position,radius);}resolveTerrainBoundary(position,radius);return position;},
@@ -660,7 +663,7 @@ function loadState(saved, descriptor) {
   for (const e of saved.edits) {
     if (!record(e) || !unique(e.id) || !validXZ(e) ||
         !((e.kind === 'raise' && e.radius === 6 && e.height === 2) || (e.kind === 'lower' && e.radius === 6 && e.height === -2) ||
-          (e.kind === 'starfall' && e.radius === 5 && e.height === -1) ||
+          (e.kind === 'starfall' && e.radius === 5 && e.height === -1) || (e.kind === 'keg_crater' && e.radius === FUSEWICK.crater && e.height === -FUSEWICK.depth) ||
           (e.kind === 'sunder' && (e.wall === undefined ? e.radius === 2.5 && e.height === -1.5 : validateWallSegment(e, saved.tick))) || (e.kind === 'wall' && (e.wall === undefined ? e.radius === 2.5 && e.height === 1.5 && e.rupture === undefined : validateWallSegment(e, saved.tick))) ||
           (e.kind === 'axe_sunder' && e.radius === 1.35 && e.height === -.12) || (e.kind === 'pick_wall' && (e.wall === undefined ? e.radius === 1 && e.height === 2.4 && e.rupture === undefined : validateWallSegment(e, saved.tick)))))
       throw Error('Invalid simulation edit');

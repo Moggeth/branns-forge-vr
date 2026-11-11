@@ -14,6 +14,7 @@ export const SPELL_ICONS = Object.freeze({
     + `<path transform="translate(-1.2 5) scale(.62)" d="${SKULL}"/><path transform="translate(10.3 5) scale(.62)" d="${SKULL}"/>`
     + `<path transform="translate(3.6 .4) scale(.7)" d="${SKULL}"/></g>`,
   // Muster: three shafts of forge-light coming down onto an anvil.
+  sapper: '<path d="M7 9.5h10l1 2.2v6.6l-1 2.2H7l-1-2.2v-6.6zM6.2 13h11.6M6.2 17h11.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 9.5c0-2 1-3 2.6-3.6" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="15.6" cy="5.2" r="1.6"/>',
   muster: '<path d="M2.5 13.2h13.2c0 2.2-1.7 3.6-3.8 3.8l1.5 3.2h1.7V22H5.4v-1.8h1.7l1.5-3.2C5 16.6 2.5 15.4 2.5 13.2zM16.2 13.2h5.3l-1.3 2.4h-4.1z"/>'
     + '<path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" d="M5.5 1.8v7.6M10 1v8.4M14.5 1.8v7.6" opacity=".85"/>',
   golem: '<path fill-rule="evenodd" d="M8 2h8v5h3l2.5 6.5h-3.2L17 10v4l2 8h-4.2l-1.3-5h-3l-1.3 5H5l2-8v-4l-1.3 3.5H2.5L5 7h3zM9.8 3.8v1.8h1.6V3.8zM12.6 3.8v1.8h1.6V3.8z"/>',

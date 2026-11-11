@@ -439,7 +439,8 @@ export function createSpellPresentation({ scene, height, pointScale = 720, tickS
     skeleton(ev, c) { ev.dur = 2.3; summon(ev, c, c.x, c.z, 1, 0); },
     // MUSTER: three shafts of brass forge-light stab down onto the spawn seals (shared/warband.js formation); each Forgeling
     // drops down its shaft and lands at 0.9 s (WARBAND.landTicks) in a spray of brass sparks, a dust ring and a resonance pulse.
-    muster(ev, c) { ev.dur = 2.2; const sp = SPELL_SHAPES.muster.spawns, land = 0.9;
+    sapper(ev, c) { FX.muster(ev, c, SPELL_SHAPES.sapper.spawns); },
+    muster(ev, c, sp = SPELL_SHAPES.muster.spawns) { ev.dur = 2.2; const land = 0.9;
       pulse(ev, c, ribMat(PAL.gold, PAL.resonance, 0, 1), 0.3, 3.4, 0, 0.8, 0.35);
       const shafts = sp.map(() => mk(ev, 12, ribMat(PAL.gold, PAL.resonanceHi, 0, 1.6)));
       const landed = sp.map(() => false);

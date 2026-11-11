@@ -13,6 +13,7 @@ const RECOVERY = {
  "dragon_cooldown": "The dragon is catching its breath. Watch the button fill, then try again.",
  "out_of_reach": "That target is beyond reach. Move closer and aim at it again.",
  "warband_full": "Six Forgelings is a full warband. Lose one in battle before mustering more.",
+ "fusewick_full": "Two Fusewicks is plenty. Send one at a foe before mustering another.",
  "no_warband": "You have no Forgelings yet. Cast Muster from the Command spells to call three down.",
  "invalid_order": "That order could not be given. Choose ground inside the world, or an enemy to attack.",
  "invalid_target": "That target is gone or cannot receive this action. Aim at another valid target.",

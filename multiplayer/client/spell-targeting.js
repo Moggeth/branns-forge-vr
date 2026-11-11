@@ -283,6 +283,11 @@ export function createSpellTargeting({ scene, height, quality = 'high', reducedM
         gS(rot2([[0.75, 0], [0.98, 0]], Math.atan2(z, x), x, z), 0.05, PAL.gold); }
       gS(poly(4, 0.28, Math.PI / 4), 0.05, PAL.purple); cross(R * 0.5); moteField(16, R, PAL.purple, 1, 0.15, 5);
     },
+    sapper(R) { // a scorched seal: one ring for the single Fusewick, eight staves of keg and an ember at the heart
+      gS(circ(R), 0.08, PAL.amber, { flow: 0.5 }); gS(circ(R * 1.15), 0.04, PAL.gold, { dash: 0.8, flow: -0.6, fine: true });
+      for (let i = 0; i < 8; i++) { const a = (i * TAU) / 8; gS(radial(a, R * 0.55, R * 0.92), 0.06, PAL.gold); }
+      gS(poly(4, 0.3, Math.PI / 4), 0.07, PAL.amber); moteField(10, R, PAL.amber, 1.2, 0.15, 7);
+    },
     muster(R) { // a forge seal: brass cog ring with one anvil seal on each spot a Forgeling will land (shared/warband.js)
       gS(circ(R), 0.09, PAL.gold, { flow: 0.4 }); gS(circ(R * 1.1), 0.04, PAL.crystal, { dash: 1.1, flow: -0.5, fine: true });
       for (let i = 0; i < 16; i++) { const a = (i * TAU) / 16; gS(rot2([[R * 1.0, -0.12], [R * 1.14, -0.08], [R * 1.14, 0.08], [R * 1.0, 0.12]], a), 0.045, PAL.gold); }

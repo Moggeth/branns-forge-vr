@@ -38,6 +38,7 @@ export function dressForgeling(visual, kind) {
 export const FORGELING_LOOKS = Object.freeze([
   Object.freeze(['Gear_Chimney', 'Gear_Toolbelt']), Object.freeze(['Gear_Goggles', 'Gear_Toolbelt']), Object.freeze(['Gear_Chimney', 'Gear_Goggles'])]);
 const hash = id => { let h = 2166136261; for (const c of String(id)) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; };
+export const FUSEWICK_LOOK = Object.freeze(['Gear_Goggles', 'Gear_Toolbelt']);
 export function forgelingLook(id) { return FORGELING_LOOKS[hash(id) % FORGELING_LOOKS.length]; }
 
 /** Once per loaded template: resonance-blue crystal glow. */
@@ -45,9 +46,9 @@ export function prepareForgelingTemplate(scene) {
   scene.traverse(n => { for (const m of [n.material].flat()) if (m && /^Crystal/.test(m.name)) { m.emissive.setRGB(.35, .68, 1); m.emissiveIntensity = 2.2; } });
 }
 
-/** Keeps the id's gear on a cloned forgeling and drops the rest. */
-export function dressForgelingModel(visual, id) {
-  const keep = forgelingLook(id), drop = [];
+/** Keeps the id's gear on a cloned forgeling and drops the rest (a Fusewick keeps goggles and toolbelt: the keg is its gear). */
+export function dressForgelingModel(visual, id, role) {
+  const keep = role === 'fusewick' ? FUSEWICK_LOOK : forgelingLook(id), drop = []; // a sapper: goggles down, keg buckled to its toolbelt
   visual.traverse(n => { const name = n.name.replace(/_\d+$/, ''); if (/^Gear_/.test(name) && !keep.includes(name) && !/^Gear_/.test(n.parent?.name || '')) drop.push(n); });
   for (const n of drop) n.removeFromParent();
   visual.userData.forgeling = true; visual.userData.forgelingLook = keep;
