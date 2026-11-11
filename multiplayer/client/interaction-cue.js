@@ -281,7 +281,7 @@ function aimedTarget(hit, self, snapshot, ctx, keys, tool, boneHeld, yaw, make) 
     const friendly=base.side===(self.side==='rivals'?'rivals':'party');
     return make('structure',friendly?'friendly':'ready',id,`${base.side==='party'?'Dawn':'Dusk'} sanctuary`,friendly?'Defend this sanctuary':'Attack this sanctuary',friendly?'':keys.strike,`${Math.ceil(base.hp)} / ${base.maxHp} health`,{done:base.hp,total:base.maxHp});
   }
-  const bot=snapshot.enemies?.find(e=>e.id===id&&e.battleRun!==undefined);
+  const bot=snapshot.enemies?.find(e=>e.id===id&&(e.battleRun!==undefined||e.warband));
   if(bot){const friendly=bot.side===(self.side==='rivals'?'rivals':'party');return make('enemy',friendly?'friendly':'ready',id,bot.side==='party'?(bot.kind==='golem'?'Dawnhold golem':'Forgeling'):`Dusk ${bot.kind==='golem'?'golem':'skeleton'}`,friendly?'Ally — fights alongside you':'Enemy — attack',friendly?'':keys.strike);}
   const facing = Number.isFinite(yaw) ? [-Math.sin(yaw), -Math.cos(yaw)] : null;
   const reachable = (x, z, y) => {   // simulation.js targetOK, from the authoritative position

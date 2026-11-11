@@ -61,6 +61,7 @@ import {worldFor, restoreWorldDescriptor} from './worldgen/registry.js';
 import {thingLimit, extentLimit, posLimit, withWorld} from './world-extent.js';
 import {newWildsState, stepWilds, restoreWilds, wildsDepositKnown, wildsOrigin, wildsFacing} from './wilds.js';
 import {worldMode} from './world-modes.js';
+import {WARBAND,warbandAction,musterWarband,rallyWarband,warbandRoom,validWarband,restoreWarband} from './warband.js';
 import {treeIdSet} from './world-content.js';
 // Deposits a world may hold at once (generated worlds keep a live window of rocks around every Hero).
 const depositCap = state => state?.world ? 192 : 80;
@@ -266,7 +267,7 @@ function instantiate(state) {
         if (p.role !== message.role) {
           releaseHeld(state,p,[0,0,0]); releaseLog(state,p); releaseSnack(state,p); releasePack(state,p);
           p.role = message.role; p.roleTick = state.tick; p.move = [0, 0]; p.vy = 0;p.velocity=[0,0,0];dismissDragon(p);
-          if (p.role === 'hero') p.position = spawn(state, p.id);
+          if (p.role === 'hero') { p.position = spawn(state, p.id); rallyWarband(state, p); }
         }
         return ok();
       }
@@ -303,6 +304,7 @@ function instantiate(state) {
         if (message.action === 'collectTarget') return collectTarget(state,p,message,{terrainHeight,combatAction,combatContext});
         if (message.action === 'talent') return talentAction(state,p,message);
         if (message.action === 'temper') { const r = temperAction(state,p,message); if (r.ok) rememberProgress(state,p); return r; }
+        if (message.action === 'warband') return warbandAction(state,p,message,{terrainHeight,clamp:v=>clamp(v,-thingLimit(),thingLimit()),reach:thingLimit()});
         if (p.role !== 'hero') return fail('invalid_action');
         if (message.action === 'craftWeapon') return craftWeapon(state,p,message);
         if (message.action === 'mount' || message.action === 'dismount') return mountAction(state,p,message,{takeApple:h=>{const f=state.fruit,i=f?.drops?.findIndex(d=>d.heldBy===h.id)??-1;if(i<0)return false;f.drops.splice(i,1);return true;}});
@@ -421,7 +423,8 @@ function instantiate(state) {
       if(spell==='crystal'||spell==='starfall'||spell==='wall')reclaimDepletedDeposits(state); // a wall reclaims room for its quarry stone
       // Terrain is unlimited: the oldest settled earthworks fold into the baked ground to make room.
       if(['raise','lower','sunder','wall','starfall'].includes(spell))makeTerrainRoom(state,(line?lineCount:1)+state.pendingStarfalls.length);
-      if ((['skeleton','squad','golem','rabble'].includes(spell) && state.enemies.length+(spell==='squad'?4:1)>MAX_WORLD) ||
+      if (spell==='muster' && warbandRoom(state,p.id)<=0) return fail('warband_full');
+      if ((['skeleton','squad','golem','rabble','muster'].includes(spell) && state.enemies.length+(spell==='squad'?4:1)>MAX_WORLD) ||
           (['grove','ring','wave'].includes(spell) && state.groves.length >= MAX_WORLD) ||
           (['raise','lower','sunder','wall'].includes(spell) && state.edits.length + state.pendingStarfalls.length + (line?lineCount:1) > MAX_WORLD) || (spell==='crystal' && state.deposits.length+state.pendingStarfalls.length>=80) ||
           (spell === 'starfall' && state.edits.length + state.pendingStarfalls.length >= MAX_WORLD) ||
@@ -446,6 +449,7 @@ function instantiate(state) {
       if (spell === 'skeleton'||spell==='golem') state.enemies.push({...createEnemy(idNew,at,spell==='golem'?'golem':'skeleton'),emergeTick:state.tick});
       if(spell==='rabble')state.enemies.push({...createEnemy(idNew,at,rabbleKind(idNew)),emergeTick:state.tick});
       if(spell==='squad')for(let i=0;i<4;i++){const sx=clamp(x+(i%2?1:-1)*1.4,-thingLimit(),thingLimit()),sz=clamp(z+(i<2?-1:1)*1.4,-thingLimit(),thingLimit());state.enemies.push({...createEnemy(`${idNew}_${i}`,[sx,terrainHeight(state,sx,sz),sz]),emergeTick:state.tick});}
+      if(spell==='muster'){const units=musterWarband(state,p,idNew,at,{terrainHeight,clamp:v=>clamp(v,-thingLimit(),thingLimit()),worldRoom:MAX_WORLD-state.enemies.length});events.push({kind:'warband_muster',by:p.id,id:idNew,units:units.map(e=>e.id),position:[...at],tick:state.tick});}
       if(spell==='crystal')state.deposits.push({id:idNew,x,z,kind:'crystal',hits:0,maxHits:5,depleted:false});
       if(spell==='heal'||spell==='frost')quenchFire(state,at,7);
       if(spell==='rainfall'){events.push(castRainfall(state,at,p.id));quenchFire(state,at,RAINFALL.quenchRadius);}
@@ -533,7 +537,7 @@ function instantiate(state) {
       stepEnemies(state,{
         ground:(x,z)=>inventionFloor(state,x,z,forgeFloor(x,z,forgeY,terrainHeight(state,x,z))),
         resolve:(position,radius=.28,height=1.65)=>{if(inUnderway(position[0],position[2]))return resolveUnderway(state,position,radius);resolveForge(position,forgeY,radius,height);resolveInventions(state,position,radius,height);if(state.landmarks)resolveStartingWorld(position,(x,z)=>terrainHeight(state,x,z),radius,height);resolveTrees(position,treeIndex,treeCuts,(x,z)=>terrainHeight(state,x,z),radius,height);resolveDeposits(state,position,radius,(x,z)=>terrainHeight(state,x,z));resolveHomeStructures(state,position,radius);if(state.world)resolvePlaces(worldFor(state),position,radius);else{resolveBackTowns(state,position,radius);resolveCoveLakes(position,radius);resolveMapExtras(position,radius);}resolveTerrainBoundary(position,radius);return position;},
-        damageHero,damageEnemy:(enemy,n,ev,side,ownerId)=>hitEnemyPart(state,enemy,'torso',n,ownerId?{side,ownerId}:{side},{nextId,terrainHeight},ev),damageBase:(id,n,side)=>damageBattleBase(state,id,n,side,events),damageStructure:(id,n,ev,side)=>damageInvention(state,id,n,null,ev,side),events
+        damageHero,damageEnemy:(enemy,n,ev,side,ownerId)=>hitEnemyPart(state,enemy,'torso',n,ownerId?{side,ownerId,by:'warband'}:{side},{nextId,terrainHeight},ev),damageBase:(id,n,side)=>damageBattleBase(state,id,n,side,events),damageStructure:(id,n,ev,side)=>damageInvention(state,id,n,null,ev,side),events
       });
       for(const e of state.enemies)if(e.hp>0&&e.battleRun!==undefined)resolveHomeDomes(state,e.position,e.side,.4);
       for(const e of state.enemies)if(e.hp>0)resolveTaverns(state,e.position,.5); // monsters are shooed out of every tavern
@@ -647,6 +651,7 @@ function loadState(saved, descriptor) {
   const underways = restoreUnderways(saved);
   for (const e of saved.enemies) {
     if(e?.emergeTick!==undefined&&!validTick(e.emergeTick,saved.tick,0))throw Error('Invalid enemy emergence');
+    if(e&&!validWarband(e,saved.tick,thingLimit()))throw Error('Invalid warband');
     if (!record(e) || !unique(e.id) || !validPosition(e.position) || !finite(e.yaw) || Math.abs(e.yaw) > Math.PI + 0.000001 ||
         (e.attackTarget!==undefined&&!validId(e.attackTarget)) || !finite(e.hp) || e.hp <= 0 || e.hp > enemyMaxHp(e) || !validEnt(e,saved,entAwake) || !validStumpling(e,saved) || !validUnderwayEnemy(e,underways.runs) || (e.slowUntil!==undefined&&!validTick(e.slowUntil,saved.tick,0,300)) || !validTick(e.attackTick, saved.tick) || (e.hurtTick !== undefined && !validTick(e.hurtTick,saved.tick)) || (e.meteorBorn!==undefined && (e.meteorBorn!==true || e.kind!=='golem' || !validTick(e.unfurlTick,saved.tick,0))) || (e.unfurlTick!==undefined && e.meteorBorn!==true) || (e.boss!==undefined && (e.kind!=='golem' || !(e.boss===true&&e.uw!==undefined || /^[a-z]{1,16}$/.test(e.boss)))) || (e.launchTick!==undefined && !validTick(e.launchTick,saved.tick,saved.tick-PICK_WALL.launchTicks)))
       throw Error('Invalid simulation enemy');
@@ -708,7 +713,7 @@ function loadState(saved, descriptor) {
     attackTick: p.attackTick, castTick: p.castTick, roleTick: p.roleTick, seq: p.seq, ...restoreProgress(p),...(p.runBoons?.length?{runBoons:[...p.runBoons]}:{}), tool: p.tool || 'axe', side:p.side||'party',...(p.heldOre?{heldOre:p.heldOre}:{}),...(p.rally?{rally:p.rally}:{}), resources: restoreMaterials(p.resources),
     ...(p.protectedUntil!==undefined?{protectedUntil:p.protectedUntil}:{}),heat:p.heat||0,overheatUntil:p.overheatUntil||0,flameTick:p.flameTick??-1000,flaskLit:!!p.flaskLit,
     ...(p.specialTick!==undefined?{specialTick:p.specialTick}:{}),...(p.siegebird?{siegebird:{n:p.siegebird.n,golden:p.siegebird.golden,hits:p.siegebird.hits,...(p.siegebird.quick!==undefined?{quick:p.siegebird.quick,wind:p.siegebird.wind}:{})}}:{}),...(p.charge?{charge:{hits:p.charge.hits,until:p.charge.until}}:{}),...(p.swiftUntil!==undefined?{swiftUntil:p.swiftUntil}:{}),...restoreTownFields(p),...(p.streak?{streak:p.streak}:{}),...(p.dragonReady?{dragonReady:true}:{}),...(p.dragon?{dragon:p.dragon}:{}), ...(p.head ? {head: p.head} : {}), ...(p.hands ? {hands: p.hands} : {})}));
-  state.enemies = copy(saved.enemies).map(({id, position, yaw, hp, attackTick, attackTarget,hurtTick,side,battleRun,battleWaypoint,kind,parts,missingParts,slowUntil,armor,meteorBorn,unfurlTick,scorch,burnUntil,burnPart,emergeTick,launchTick,size,treeId,variant,treeHeight,wakeTick,shield,shieldBroken,flinchTick,home,uw,room,boss}) => ({id, position, yaw, hp, attackTick,...underwayEnemyFields({uw,room,boss}),...(uw===undefined&&boss&&kind==='golem'?{boss}:{}),...(battleRun!==undefined?{side,battleRun,battleWaypoint}:{}),...(kind==='ent'?{size,treeId,variant,treeHeight,wakeTick}:{}),...(kind==='stumpling'?{treeId,variant,wakeTick,home}:{}),...(launchTick!==undefined?{launchTick}:{}),...(scorch?{scorch}:{}),...(burnUntil!==undefined?{burnUntil,burnPart}:{}),...(emergeTick!==undefined?{emergeTick}:{}),...(attackTarget?{attackTarget}:{}),...(meteorBorn?{meteorBorn:true,unfurlTick}:{}),kind:kind||'skeleton',parts:parts?Object.fromEntries(PARTS.map(p=>[p,parts[p]])):enemyParts(kind,size),missingParts:missingParts||[],...(kind==='golem'?{armor:armor??3}:{}), ...(slowUntil!==undefined?{slowUntil}:{}), ...(hurtTick !== undefined ? {hurtTick} : {}),...(shield!==undefined?{shield}:{}),...(shieldBroken?{shieldBroken:true}:{}),...(flinchTick!==undefined?{flinchTick}:{})}));
+  state.enemies = copy(saved.enemies).map(({id, position, yaw, hp, attackTick, attackTarget,hurtTick,side,battleRun,battleWaypoint,kind,parts,missingParts,slowUntil,armor,meteorBorn,unfurlTick,scorch,burnUntil,burnPart,emergeTick,launchTick,size,treeId,variant,treeHeight,wakeTick,shield,shieldBroken,flinchTick,home,uw,room,boss,warband}) => ({id, position, yaw, hp, attackTick,...underwayEnemyFields({uw,room,boss}),...(uw===undefined&&boss&&kind==='golem'?{boss}:{}),...(battleRun!==undefined?{side,battleRun,battleWaypoint}:{}),...(warband?{side,warband:restoreWarband(warband)}:{}),...(kind==='ent'?{size,treeId,variant,treeHeight,wakeTick}:{}),...(kind==='stumpling'?{treeId,variant,wakeTick,home}:{}),...(launchTick!==undefined?{launchTick}:{}),...(scorch?{scorch}:{}),...(burnUntil!==undefined?{burnUntil,burnPart}:{}),...(emergeTick!==undefined?{emergeTick}:{}),...(attackTarget?{attackTarget}:{}),...(meteorBorn?{meteorBorn:true,unfurlTick}:{}),kind:kind||'skeleton',parts:parts?Object.fromEntries(PARTS.map(p=>[p,parts[p]])):enemyParts(kind,size),missingParts:missingParts||[],...(kind==='golem'?{armor:armor??3}:{}), ...(slowUntil!==undefined?{slowUntil}:{}), ...(hurtTick !== undefined ? {hurtTick} : {}),...(shield!==undefined?{shield}:{}),...(shieldBroken?{shieldBroken:true}:{}),...(flinchTick!==undefined?{flinchTick}:{})}));
   state.enemies.forEach((e,i)=>{if(isCritter(e.kind))for(const k of CRITTER_FIELDS)if(saved.enemies[i][k]!==undefined)e[k]=copy(saved.enemies[i][k]);}); // shared/critters.js state
   Object.assign(state,restoreCombat(saved),restoreFire(saved,ids));
   if(!validateTerrainRuptures(saved.edits,saved.tick))throw Error('Invalid terrain rupture');

@@ -25,9 +25,11 @@ export const battleSkirmish = state => state.battle?.status === 'running' && sta
 export const battleObjectives = state => homeBattle(state)?[...siegeTargets(state,'party'),...siegeTargets(state,'rivals')]:battleActive(state)?state.battle.bases:[];
 export const battleActive = state => state.battle?.status === 'running';
 export const battleBot = e => e?.battleRun !== undefined;
-export const enemyHostileTo = (enemy,side='party') => !battleBot(enemy)||enemy.side!==side;
+// Sided bodies: lane/keep troops, and a God's Warband (shared/warband.js). Wild creatures carry no side.
+export const sidedUnit = e => battleBot(e)||!!e?.warband;
+export const enemyHostileTo = (enemy,side='party') => !sidedUnit(enemy)||enemy.side!==side;
 export function friendlyEnemyHit(state,enemy,hit) {
-  if(!battleBot(enemy))return false;
+  if(!sidedUnit(enemy))return false;
   const side=hit?.side||state.players.find(p=>p.id===hit?.ownerId)?.side;
   // Legacy delayed attacks with a departed owner have no safe faction attribution.
   return side===enemy.side||!!hit?.ownerId&&!side;
@@ -170,7 +172,7 @@ export function restoreBattle(saved) {
   }
   for(const side of BATTLE_SIDES)if(bots.filter(e=>e.side===side).length>BATTLE.perSideCap)bad();
   for(const e of bots)if(b.status!=='running'||e.battleRun!==b.run||e.kind!=='skeleton'||!BATTLE_SIDES.includes(e.side)||!int(e.battleWaypoint,0,lane.length-1)||!new RegExp(`^battle${b.run}_([1-9][0-9]*|b[0-9]+)_${e.side}_[0-9]+$`).test(e.id)||Number(e.id.split('_')[1])>b.wave||Number(e.id.split('_')[1].slice(1))>saved.tick)bad(); // b<tick>: rung out early by a barracks bell
-  for(const e of saved.enemies)if(!battleBot(e)&&(e.side!==undefined||e.battleWaypoint!==undefined||/^battle\d+_/.test(e.id)))bad();
+  for(const e of saved.enemies)if(!battleBot(e)&&!e.warband&&(e.side!==undefined||e.battleWaypoint!==undefined||/^battle\d+_/.test(e.id)))bad();
   return {v:1,status:b.status,run:b.run,wave:b.wave,nextWaveTick:b.nextWaveTick,winner:b.winner,bases:b.bases.map(({id,side,position,hp,maxHp})=>({id,side,position:[...position],hp,maxHp}))};
 }
 
@@ -179,6 +181,6 @@ function restoreHomeBattle(saved,bots) {
   if(b.status!=='running'||!int(b.run,1,1e9)||!int(b.wave,0,1e9)||!int(b.nextWaveTick,0,saved.tick+HOME.waveTicks)||(b.winner!==null&&!BATTLE_SIDES.includes(b.winner))||!int(b.sieges,0,1e9)||bots.length>BATTLE.botCap)bad();
   for(const side of BATTLE_SIDES)if(bots.filter(e=>e.side===side).length>BATTLE.perSideCap)bad();
   for(const e of bots)if(e.battleRun!==b.run||!['skeleton','golem'].includes(e.kind)||!BATTLE_SIDES.includes(e.side)||!int(e.battleWaypoint,0,lane.length-1)||!new RegExp(`^battle${b.run}_([1-9][0-9]*|b[0-9]+)_${e.side}_[0-9]+$`).test(e.id)||Number(e.id.split('_')[1])>b.wave||Number(e.id.split('_')[1].slice(1))>saved.tick)bad(); // b<tick>: rung out early by a barracks bell
-  for(const e of saved.enemies)if(!battleBot(e)&&(e.side!==undefined||e.battleWaypoint!==undefined||/^battle\d+_/.test(e.id)))bad();
+  for(const e of saved.enemies)if(!battleBot(e)&&!e.warband&&(e.side!==undefined||e.battleWaypoint!==undefined||/^battle\d+_/.test(e.id)))bad();
   return {v:2,status:'running',run:b.run,wave:b.wave,nextWaveTick:b.nextWaveTick,winner:b.winner,sieges:b.sieges,bases:restoreHomeBases(b.bases,saved.tick)};
 }

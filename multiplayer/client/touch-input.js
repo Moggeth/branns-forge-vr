@@ -50,6 +50,7 @@ export function bindWorldTouch(canvas, game, {enabled, role, sensitivity, onTarg
     const p={x:e.clientX,y:e.clientY,startX:e.clientX,startY:e.clientY,moved:false,blocked:false,role:role(),cast:current()};
     points.set(e.pointerId,p);canvas.setPointerCapture?.(e.pointerId);
     if(points.size===2){cancelLine();for(const q of points.values()){q.blocked=true;q.moved=true;}pinch=span();return;}
+    if(p.role==='god'&&game.commanding?.()){p.command=true;return;} // commanding the Warband: a tap is an order, not a line
     if(p.role==='god'&&p.cast.line){
       p.hadStart=!!p.cast.start; p.lineStarted=game.aimAt(e.clientX,e.clientY);
       if(p.lineStarted){game.beginAimLine();onTarget(true);}else p.blocked=true;
@@ -63,7 +64,7 @@ export function bindWorldTouch(canvas, game, {enabled, role, sensitivity, onTarg
     if(points.size===2){const next=span();if(role()==='god'&&pinch!==null)game.zoomBy((pinch-next)*.07);pinch=next;return;}
     if(p.blocked)return;
     if(!valid(p)){p.blocked=true;return;}
-    if(p.role==='god'&&p.cast.line){onTarget(game.aimAt(p.x,p.y));return;}
+    if(p.role==='god'&&p.cast.line&&!p.command){onTarget(game.aimAt(p.x,p.y));return;}
     if(p.moved)game.lookByPixels(dx*sensitivity(),dy*sensitivity());
   });
   for(const name of ['pointerup','pointercancel','lostpointercapture'])on(name,e=>{
@@ -71,7 +72,10 @@ export function bindWorldTouch(canvas, game, {enabled, role, sensitivity, onTarg
     const accept=name==='pointerup'&&!p.blocked&&valid(p)&&onWorld(e);
     points.delete(e.pointerId);pinch=null;
     if(p.role==='hero'&&accept&&!p.moved)(game.tapAt||game.collectAt)?.(e.clientX,e.clientY);
-    if(p.role==='god'){
+    // A still tap on a Forgeling takes command; while commanding, a still tap orders the Warband (client/game.js commandTap).
+    if(p.role==='god'&&accept&&!p.moved&&game.commandTap?.(e.clientX,e.clientY)){if(p.lineStarted){game.cancelAim?.();onTarget(false);}}
+    else if(p.role==='god'&&p.command){}
+    else if(p.role==='god'){
       if(accept&&(p.cast.line||!p.moved)){
         const hit=game.aimAt(e.clientX,e.clientY);onTarget(hit);
         if(hit&&p.cast.quick&&(!p.cast.line||p.moved||p.hadStart))game.castAim();
