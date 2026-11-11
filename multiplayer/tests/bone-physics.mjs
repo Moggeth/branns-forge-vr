@@ -219,6 +219,21 @@ for (const part of ['leftArm', 'rightArm', 'leftLeg', 'rightLeg', 'head']) {
   assert.ok(high.object.children.every(m => m.count === 0));
   high.dispose(); low.dispose();
 }
+// Golems topple away from the killing blow like a felled tower, and the stones tumble apart where they land.
+{
+  const w = world(), g = createEnemy('g2', [0, 0, 0], 'golem'); g.hp = 1; g.armor = 0; w.state.enemies.push(g);
+  hitEnemyPart(w.state, g, 'torso', 999, {tool: 'axe', point: [0, 1.6, .5], normal: [0, 0, 1]}, w.ctx, []);
+  const rocks = w.state.detachedParts, by = p => rocks.find(d => d.part === p);
+  assert.ok(rocks.length >= 5, 'the golem comes apart');
+  step(w, 360);
+  const head = by('head'), legs = rocks.filter(d => d.part.endsWith('Leg'));
+  assert.ok(head && head.position[2] < -1.2, `it falls away from the blow (head z ${head?.position[2].toFixed(2)})`);
+  assert.ok(legs.every(l => l.position[2] > head.position[2] + .8), 'feet stay behind, the top goes furthest');
+  assert.ok(rocks.every(d => d.position[1] < 1.2 && d.rest > 0), 'every stone ends on the ground and settles');
+  const again = world(), g2 = createEnemy('g2', [0, 0, 0], 'golem'); g2.hp = 1; g2.armor = 0; again.state.enemies.push(g2);
+  hitEnemyPart(again.state, g2, 'torso', 999, {tool: 'axe', point: [0, 1.6, .5], normal: [0, 0, 1]}, again.ctx, []); step(again, 360);
+  assert.deepEqual(again.state.detachedParts.map(d => d.position), rocks.map(d => d.position), 'deterministic');
+}
 // ---- explosion effect: pooled, capped, and gone when it is over ---------------------------------------------------
 {
   const scene = new THREE.Scene(), fx = createBlastFx({scene, height: () => 0});
