@@ -1325,7 +1325,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
       if(!weaponModels.has(next)){report(`Could not prepare ${next}. Check your connection and reload to retry.`);return;}
       if(!active||role!=='hero')return;
     }else startup.pendingTool=null;
-    inspect.cancel();weapons.cancel();cinderAim=false;cancelWallAim();specialSwing=null;presses.invalidate();swingAt=-Infinity;strikeClock.cancel();swingContact=true;onAction('equip',{tool:next});aiming=false;
+    inspect.cancel();weapons.cancel();cinderAim=false;cancelWallAim();specialSwing=null;sunfall.cancelSlam();presses.invalidate();swingAt=-Infinity;strikeClock.cancel();swingContact=true;onAction('equip',{tool:next});aiming=false;
     // First person: stash the old item, then draw the new one (weapon-swap.js). VR hands and held limbs swap at once.
     if(renderer.xr.isPresenting||!weaponAnchor.visible||next==='limb'||tool==='limb'){const pending=weaponSwap.cancel();if(pending&&pending!==next)equipVisual(pending);equipVisual(next);}else weaponSwap.request(next,tool);}
   // VR aim comes from the controller that actually holds the weapon (or that made this grab/throw press), never an
@@ -1536,7 +1536,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   }
   function clearInput() {
     dragonRide.clearInput();
-    aiming=false;cinderAim=false;scoping=false;crankHeld=false;weapons.cancel();specialSwing=null;cancelWallAim();pickupHighlight.clear();nearestPickup=null;feedback.reset();updateFireAudio(false);cancelCast();
+    aiming=false;cinderAim=false;scoping=false;crankHeld=false;weapons.cancel();specialSwing=null;sunfall.cancelSlam();cancelWallAim();pickupHighlight.clear();nearestPickup=null;feedback.reset();updateFireAudio(false);cancelCast();
     swingContact=true; swingAt=-Infinity; strikeClock.cancel(); viewPunch.reset();
     keys.clear(); jumpPending = false; rightDrag = false; move.set(0, 0, 0);
     for (const axis of Object.values(touchAxes)) { axis.x = 0; axis.y = 0; }

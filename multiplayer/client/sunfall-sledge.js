@@ -131,7 +131,7 @@ const DUST = new THREE.Color(.62, .55, .45);
 /**
  * createSunfallSledge({scene, realLight, reducedMotion, height(x, z)}) ->
  *   {attach(model|null), update(frame), beginSlam(now) -> bool, pose(now) -> {offset, quaternion} | null,
- *    slamming(now), takeImpact(now) -> bool, impact(position), stats(), dispose()}
+ *    slamming(now), takeImpact(now) -> bool, cancelSlam(), impact(position), stats(), dispose()}
  * frame: {time, dt, charge: 0..1 (special readiness), shown, swinging, night: 0..1}
  */
 export function createSunfallSledge({scene, realLight = true, reducedMotion = false, height = () => 0} = {}) {
@@ -206,8 +206,8 @@ export function createSunfallSledge({scene, realLight = true, reducedMotion = fa
     model.traverse(n => {
       if (!n.isMesh) return;
       const swap = m => {
-        if (!GLOW_MATERIALS.test(m?.name || '')) return m;
-        let c = copies.get(m); if (!c) { c = m.clone(); c.userData.baseEmissive = Math.min(1, m.emissiveIntensity ?? 1) * (m.name === 'Vent_Glow' ? 1.25 : .9); c.userData.vent = m.name === 'Vent_Glow'; copies.set(m, c); }
+        if (!GLOW_MATERIALS.test(m?.name || '') || m.userData.sunfallOwned) return m;   // already this sledge's own copy
+        let c = copies.get(m); if (!c) { c = m.clone(); c.userData.sunfallOwned = true; c.userData.baseEmissive = Math.min(1, m.emissiveIntensity ?? 1) * (m.name === 'Vent_Glow' ? 1.25 : .9); c.userData.vent = m.name === 'Vent_Glow'; copies.set(m, c); }
         return c;
       };
       n.material = Array.isArray(n.material) ? n.material.map(swap) : swap(n.material);
@@ -222,7 +222,9 @@ export function createSunfallSledge({scene, realLight = true, reducedMotion = fa
   const S = SUNFALL.slam, total = S.raise + S.drive + S.hold + S.back;
   function beginSlam(now) { if (now - slamAt < total) return false; slamAt = now; slamSent = false; return true; }
   function slamming(now) { return now - slamAt < total; }
-  function takeImpact(now) { if (slamSent || now - slamAt < S.raise + S.drive) return false; slamSent = true; return true; }
+  function takeImpact(now) { if (slamSent || now - slamAt < S.raise + S.drive) return false; slamSent = true; return now - slamAt < total; }
+  /** Drop a slam in progress (weapon swap, menus, death): it must never land later on its own. */
+  function cancelSlam() { slamAt = -Infinity; slamSent = true; }
   function pose(now) {
     const t = now - slamAt; if (!(t >= 0 && t < total)) return null;
     const k = reducedMotion ? .55 : 1;
@@ -365,5 +367,5 @@ export function createSunfallSledge({scene, realLight = true, reducedMotion = fa
     if (light) scene.remove(light);
     quad.dispose(); model = null;
   }
-  return {attach, update, beginSlam, pose, slamming, takeImpact, impact, stats, dispose};
+  return {attach, update, beginSlam, pose, slamming, takeImpact, cancelSlam, impact, stats, dispose};
 }
