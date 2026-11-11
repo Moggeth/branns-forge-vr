@@ -43,6 +43,15 @@ export const ASSET_TAGS = Object.freeze([
   {asset: 'root_tangle', purpose: 'decor', biomes: {forest: 2, pine: 1}, slope: [0, .6], footprint: 0, spacing: 8, scale: [.8, 1.2], near: 'forest-edge', lod: 'near'},
 ]);
 export const TREE_TAGS = ASSET_TAGS.filter(t => t.purpose === 'tree');
+// Where trees stand is frozen: these are the original three species' weights and slope limits, and they alone decide
+// whether a lattice cell grows a tree. Generated tree ids (`wt{cx}_{cz}_{n}`) count placed trees, and saves record felled
+// and harvested trees by id, so changing placement would hand old changes to different trees. Which species grows on a
+// placed spot is picked separately from TREE_TAGS above, so species weights can change freely without moving a tree.
+export const TREE_PLACEMENT_TAGS = Object.freeze([
+  {variant: 0, biomes: {meadow: 6, forest: 4, marsh: 1, steppe: 1}, slope: [0, .6]},
+  {variant: 1, biomes: {forest: 4, pine: 6, marsh: 4, tundra: 1}, slope: [0, .65]},
+  {variant: 2, biomes: {meadow: 3, forest: 2, pine: 4, steppe: 3, tundra: 4, beach: 1}, slope: [0, .7]},
+]);
 export const RESOURCE_TAGS = ASSET_TAGS.filter(t => t.purpose === 'resource');
 export const DECOR_TAGS = ASSET_TAGS.filter(t => t.purpose === 'decor');
 export const tagFor = asset => ASSET_TAGS.find(t => t.asset === asset) || null;
