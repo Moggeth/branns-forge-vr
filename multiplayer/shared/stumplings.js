@@ -6,7 +6,7 @@
 // sometimes ore its roots were clutching. Its harvest record is released on death or burrowing; burrowing moves
 // the tree root to the critter's exact position. Tree-view grows the sapling and the harvest slot is freed.
 import {thingLimit} from './world-extent.js';
-import {isFelled} from './trees.js';
+import {isFelled, VARIANTS} from './trees.js';
 import {clampToWorld} from './keep-sites.js';
 
 export const STUMPLING = Object.freeze({
@@ -163,7 +163,7 @@ const finite = n => typeof n === 'number' && Number.isFinite(n);
 export function validStumpling(e, saved) {
  if (!isStumpling(e)) return e.home === undefined;
  const cut = (saved.harvestedTrees || []).find(h => h.id === e.treeId);
- return !!cut && cut.cuts === 3 && e.size === undefined && e.treeHeight === undefined && Number.isInteger(e.variant) && e.variant >= 0 && e.variant <= 2 &&
+ return !!cut && cut.cuts === 3 && e.size === undefined && e.treeHeight === undefined && Number.isInteger(e.variant) && e.variant >= 0 && e.variant < VARIANTS.length &&
   Number.isSafeInteger(e.wakeTick) && e.wakeTick >= 0 && e.wakeTick <= saved.tick && saved.tick < e.wakeTick + STUMPLING.lifeTicks + STUMPLING.burrowTicks &&
   Array.isArray(e.home) && e.home.length === 2 && e.home.every(n => finite(n) && Math.abs(n) <= thingLimit()) &&
   (saved.enemies || []).filter(o => o.kind === 'stumpling' && o.treeId === e.treeId).length === 1;

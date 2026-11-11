@@ -1,12 +1,13 @@
 // Hero progression: XP, levels and weapon talents. Pure and deterministic (no clock, no RNG); the host owns every
 // change, and snapshots carry xp, talents and the derived maxHp to everyone else.
 //
-// Levels come fast: a couple of skeletons reach level 2. Each level adds healthPerLevel to max health and
-// damagePerLevel to every hero weapon hit, and earns one talent point to spend on any weapon's specialty.
+// Levels come fast: a couple of skeletons reach level 2. Each level up to `steep` adds healthPerLevel to max health and
+// damagePerLevel to every hero weapon hit; each level after that adds a quarter as much (the talents carry the growth
+// from there). Every level earns one talent point to spend on a rank of any weapon's specialty.
 import {itemBonus, validItems} from './hero-items.js';
-export const HERO_LEVEL = Object.freeze({max: 10, baseHp: 100, healthPerLevel: .2, damagePerLevel: .2, ledger: 64});
+export const HERO_LEVEL = Object.freeze({max: 20, steep: 10, lateShare: .25, baseHp: 100, healthPerLevel: .2, damagePerLevel: .2, ledger: 64});
 
-// XP to climb from `level` to the next one: 30, 50, 70 … 190 (990 XP to reach level 10).
+// XP to climb from `level` to the next one: 30, 50, 70 … 390 (990 XP to reach level 10, 3,990 to reach level 20).
 export const xpToNext = level => 30 + 20 * (level - 1);
 const START = [0, 0];
 for (let l = 2; l <= HERO_LEVEL.max; l++) START[l] = START[l - 1] + xpToNext(l - 1);
@@ -16,35 +17,49 @@ export const XP_MAX = xpForLevel(HERO_LEVEL.max);
 // What a hero earns. Kills are credited to whoever landed the killing blow; harvest to whoever swung.
 export const XP_REWARD = Object.freeze({skeleton: 20, golem: 60, ent: 45, stumpling: 8, kettlebelly: 30, bramblehog: 25, kegtoter: 18, tree: 10, ore: 6, meteor: 15});
 
-// Two specialties per weapon (the hammer is not in yet). `ready: false` lists a specialty without letting anyone buy
-// it yet (its weapon's thread turns it on when the effect ships).
+// Two specialties per weapon, each with up to three ranks bought one point at a time. Rank I is the specialty itself;
+// ranks II and III push it further and open at hero levels RANK_LEVEL[1] and RANK_LEVEL[2]. `ranks` holds one short
+// line per rank for the Talents panel; a one-line `ranks` (lab weapons) stops at rank I. A learned rank is stored
+// by repeating the id: talents.axe = ['whirlwind', 'whirlwind'] is Whirlwind rank II (old saves are all rank I).
+// `ready: false` lists a specialty without letting anyone buy it yet.
+export const RANK_LEVEL = Object.freeze([2, 6, 12]);
 export const TALENTS = Object.freeze({
   axe: Object.freeze({
-    limbsplitter: Object.freeze({name: 'Limbsplitter', text: 'Every swing that lands on an arm, leg or head lops it clean off.'}),
-    whirlwind: Object.freeze({name: 'Whirlwind', text: 'Your cleave becomes a full spin with 30% more reach, and recharges in 4 seconds instead of 6.'}),
+    limbsplitter: Object.freeze({name: 'Limbsplitter', text: 'Every swing that lands on an arm, leg or head lops it clean off.', ranks: ['Lop off arms, legs and heads in one swing.', 'Each limb you lop heals you 4 health.', 'Each limb you lop heals you 8 health.']}),
+    whirlwind: Object.freeze({name: 'Whirlwind', text: 'Your cleave becomes a full spin with 30% more reach, and recharges in 4 seconds instead of 6.', ranks: ['Full spin, 30% more reach, 4 s recharge.', '40% more reach, 3.5 s recharge.', '50% more reach, 3 s recharge.']}),
   }),
   pick: Object.freeze({
-    motherlode: Object.freeze({name: 'Motherlode', text: 'Ore cracks one strike sooner and drops twice as much.'}),
-    geode: Object.freeze({name: 'Geode Burst', text: 'When your crystal wall ends it bursts into shards that hurt and hurl every foe beside it.'}),
+    motherlode: Object.freeze({name: 'Motherlode', text: 'Ore cracks one strike sooner and drops twice as much.', ranks: ['One strike sooner, double ore.', 'Two strikes sooner on a fresh seam.', 'Triple ore.']}),
+    geode: Object.freeze({name: 'Geode Burst', text: 'When your crystal wall ends it bursts into shards that hurt and hurl every foe beside it.', ranks: ['Shards burst 2.6 m for 70 damage.', '3.2 m burst for 90 damage.', '3.8 m burst for 110 damage.']}),
   }),
   crossbow: Object.freeze({
-    flock: Object.freeze({name: 'Golden Flock', text: 'The golden songbird comes three times as often.'}),
-    skewer: Object.freeze({name: 'Skewer', text: 'Every bolt punches clean through up to three foes.'}),
+    flock: Object.freeze({name: 'Golden Flock', text: 'The golden songbird comes three times as often.', ranks: ['Golden songbird three times as often.', 'Four times as often.', 'Five times as often.']}),
+    skewer: Object.freeze({name: 'Skewer', text: 'Every bolt punches clean through up to three foes.', ranks: ['Bolts punch through 3 foes.', 'Through 4 foes.', 'Through 5 foes.']}),
   }),
   bow: Object.freeze({
-    volley: Object.freeze({name: 'Ember Volley', text: 'A full draw looses three arrows in a fan.'}),
-    firestorm: Object.freeze({name: 'Firestorm', text: 'Phoenix Flare recharges twice as fast and its blaze covers twice the ground.'}),
+    volley: Object.freeze({name: 'Ember Volley', text: 'A full draw looses three arrows in a fan.', ranks: ['A full draw looses 3 arrows.', 'Most of a draw is enough for the volley.', 'A volley of 5 arrows.']}),
+    firestorm: Object.freeze({name: 'Firestorm', text: 'Phoenix Flare recharges twice as fast and its blaze covers twice the ground.', ranks: ['5 s recharge, double blaze.', '4 s recharge, bigger blaze.', '3 s recharge, biggest blaze.']}),
   }),
   flask: Object.freeze({
-    firebomb: Object.freeze({name: 'Firebomb', text: 'A lit flask explodes where it lands, burning and throwing back every foe nearby.'}),
-    tar: Object.freeze({name: 'Tar Pit', text: 'Spills are far bigger and slow every foe that wades through them.'}),
+    firebomb: Object.freeze({name: 'Firebomb', text: 'A lit flask explodes where it lands, burning and throwing back every foe nearby.', ranks: ['Lit flasks explode on landing.']}),
+    tar: Object.freeze({name: 'Tar Pit', text: 'Spills are far bigger and slow every foe that wades through them.', ranks: ['Bigger spills that slow foes.']}),
+  }),
+  hammer: Object.freeze({
+    earthshaker: Object.freeze({name: 'Earthshaker', text: 'Your ground slam reaches 30% further and recharges in 3.5 seconds instead of 4.', ranks: ['Slam reaches 6.5 m, 3.5 s recharge.', '7.5 m, 3 s recharge.', '8.5 m, 2.5 s recharge.']}),
+    bonebreaker: Object.freeze({name: 'Bonebreaker', text: 'Hammer blows crack golem armour like a pick and hit golems 50% harder.', ranks: ['Cracks armour, golems take 50% more.', 'Golems take 75% more.', 'Golems take double.']}),
   }),
   wyrmspout: Object.freeze({
-    flood: Object.freeze({name: 'Wyrmflood', text: 'A longer, bigger burst: more sticky fire per tank, thrown further.'}),
-    cling: Object.freeze({name: 'Clinging Fire', text: 'Sticky fire clings to foes, burns twice as long and splashes onto their friends when they fall.'}),
+    flood: Object.freeze({name: 'Wyrmflood', text: 'A longer, bigger burst: more sticky fire per tank, thrown further.', ranks: ['Longer burst, thrown further.', '15% more fire per tank.', '30% more fire per tank.']}),
+    cling: Object.freeze({name: 'Clinging Fire', text: 'Sticky fire clings to foes, burns twice as long and splashes onto their friends when they fall.', ranks: ['Fire clings, burns twice as long, splashes on death.', 'Splash spreads 3 m.', 'Splash spreads 3.5 m with more fire.']}),
   }),
 });
 export const TALENT_WEAPONS = Object.freeze(Object.keys(TALENTS));
+/** Highest rank a specialty can reach (1..3). */
+export const maxRank = (weapon, id) => Object.hasOwn(TALENTS, weapon) && Object.hasOwn(TALENTS[weapon], id) ? Math.max(1, TALENTS[weapon][id].ranks?.length || 1) : 0;
+/** Hero level needed to buy `rank` (1-based). */
+export const rankLevel = rank => RANK_LEVEL[Math.max(1, Math.min(3, rank)) - 1];
+/** Pick a tuning value by talent rank: byRank(rank, [base, I, II, III]) — rank 0 gives the base. */
+export const byRank = (rank, values) => values[Math.max(0, Math.min(values.length - 1, rank | 0))];
 const finite = n => typeof n === 'number' && Number.isFinite(n);
 const record = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 
@@ -54,11 +69,18 @@ export function heroLevel(xp = 0) {
   return level;
 }
 export const levelOf = p => heroLevel(p?.xp || 0);
-export const heroMaxHp = p => Math.round(HERO_LEVEL.baseHp * (1 + HERO_LEVEL.healthPerLevel * (levelOf(p) - 1)) + itemBonus(p, 'hp'));
+/** Levels' worth of the per-level health and damage bonus: full steps to `steep`, a quarter step each after. */
+export const levelSteps = level => Math.min(level, HERO_LEVEL.steep) - 1 + Math.max(0, level - HERO_LEVEL.steep) * HERO_LEVEL.lateShare;
+export const heroMaxHp = p => Math.round(HERO_LEVEL.baseHp * (1 + HERO_LEVEL.healthPerLevel * levelSteps(levelOf(p))) + itemBonus(p, 'hp'));
 // God-cast damage is never scaled: a player's level belongs to their hero.
 // Quartermaster items add their own share on top (shared/hero-items.js).
-export const damageScale = p => p?.role === 'hero' ? (1 + HERO_LEVEL.damagePerLevel * (levelOf(p) - 1)) * (1 + itemBonus(p, 'damage')) : 1;
+export const damageScale = p => p?.role === 'hero' ? (1 + HERO_LEVEL.damagePerLevel * levelSteps(levelOf(p))) * (1 + itemBonus(p, 'damage')) : 1;
 export const hasTalent = (p, weapon, id) => !!p?.talents?.[weapon]?.includes(id);
+/** Ranks learned in one specialty (0 when not learned). */
+export function talentRank(p, weapon, id) {
+  const list = p?.talents?.[weapon]; if (!Array.isArray(list)) return 0;
+  let n = 0; for (const t of list) if (t === id) n++; return n;
+}
 export const spentPoints = p => Object.values(p?.talents || {}).reduce((n, list) => n + (Array.isArray(list) ? list.length : 0), 0);
 export const talentPoints = p => Math.max(0, levelOf(p) - 1 - spentPoints(p));
 /** Progress inside the current level, 0..1 (1 at the cap). */
@@ -119,19 +141,23 @@ export function talentAction(state, p, m) {
   const spec = TALENTS[m.weapon]?.[m.talent];
   if (!spec || !Object.hasOwn(TALENTS, m.weapon) || !Object.hasOwn(TALENTS[m.weapon], m.talent)) return fail('invalid_talent');
   if (spec.ready === false) return fail('talent_coming_soon');
-  if (hasTalent(p, m.weapon, m.talent)) return fail('already_learned');
+  const rank = talentRank(p, m.weapon, m.talent) + 1;
+  if (rank > maxRank(m.weapon, m.talent)) return fail('already_learned');
+  if (levelOf(p) < rankLevel(rank)) return fail('rank_level_required');
   if (talentPoints(p) < 1) return fail('no_talent_points');
   (p.talents ??= {})[m.weapon] = [...(p.talents[m.weapon] || []), m.talent];
   remember(state, p);
-  return {ok: true, events: [{kind: 'talent_learned', id: p.id, weapon: m.weapon, talent: m.talent, position: [...p.position]}]};
+  return {ok: true, events: [{kind: 'talent_learned', id: p.id, weapon: m.weapon, talent: m.talent, rank, position: [...p.position]}]};
 }
 
 function validTalents(t, xp) {
   if (!record(t)) return false;
   let spent = 0;
   for (const [weapon, list] of Object.entries(t)) {
-    if (!Object.hasOwn(TALENTS, weapon) || !Array.isArray(list) || new Set(list).size !== list.length ||
+    if (!Object.hasOwn(TALENTS, weapon) || !Array.isArray(list) ||
         !list.every(id => typeof id === 'string' && Object.hasOwn(TALENTS[weapon], id))) return false;
+    const level = heroLevel(xp);
+    for (const id of new Set(list)) { const rank = list.filter(t => t === id).length; if (rank > maxRank(weapon, id) || level < rankLevel(rank)) return false; }
     spent += list.length;
   }
   return spent <= heroLevel(xp) - 1;

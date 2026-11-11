@@ -330,12 +330,15 @@ export function createWildsView({scene, renderer = null, templates = null, quali
       treeKey = ''; treeJob = null; // rebuild the forest as impostors
     } catch (e) { impostorFailed = true; report('wilds-impostors', String(e?.message || e)); }
   }
-  const VARIANT_BY_BIOME = {[BIOME.MEADOW]: [0, 0, 2], [BIOME.FOREST]: [0, 1, 2], [BIOME.PINE]: [1, 1, 2], [BIOME.MARSH]: [1, 1, 0], [BIOME.STEPPE]: [2, 0, 2], [BIOME.TUNDRA]: [2, 1, 2], [BIOME.BEACH]: [2, 2, 2]};
+  // Far canopy species per biome (same mix as shared/worldgen/asset-tags.js). Without impostors the faceted stand-ins
+  // draw them: STAND_IN maps each species to the stand-in shape that reads most like it (firs and birches upright).
+  const VARIANT_BY_BIOME = {[BIOME.MEADOW]: [0, 0, 2, 5], [BIOME.FOREST]: [0, 1, 4, 2], [BIOME.PINE]: [3, 3, 3, 1], [BIOME.MARSH]: [1, 2, 0], [BIOME.STEPPE]: [2, 0, 4], [BIOME.TUNDRA]: [3, 3, 2], [BIOME.BEACH]: [2, 2, 5]};
+  const STAND_IN = [0, 1, 2, 2, 0, 0], FAR_HEIGHT = [6.6, 6.6, 4.4, 8.6, 6.8, 5.4];
   const TREE_TINT = {[BIOME.PINE]: [.78, .9, .86], [BIOME.TUNDRA]: [.92, .9, .78], [BIOME.MARSH]: [.9, .95, .72], [BIOME.STEPPE]: [1.08, 1.02, .78]};
   function* buildTrees(fx, fz, skip, felled) {
-    const lists = [[], [], []], mid2 = Q.mid * Q.mid, far2 = Q.far * Q.far, seed = world.gen.seedHash;
-    const imp = impostors, room = v => imp ? imp.capacity / 2 : treeMeshes[v].instanceMatrix.count;
-    const push = (v, x, z, h, tint) => { const L = lists[v]; if (L.length / 6 < room(v)) L.push(x, z, h, tint[0], tint[1], tint[2]); };
+    const lists = VARIANTS.map(() => []), mid2 = Q.mid * Q.mid, far2 = Q.far * Q.far, seed = world.gen.seedHash;
+    const imp = impostors, room = v => imp ? imp.capacity / 2 : treeMeshes[v].instanceMatrix.count; // v is already a stand-in index without impostors
+    const push = (v, x, z, h, tint) => { if (!imp) v = STAND_IN[v] ?? 0; const L = lists[v]; if (L.length / 6 < room(v)) L.push(x, z, h, tint[0], tint[1], tint[2]); };
     // Exact generated trees between the live window and the mid radius.
     const r = Math.ceil(Q.mid / CHUNK);
     const ccx = Math.floor(fx / CHUNK), ccz = Math.floor(fz / CHUNK);
@@ -366,7 +369,7 @@ export function createWildsView({scene, renderer = null, templates = null, quali
         for (let k = 0; k < n; k++) {
           if (hash01(seed, 81, i, j, k) > cover * thin) continue;
           const x = cxs + (hash01(seed, 82, i, j, k) - .5) * cell * .9, z = czs + (hash01(seed, 83, i, j, k) - .5) * cell * .9;
-          const v = variants[Math.floor(hash01(seed, 84, i, j, k) * 3)], h = (v === 2 ? 4.4 : 6.6) * (.85 + hash01(seed, 85, i, j, k) * .45);
+          const v = variants[Math.floor(hash01(seed, 84, i, j, k) * variants.length)], h = FAR_HEIGHT[v] * (.85 + hash01(seed, 85, i, j, k) * .45);
           const shade = .82 + hash01(seed, 86, i, j, k) * .3, tint = TREE_TINT[b] || [1, 1, 1];
           push(v, x, z, h * 1.15, [tint[0] * shade, tint[1] * shade, tint[2] * shade]);
         }
@@ -388,7 +391,7 @@ export function createWildsView({scene, renderer = null, templates = null, quali
       imp.set(data, n); treeCount = imp.count(); return;
     }
     for (const [v, L] of lists.entries()) {
-      const mesh = treeMeshes[v], n = L.length / 6;
+      const mesh = treeMeshes[v]; if (!mesh) continue; const n = L.length / 6;
       for (let k = 0; k < n; k++) {
         const x = L[k * 6], z = L[k * 6 + 1], h = L[k * 6 + 2];
         q.setFromAxisAngle(up, hash01(seed, 91, x * 10 | 0, z * 10 | 0) * 6.283);

@@ -46,7 +46,7 @@ import {chopTree,stepTrees,logAction,releaseLog,resolveTrees,createTreeIndex,res
 import {STUMPLING,treeCutMap,stepStumplings,validStumpling} from './stumplings.js';
 import {CRITTER_KINDS,CRITTER_FIELDS,isCritter,rabbleKind,setCritterWorld} from './critters.js';
 import {ENT,ENT_SPELLS,entTargets,createEnt,rememberAwakened,pruneAwakened,stepEntRooting,restoreEntTrees,validEnt} from './ents.js';
-import {hasTalent,heroMaxHp,damageScale,adoptProgress,grantXp,talentAction,validProgress,restoreProgress,restoreLedger,XP_REWARD} from './hero-progress.js';
+import {hasTalent,talentRank,heroMaxHp,damageScale,adoptProgress,grantXp,talentAction,validProgress,restoreProgress,restoreLedger,XP_REWARD} from './hero-progress.js';
 import {dragonAction,stepDragons,breakStreak,dismissDragon,validDragonFields} from './dragon-streak.js';
 import {clampToWorld} from './keep-sites.js';
 import {resolveCoveLakes} from './larimar-cove.js';
@@ -381,10 +381,10 @@ function instantiate(state) {
           // A Raise Wall segment is quarried anywhere on its face, from its foot up to the crest.
           const face=ore.special==='wall'?RAISE_WALL.peak:0,reachY=Math.max(oreFloor-face,Math.min(oreFloor,p.position[1]));
           if (requestedTool !== 'pick' || ore.depleted || !targetOK({x:ore.x,z:ore.z,y:reachY}) || (face ? Math.hypot(message.point[0]-ore.x,message.point[2]-ore.z) > RAISE_WALL.width+.5 : Math.hypot(message.point[0]-ore.x,message.point[2]-ore.z) > 1.5) || message.point[1]>oreFloor+2 || message.point[1]<oreFloor-face-2) return ok();
-          const motherlode=hasTalent(p,'pick','motherlode');
+          const yieldX=oreYield(p);
           if(ore.hits+oreStep(p,ore)>=ore.maxHits&&state.pickups.length>=256)return fail('world_limit');
           ore.hits=Math.min(ore.maxHits,ore.hits+oreStep(p,ore)); events.push({...event('stone_hit',message.point,ore.id),material:'stone',normal:[...message.normal]});
-          if (ore.hits >= ore.maxHits) { ore.depleted=true; collapseMinedWall(state,ore); const reward=depositReward(ore.kind);makePickup(reward.kind,ore.x,ore.z,Math.min(10,reward.amount*(motherlode?2:1)));if(ore.kind==='meteor')makePickup('gems',ore.x+.3,ore.z,motherlode?4:2); events.push(event('ore_break',[ore.x,terrainHeight(state,ore.x,ore.z),ore.z],ore.id)); } return ok(events);
+          if (ore.hits >= ore.maxHits) { ore.depleted=true; collapseMinedWall(state,ore); const reward=depositReward(ore.kind);makePickup(reward.kind,ore.x,ore.z,Math.min(10,reward.amount*yieldX));if(ore.kind==='meteor')makePickup('gems',ore.x+.3,ore.z,2*yieldX); events.push(event('ore_break',[ore.x,terrainHeight(state,ore.x,ore.z),ore.z],ore.id)); } return ok(events);
         }
         if (supplied) {
           // Home-base PvP: heroes on opposite sides can strike each other; respawn is at their own heart forge.
@@ -589,8 +589,10 @@ function worldScoped(state, api) {
   for (const [k, fn] of Object.entries(api)) if (typeof fn === 'function') api[k] = (...args) => withWorld(world(), () => fn(...args));
   return api;
 }
-// Motherlode (pick talent): the first strike on a fresh seam counts twice, so ore cracks one strike sooner.
-const oreStep = (p, ore) => hasTalent(p, 'pick', 'motherlode') && ore.hits === 0 && ore.maxHits > 1 ? 2 : 1;
+// Motherlode (pick talent): the first strike on a fresh seam counts twice (three times from rank II), so ore cracks
+// sooner; it pays double ore (triple at rank III).
+const oreStep = (p, ore) => { const r = talentRank(p, 'pick', 'motherlode'); return r && ore.hits === 0 && ore.maxHits > 1 ? (r >= 2 ? 3 : 2) : 1; };
+const oreYield = p => [1, 2, 2, 3][Math.min(3, talentRank(p, 'pick', 'motherlode'))];
 
 export function createSimulation(options) { return instantiate(newState(options)); }
 export function loadSimulation(saved) {
