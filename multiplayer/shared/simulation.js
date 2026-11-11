@@ -48,7 +48,7 @@ import {STUMPLING,treeCutMap,stepStumplings,validStumpling} from './stumplings.j
 import {CRITTER_KINDS,CRITTER_FIELDS,isCritter,rabbleKind,setCritterWorld} from './critters.js';
 import {ENT,ENT_SPELLS,entTargets,createEnt,rememberAwakened,pruneAwakened,stepEntRooting,restoreEntTrees,validEnt} from './ents.js';
 import {hasTalent,talentRank,heroMaxHp,damageScale,adoptProgress,grantXp,talentAction,validProgress,restoreProgress,restoreLedger,rememberProgress,XP_REWARD} from './hero-progress.js';
-import {temperAction} from './weapon-temper.js';
+import {temperAction, temperScale} from './weapon-temper.js';
 import {dragonAction,stepDragons,breakStreak,dismissDragon,validDragonFields} from './dragon-streak.js';
 import {clampToWorld} from './keep-sites.js';
 import {resolveCoveLakes} from './larimar-cove.js';
@@ -393,7 +393,7 @@ function instantiate(state) {
         if (supplied) {
           // Home-base PvP: heroes on opposite sides can strike each other; respawn is at their own heart forge.
           const rival=homeBattle(state)&&state.players.find(h=>h.id===message.targetId&&h.id!==p.id&&h.role==='hero'&&(h.side||'party')!==(p.side||'party'));
-          if(rival){if(tavernSafe(state,p))return fail('tavern_peace');if(inReach(rival)<Infinity){const wasAlive=rival.hp>0;damageHero(state,rival,(PVP_DAMAGE[requestedTool]||20)*damageScale(p),events,p.position);if(wasAlive&&events.some(e=>e.kind==='death'&&e.id===rival.id)&&p.stats)p.stats.kills=Math.min(1e9,p.stats.kills+1);}return ok(events);}
+          if(rival){if(tavernSafe(state,p))return fail('tavern_peace');if(inReach(rival)<Infinity){const wasAlive=rival.hp>0;damageHero(state,rival,(PVP_DAMAGE[requestedTool]||20)*damageScale(p)*temperScale(p,requestedTool),events,p.position);if(wasAlive&&events.some(e=>e.kind==='death'&&e.id===rival.id)&&p.stats)p.stats.kills=Math.min(1e9,p.stats.kills+1);}return ok(events);}
           if(state.battle.bases.some(b=>b.id===message.targetId)||findHomeTarget(state,message.targetId))return attackBattleBase(state,p,message.targetId,combatContext,{cooldown:false});
           const building=state.inventions.structures.find(b=>b.id===message.targetId);
           if(building){if(inReach(building)<Infinity&&Math.hypot(message.point[0]-building.position[0],message.point[2]-building.position[2])<4)damageInvention(state,building.id,requestedTool==='hammer'?55:25,p.id,events);return ok(events);}

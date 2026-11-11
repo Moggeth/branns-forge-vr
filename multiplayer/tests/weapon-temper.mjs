@@ -61,6 +61,17 @@ test('a tempered weapon hits harder', () => {
   assert.ok(Math.abs(hit({pick: 3}) / hit(null) - 1) < 1e-9, 'another weapon\'s temper does nothing for the axe');
 });
 
+test('temper also counts against rival heroes in home-base PvP', () => {
+  const pvp = temper => {
+    const sim = createSimulation({seed: 9}); sim.addPlayer({id: 'host'}); const w = sim.adventureWorld(); sim.addPlayer({id: 'foe'});
+    const [p, foe] = w.players; foe.side = 'rivals'; if (temper) p.temper = temper;
+    p.position = [0, terrainHeight(w, 0, 0), 20]; p.yaw = 0; foe.position = [0, terrainHeight(w, 0, 18.6), 18.6]; foe.protectedUntil = 0;
+    const hp = foe.hp; assert.equal(sim.command('host', {type: 'action', action: 'strike', seq: 5, targetId: 'foe', point: [0, 1, 18.6], normal: [0, 0, 1]}).ok, true);
+    return hp - foe.hp;
+  };
+  assert.ok(Math.abs(pvp({axe: 3}) / pvp(null) - 1.45) < 1e-9);
+});
+
 test('wilds: only weapons you have forged temper, at the village forge', () => {
   const world = worldDescriptor({kind: 'wilds', seed: 'ci-temper', preset: 'continent', size: 2048});
   const sim = createSimulation({room: 'W', seed: 41, world}); sim.addPlayer({id: 'h1', name: 'Brann', role: 'hero'});
