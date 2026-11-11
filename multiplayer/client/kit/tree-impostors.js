@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import {enhanceTreeTemplate} from '../forest-resource-art.js';
 
 const FRAMES = 8;
-const STYLE = {tree: 'broad', tree_b: 'weeping', tree_young: 'upright'};
+const STYLE = {tree: 'broad', tree_b: 'weeping', tree_young: 'upright', tree_fir: 'upright', tree_maple: 'broad', tree_blossom: 'broad'};
 
 /** The species models to bake, or null until every one has loaded. */
 export function impostorSources(templates, variants) {

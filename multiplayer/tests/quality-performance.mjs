@@ -29,10 +29,20 @@ for(const tick of [40,41,60,80,105,200]){state.tick=tick;verify();}
 state.edits=[];verify(); // reset removes every old cached crater
 const index=createTreeIndex();index.update(state);const cuts=new Map(index.all().filter((t,i)=>i%3===0).map(t=>[t.id,{cuts:3,felledTick:1,cutHeight:1}]));
 let baselineReads=0,optimizedReads=0,collisions=0;
-for(const tree of index.all())for(const offset of [-2,-.42,0,.42,2])for(const y of [0,.7,2.6]){
+// The oracle predates the 2026-11-11 species (fir, maple, cherry) and only knows variants 0..2, so new-species trunks
+// are checked against an exhaustive scan (every tree, no spatial grid) with the current tapered-trunk contact.
+const everyTree={near:()=>index.all()};
+for(const tree of index.all().filter(t=>(t.variant||0)>=3))for(const offset of [-2,-.42,0,.42,2])for(const y of [0,.7,2.6]){
+ const a=[tree.x+offset,y,tree.z+.05],b=[...a],ground=(x,z)=>terrainHeight(state,x,z,false);
+ resolveTrees(a,everyTree,cuts,ground);resolveTrees(b,index,cuts,ground);
+ assert.deepEqual(b,a,`new species ${tree.id} collision matches an exhaustive scan`);
+ if(offset===0&&y===.7&&!cuts.has(tree.id))assert.notDeepEqual(a,[tree.x,y,tree.z+.05],`${tree.id} trunk is solid`);
+}
+const legacy={near:(x,z,out)=>index.near(x,z,out).filter(t=>(t.variant||0)<3)}; // same grid, oracle-known species only
+for(const tree of index.all().filter(t=>(t.variant||0)<3))for(const offset of [-2,-.42,0,.42,2])for(const y of [0,.7,2.6]){
  const a=[tree.x+offset,y,tree.z+.05],b=[...a];
- oldTrees.resolveTrees(a,index,cuts,(x,z)=>{baselineReads++;return terrainHeight(state,x,z,false);});
- resolveTrees(b,index,cuts,(x,z)=>{optimizedReads++;return terrainHeight(state,x,z,false);});
+ oldTrees.resolveTrees(a,legacy,cuts,(x,z)=>{baselineReads++;return terrainHeight(state,x,z,false);});
+ resolveTrees(b,legacy,cuts,(x,z)=>{optimizedReads++;return terrainHeight(state,x,z,false);});
  assert.deepEqual(b,a,'tree collision broad phase must preserve exact displacement');collisions++;
 }
 assert.ok(optimizedReads<baselineReads*.3);

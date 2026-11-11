@@ -11,10 +11,15 @@ export const TREE_LIMITS = {logs: 48, logsPerTree: 3, logLength: 1.1, logRadius:
 export const TREE_PROFILES = {
  tree: {height: 6.002, firstLimb: 2.514, rings: [[-.1,.42],[0,.42],[.12,.3688],[.3,.2745],[.6,.2658],[1,.2541],[1.4,.2425],[1.8,.2308],[2,.225],[2.367,.204],[2.733,.183],[3.1,.162]]},
  tree_b: {height: 6.297, firstLimb: 2.418, rings: [[-.1,.4],[0,.4],[.12,.3494],[.3,.2562],[.6,.248],[1,.2372],[1.4,.2263],[1.8,.2154],[2,.21],[2.3,.1904],[2.6,.1708],[2.9,.1512]]},
- tree_young: {height: 4.095, firstLimb: 2.255, rings: [[-.1,.19],[0,.19],[.12,.1682],[.3,.1281],[.6,.124],[1,.1186],[1.4,.1132],[1.8,.1077],[2,.105],[2.133,.0952],[2.267,.0854],[2.4,.0756]]}
+ tree_young: {height: 4.095, firstLimb: 2.255, rings: [[-.1,.19],[0,.19],[.12,.1682],[.3,.1281],[.6,.124],[1,.1186],[1.4,.1132],[1.8,.1077],[2,.105],[2.133,.0952],[2.267,.0854],[2.4,.0756]]},
+ // 2026-11-11 species (assets/trees-species-20261111/species_contract.json): Highland Fir, Emberleaf Maple, Dawnbloom Cherry.
+ tree_fir: {height: 8.4, firstLimb: 2.85, rings: [[-.1,.36],[0,.36],[.12,.3192],[.3,.244],[.6,.2362],[1,.2259],[1.4,.2155],[1.8,.2052],[2,.2],[2.533,.1813],[3.067,.1627],[3.6,.144]]},
+ tree_maple: {height: 6.8, firstLimb: 2.3, rings: [[-.1,.4],[0,.4],[.12,.3515],[.3,.2623],[.6,.254],[1,.2428],[1.4,.2317],[1.8,.2206],[2,.215],[2.333,.1949],[2.667,.1749],[3,.1548]]},
+ tree_blossom: {height: 5.2, firstLimb: 2.2, rings: [[-.1,.34],[0,.34],[.12,.3062],[.3,.244],[.6,.2362],[1,.2259],[1.4,.2155],[1.8,.2052],[2,.2],[2.3,.1813],[2.6,.1627],[2.9,.144]]}
 };
 export const CUT_RANGE = [.4, 1.6]; // authored metres above ground (contract cut_range_m)
-export const VARIANTS = ['tree', 'tree_b', 'tree_young'];
+// Variant numbers are saved: append new species, never reorder. 0 apple, 1 oak, 2 birch, 3 fir, 4 maple, 5 cherry.
+export const VARIANTS = ['tree', 'tree_b', 'tree_young', 'tree_fir', 'tree_maple', 'tree_blossom'];
 export const NOTCH = {upper: Math.tan(50*Math.PI/180), lower: Math.tan(12*Math.PI/180), depth: [0, .34, .62]};
 
 const clamp = (n, a, b) => Math.max(a, Math.min(b, n));

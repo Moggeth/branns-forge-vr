@@ -10,7 +10,7 @@ import {VARIANTS, TREE_PROFILES} from './trees.js';
 const FORGE_APRON = 7, GROVE_EDGE = 51;
 
 // Authored crown half-widths (metres at authored scale, from the tree contract bounding boxes).
-const CROWN = {tree: 2.7, tree_b: 2.9, tree_young: 1.55};
+const CROWN = {tree: 2.7, tree_b: 2.9, tree_young: 1.55, tree_fir: 2.05, tree_maple: 2.7, tree_blossom: 2.65};
 export const GROWTH = Object.freeze({
   // Crowns may brush (a real orchard touches) but centres keep 80% of the two crown radii apart.
   gapFactor: .92, step: .7,
