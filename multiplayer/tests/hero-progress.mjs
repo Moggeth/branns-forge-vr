@@ -217,6 +217,12 @@ act(s,{action:'fire',origin:[10,terrainHeight(s.checkpoint(),10,10)+1.4,10],dire
  for(const e of [...live.enemies]){const point=[e.position[0],e.position[1]+1.15,e.position[2]];bolt.trail=[[point[0],point[1],point[2]+.5],[point[0],point[1],point[2]-.5]];
   const r=s.projectileContact({projectileId:bolt.id,targetId:e.id,part:'torso',point,normal:[0,0,1],localPoint:[0,0,0],localQuaternion:[0,0,0,1]});if(r.events.some(q=>q.kind==='pierce'))n++;if(!live.projectiles.includes(bolt))break;}
  assert.equal(n,5);}
+// A checkpoint taken mid-flight after the fourth body still loads.
+s=fixture({tool:'crossbow',xp:xpForLevel(12),talents:{crossbow:['skewer','skewer','skewer']},foes:[4,5,6,7,8,9]});
+act(s,{action:'fire',origin:[10,terrainHeight(s.checkpoint(),10,10)+1.4,10],direction:[0,0,-1]});s.step();
+{const live=s.adventureWorld(),bolt=live.projectiles[0];for(const e of [...live.enemies].slice(0,4)){const point=[e.position[0],e.position[1]+1.15,e.position[2]];bolt.trail=[[point[0],point[1],point[2]+.5],[point[0],point[1],point[2]-.5]];
+  s.projectileContact({projectileId:bolt.id,targetId:e.id,part:'torso',point,normal:[0,0,1],localPoint:[0,0,0],localQuaternion:[0,0,0,1]});}
+ assert.equal(bolt.pierced.length,4);assert.ok(live.projectiles.includes(bolt));loadSimulation(JSON.parse(JSON.stringify(s.checkpoint())));}
 
 // Ember Volley rank III: five arrows from most of a draw.
 s=fixture({tool:'bow',xp:xpForLevel(12),talents:{bow:['volley','volley','volley']}});
