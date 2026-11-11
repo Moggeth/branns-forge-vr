@@ -179,6 +179,7 @@ import {worldFor} from '../shared/worldgen/registry.js';
 import {resolvePlaces} from '../shared/worldgen/places.js';
 import {setActiveWorld,godReach} from '../shared/world-extent.js';
 import {installEmptyDrawSkip} from './empty-draw-skip.js';
+import {rootsNearRay} from './view-cull.js';
 import {createCompileGate} from './compile-gate.js';
 
 // Rendering and physics sample exactly the same bounded, deformable surface.
@@ -312,7 +313,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   const groundHit = () => wildsView.active() ? wildsView.nearMesh() : ground;
   let wildsKey = '';
   const shotProbe = new URLSearchParams(globalThis.location?.search || '').has('acceptanceProbe');
-  if(shotProbe)globalThis.__brannDebug={scene,renderer,camera}; // QA probe only: performance benchmark breakdowns
+  if(shotProbe)globalThis.__brannDebug={scene,renderer,camera,raycaster}; // QA probe only: performance benchmark breakdowns
   function syncWorld() {
     const key = snapshot.world ? JSON.stringify(snapshot.world) : '';
     if (key === wildsKey) return; wildsKey = key;
@@ -1412,7 +1413,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   function aimProbe(){
     const aim=weaponAim(),from=new THREE.Vector3(...aim.origin),direction=new THREE.Vector3(...aim.direction),to=from.clone().addScaledVector(direction,8);
     const enemy=(combat.segmentContacts(from.toArray(),to.toArray(),{includePartPoses:false})||[])[0],enemyDistance=enemy?from.distanceTo(new THREE.Vector3(...enemy.point)):Infinity;
-    raycaster.set(from,direction);raycaster.far=8;const h=raycaster.intersectObjects(content.targets().concat(inventionVisual.targets(),[shrine,startingWorld.group]),true).find(v=>surfaceVisible(v.object));raycaster.far=Infinity;
+    raycaster.set(from,direction);raycaster.far=8;const h=raycaster.intersectObjects(content.targets().concat(rootsNearRay(inventionVisual.targets(),from,direction,8),[shrine,startingWorld.group]),true).find(v=>surfaceVisible(v.object));raycaster.far=Infinity;
     const r=h&&h.distance<enemyDistance?resolveHit(h):null;
     const hit=h&&h.distance<enemyDistance?{targetId:r?.targetId||'world',point:h.point.toArray(),distance:h.distance}:enemy?{targetId:enemy.targetId,point:enemy.point,distance:enemyDistance}:null;
     return {...aim,yaw,hit,collectible:nearestPickup};
