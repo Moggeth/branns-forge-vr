@@ -1,3 +1,4 @@
+import {setLiveInstances} from './instance-upload.js';
 import * as THREE from 'three';
 // Presentation for the skeleton warband's violent moments (no lights, no bloom: Quest-safe, 4 draws total):
 // - Golden Siegebird bolt: twin spiral contrails of gold sparks wound round its flight line.
@@ -92,7 +93,7 @@ export function createSkeletonFx({scene, height = () => 0, audio = () => null}) 
       shardMesh.setColorAt(n, _c.setRGB(s.colour[0] + g, s.colour[1] + g * .75, s.colour[2] + g * .3));
       n++;
     }
-    shardMesh.count = n; shardMesh.instanceMatrix.needsUpdate = true; if (shardMesh.instanceColor) shardMesh.instanceColor.needsUpdate = true;
+    setLiveInstances(shardMesh, n);
   }
   // ---- billboards (flash) and oriented rings ----
   const flashTex = glowTexture(false), ringTex = glowTexture(true), cards = [];
