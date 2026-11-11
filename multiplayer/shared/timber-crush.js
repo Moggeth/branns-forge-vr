@@ -29,6 +29,7 @@ export function timberCrush(state, events, from, ctx) {
   for (let i = from; i < events.length; i++) {
     const e = events[i]; if (e?.kind !== 'tree_land') continue;
     const h = state.harvestedTrees?.find(t => t.id === e.id), who = feller(state, h);
+    if (h) delete h.by; // only a falling tree needs its feller (saves of landed trees never carry it)
     const tree = who && ctx.trees.get(e.id); if (!tree) continue;
     // tree_land's position sits 2 m along the fall, so it gives the direction; the trunk reaches the tree's height.
     const dx = e.position[0] - tree.x, dz = e.position[2] - tree.z, d = Math.hypot(dx, dz) || 1;
