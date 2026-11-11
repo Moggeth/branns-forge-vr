@@ -17,6 +17,7 @@ import {EMBERDEW,cinderLaunch,cinderVelocities} from './emberdew.js';
 export const FLARE=Object.freeze({speed:30,loft:6,fuse:48});
 import {skeletonShield} from './skeleton-kinds.js';
 import {damageScale,grantXp,killXp,hasTalent,talentRank,byRank,heroMaxHp} from './hero-progress.js';
+import {popFusewick} from './warband.js';
 import {temperScale} from './weapon-temper.js';
 import {itemBonus} from './hero-items.js';
 import {payKillGold} from './home-shop.js';
@@ -293,7 +294,7 @@ export function hitEnemyPart(state,enemy,part,amount,hit,ctx,events,{projectile=
     // so discard any contacts still attached to the dead actor before saves validate their targets.
     state.embeds=state.embeds.filter(e=>e.targetId!==enemy.id);
     clingSplash(state,enemy,ctx,events);
-    const style=deathStyle(enemy,part,hit,projectile);if(enemy.kind==='skeleton')ragdoll(state,enemy,fallen,hit,style);else if(enemy.kind==='golem'&&fallen.length){if(vec(hit?.blastFrom))blastApart(state,enemy,fallen,hit.blastFrom,clamp(Number(hit?.energy)||1,.5,2),false);else toppleGolem(state,enemy,fallen,hit);}events.push({kind:'death',position:[...enemy.position],id:enemy.id,creature:enemy.kind,part,normal:unit(hit?.normal)?[...hit.normal]:[0,1,0],energy:hit?.tool==='hammer'?1.8:1,...(style?{style}:{}),...(style&&vec(hit?.point)?{point:[...hit.point]}:{}),...(style==='headshot'&&unit(hit?.direction)?{direction:[...hit.direction],shot:hit.shot}:style==='shatter'&&unit(hit?.direction)?{direction:[...hit.direction]}:style==='blast'?{from:[...hit.blastFrom]}:{})});state.enemies.splice(state.enemies.indexOf(enemy),1);
+    const style=deathStyle(enemy,part,hit,projectile);if(enemy.kind==='skeleton')ragdoll(state,enemy,fallen,hit,style);else if(enemy.kind==='golem'&&fallen.length){if(vec(hit?.blastFrom))blastApart(state,enemy,fallen,hit.blastFrom,clamp(Number(hit?.energy)||1,.5,2),false);else toppleGolem(state,enemy,fallen,hit);}events.push({kind:'death',position:[...enemy.position],id:enemy.id,creature:enemy.kind,part,normal:unit(hit?.normal)?[...hit.normal]:[0,1,0],energy:hit?.tool==='hammer'?1.8:1,...(style?{style}:{}),...(style&&vec(hit?.point)?{point:[...hit.point]}:{}),...(style==='headshot'&&unit(hit?.direction)?{direction:[...hit.direction],shot:hit.shot}:style==='shatter'&&unit(hit?.direction)?{direction:[...hit.direction]}:style==='blast'?{from:[...hit.blastFrom]}:{})});state.enemies.splice(state.enemies.indexOf(enemy),1);popFusewick(state,enemy); // a sapper's keg goes off where it falls
     if(critterDying)critterDeath(state,enemy,hit,{...ctx,hitEnemyPart},events,owner);}
   return true;
 }

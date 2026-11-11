@@ -6,6 +6,8 @@
 //   move    march to a point without stopping to fight, then hold there
 //   hold    guard a point: fight anything that comes close, then return to it
 //   attack  chase one named foe until it falls, then hold where it fell
+// A Fusewick (role 'fusewick', the sapper) never swings: sent at a foe it scampers up, lights its keg's fuse and
+// goes up in one big blast (FUSEWICK); if anything kills it first, the keg goes off where it falls.
 //   gather  work the trees or rocks round a point: fell, chop and quarry, haul each load to the Forge or the
 //           owner's Hero, and go back for more until the area is bare (an order on a tree or rock gives this)
 import {depositReward} from './material-catalog.js';
@@ -32,6 +34,19 @@ export const WARBAND = Object.freeze({
  haul: 6,              // most of one pile a Forgeling carries
  defend: 4,            // a gatherer only fights foes this close to itself
 });
+export const FUSEWICK = Object.freeze({
+ cap: 2,               // Fusewicks one player has at once (they count toward WARBAND.perOwner)
+ hp: 60,               // light: a quilted jerkin, not plate
+ reach: 2.2,           // lights the fuse this close to its target
+ fuseTicks: 72,        // 1.2 s of fizzing (and a panicked little circle) before the WHUMP
+ radius: 4.5,          // blast radius in metres
+ damage: 140,          // to a foe at the centre, half that at the rim: a camp of skeletons goes flying
+ building: 70,         // to a rival building or keep in the blast
+ crater: 2.2,          // the blast scoops the ground this wide...
+ depth: .55,           // ...and this deep
+});
+export const WARBAND_ROLES = Object.freeze(['fusewick']);
+export const fusewick = e => e?.warband?.role === 'fusewick';
 export const WARBAND_ORDERS = Object.freeze(['follow', 'move', 'hold', 'attack', 'gather']);
 /** Gathering jobs, by the resource they bring home (wire keys: wood = Timber, gems = Crystal). */
 export const WARBAND_JOBS = Object.freeze(['wood', 'iron', 'gems']);
@@ -70,22 +85,24 @@ export function followSlot(hero, index, count) {
  return [hero.position[0] + s * back - c * side, hero.position[1], hero.position[2] + c * back + s * side];
 }
 
-export function createForgeling(id, position, owner, tick, side = 'party') {
- return {id, position: [...position], kind: 'skeleton', side, yaw: 0, hp: WARBAND.hp,
-  parts: {head: 55, torso: 100, leftArm: 55, rightArm: 55, leftLeg: 55, rightLeg: 55}, missingParts: [], attackTick: -1000,
-  warband: {owner, born: tick, order: {kind: 'follow'}}};
+export function createForgeling(id, position, owner, tick, side = 'party', role) {
+ const hp = role === 'fusewick' ? FUSEWICK.hp : WARBAND.hp, k = hp / WARBAND.hp;
+ return {id, position: [...position], kind: 'skeleton', side, yaw: 0, hp,
+  parts: {head: 55 * k, torso: 100 * k, leftArm: 55 * k, rightArm: 55 * k, leftLeg: 55 * k, rightLeg: 55 * k}, missingParts: [], attackTick: -1000,
+  warband: {owner, born: tick, order: {kind: 'follow'}, ...(role ? {role} : {})}};
 }
+export const fusewickRoom = (state, ownerId) => Math.max(0, Math.min(warbandRoom(state, ownerId), FUSEWICK.cap - warbandOf(state, ownerId).filter(fusewick).length));
 
 /**
  * Muster: bring down up to WARBAND.muster Forgelings round `at`, never past the owner's cap or the world's.
  * ctx: {terrainHeight(state,x,z), clamp(v), worldRoom}. Returns the new units (already in state.enemies).
  */
-export function musterWarband(state, owner, id, at, ctx) {
- const n = Math.min(WARBAND.muster, warbandRoom(state, owner.id), Math.max(0, ctx.worldRoom));
+export function musterWarband(state, owner, id, at, ctx, role) {
+ const n = role === 'fusewick' ? Math.min(1, fusewickRoom(state, owner.id), Math.max(0, ctx.worldRoom)) : Math.min(WARBAND.muster, warbandRoom(state, owner.id), Math.max(0, ctx.worldRoom));
  const offsets = formationOffsets(n), out = [];
  for (let i = 0; i < n; i++) {
   const x = ctx.clamp(at[0] + offsets[i][0]), z = ctx.clamp(at[2] + offsets[i][1]);
-  const unit = createForgeling(`${id}_${i}`, [x, ctx.terrainHeight(state, x, z), z], owner.id, state.tick, owner.side || 'party');
+  const unit = createForgeling(`${id}_${i}`, [x, ctx.terrainHeight(state, x, z), z], owner.id, state.tick, owner.side || 'party', role);
   // Face the God's Hero if there is one below, otherwise face the way the view looks.
   unit.yaw = owner.yaw || 0;
   state.enemies.push(unit); out.push(unit);
@@ -120,7 +137,7 @@ export function warbandAction(state, p, message, ctx) {
  if (source) {
   // Everyone starts on the source that was clicked; once it is spent they spread to the nearest others round it.
   const spot = [source.position[0], ctx.terrainHeight(state, source.position[0], source.position[2]), source.position[2]];
-  for (const e of units) e.warband.order = {kind: 'gather', job: source.job, point: [...spot], target: source.id, type: source.type, at: [...spot]};
+  for (const e of units) e.warband.order = fusewick(e) ? {kind: 'move', point: [...spot]} : {kind: 'gather', job: source.job, point: [...spot], target: source.id, type: source.type, at: [...spot]}; // a sapper carries nothing but its keg
   return {ok: true, events: [{kind: 'warband_order', by: p.id, order: 'gather', job: source.job, units: units.map(e => e.id), position: [...at]}]};
  }
  const offsets = formationOffsets(units.length);
@@ -173,7 +190,21 @@ const progress = new WeakMap(); // live-only steering memory: {id, best, ticks, 
  * next. ctx: {trees (createTreeIndex), terrainHeight(state,x,z)}.
  */
 export function stepWarbandWork(state, ctx, events) {
- for (const e of state.enemies) {
+ // Kegs knocked off by a killing blow last tick (combat queued them) go up now, where their carriers fell.
+ for (const b of (state.warbandPops || []).splice(0)) fusewickBlast(state, b.position, b, ctx, events);
+ for (const e of [...state.enemies]) {
+  if (fusewick(e) && e.hp > 0 && warbandLanded(e, state.tick)) {
+   const w = e.warband;
+   if (w.fuse === undefined && w.order.kind === 'attack') {
+    const foe = state.enemies.find(f => f.id === w.order.target && f.hp > 0);
+    if (foe && flat(foe.position, e.position) <= FUSEWICK.reach && Math.abs(foe.position[1] - e.position[1]) < 2) { w.fuse = state.tick; events.push({kind: 'fusewick_lit', id: e.id, by: w.owner, position: [...e.position], tick: state.tick}); }
+   }
+   if (w.fuse !== undefined && state.tick - w.fuse >= FUSEWICK.fuseTicks) {
+    state.enemies.splice(state.enemies.indexOf(e), 1); // the sapper goes up with its keg (Forgelings are forge-light: no remains)
+    fusewickBlast(state, [e.position[0], e.position[1] + .6, e.position[2]], {id: e.id, owner: w.owner, side: e.side}, ctx, events);
+   }
+   continue;
+  }
   const o = e.warband?.order; if (o?.kind !== 'gather' || e.hp <= 0 || !warbandLanded(e, state.tick)) continue;
   const memo = progress.get(e) || {id: '', best: Infinity, ticks: 0, avoid: new Map()}; progress.set(e, memo);
   const w = e.warband;
@@ -220,6 +251,34 @@ export function stepWarbandWork(state, ctx, events) {
   Object.assign(o, {target: pick.id, type: pick.type, at: [pick.position[0], ctx.terrainHeight(state, pick.position[0], pick.position[2]), pick.position[2]]});
  }
 }
+/** Queue a killed Fusewick's keg to go off at the start of the next tick (combat cannot blast mid-hit). */
+export function popFusewick(state, e) {
+ if (!fusewick(e)) return;
+ (state.warbandPops ||= []).push({id: e.id, owner: e.warband.owner, side: e.side, position: [e.position[0], e.position[1] + .6, e.position[2]]});
+}
+/**
+ * The keg goes off: foes of the owner's side in FUSEWICK.radius take falling-off damage and are blown apart (skeletons
+ * scatter, smaller bodies are tossed), rival buildings take a siege blow and the ground is scooped out. The owner's
+ * Hero, their Forgelings and their buildings are spared. ctx: {hitEnemyPart(state,e,part,n,hit,ctx,events),
+ * damageStructure(id,n,events,side), damageBase(id,n,side,events), crater(x,z,r,depth), blastRemains(state,at,r,energy)}.
+ */
+export function fusewickBlast(state, at, src, ctx, events) {
+ const R = FUSEWICK.radius, fall = d => 1 - .5 * Math.min(1, Math.max(0, d - 1.5) / (R - 1.5)); // full force near the keg
+ events.push({kind: 'critter_blast', id: src.id, style: 'keg', by: src.owner, position: [...at], radius: R, tick: state.tick});
+ for (const other of [...state.enemies]) {
+  if (other.hp <= 0 || !state.enemies.includes(other) || other.kind === 'stumpling') continue;
+  if (other.side !== undefined && other.side === src.side) continue; // your own troops, and your side's bots
+  const d = flat(other.position, at); if (d >= R) continue;
+  const normal = d > 1e-3 ? [(other.position[0] - at[0]) / d, 0, (other.position[2] - at[2]) / d] : [0, 1, 0];
+  ctx.hitEnemyPart?.(state, other, 'torso', FUSEWICK.damage * fall(d), {side: src.side, ownerId: src.owner, by: 'warband', point: [other.position[0], other.position[1] + 1, other.position[2]], normal, energy: 1.8, blast: true, blastFrom: [...at]}, ctx, events);
+  if (state.enemies.includes(other) && other.kind !== 'ent' && other.kind !== 'golem' && other.launchTick === undefined && d < R * .7) other.launchTick = state.tick; // tossed
+ }
+ ctx.blastRemains?.(state, at, R * 1.3, 1.2);
+ for (const b of state.inventions?.structures || []) if (b.hp > 0 && b.type !== 'forge' && b.side !== src.side && flat(b.position, at) < R + 1.5) ctx.damageStructure?.(b.id, FUSEWICK.building, events, src.side);
+ for (const b of state.battle?.bases || []) if (b.side !== src.side && flat(b.position, at) < R + 1.5) ctx.damageBase?.(b.id, FUSEWICK.building, src.side, events);
+ ctx.crater?.(at[0], at[2], FUSEWICK.crater, FUSEWICK.depth);
+}
+
 /**
  * A gatherer's swing lands on its tree or rock (called on the strike frame of its wind-up, so the blow and the chip
  * agree). ctx: {trees, terrainHeight(state,x,z,bridges?), chopTree(state,tree,point,normal,ctx), collapseMinedWall(state,ore)}.
@@ -264,6 +323,19 @@ export function warbandGoal(state, e, foes) {
   return best;
  };
  const go = (position, speed = WARBAND.walk) => ({target: {id: 'warband-point', position}, dist: flat(e.position, position), patrol: true, speed});
+ if (fusewick(e)) {
+  // A sapper never swings. Fuse lit: it stays put (presentation does the panic). Sent at a foe: it scampers up to it.
+  if (e.warband.fuse !== undefined) return go(e.position, 0);
+  if (order.kind === 'attack') { const foe = foes.find(f => f.id === order.target); if (foe) return go(foe.position, WARBAND.jog); e.warband.order = {kind: 'hold', point: [...e.position]}; }
+  if (order.kind === 'move' || order.kind === 'hold') {
+   if (order.kind === 'move' && flat(e.position, order.point) <= WARBAND.arrive) e.warband.order = {kind: 'hold', point: order.point};
+   return go(e.warband.order.point);
+  }
+  const hero = state.players.find(p => p.id === e.warband.owner && p.role === 'hero' && p.hp > 0);
+  if (!hero) { e.warband.order = {kind: 'hold', point: [...e.position]}; return go(e.position); }
+  const team = warbandOf(state, hero.id), slot = followSlot(hero, Math.max(0, team.indexOf(e)), team.length);
+  return go(slot, flat(e.position, slot) > 6 ? WARBAND.jog : WARBAND.walk);
+ }
  const fight = f => ({target: f, dist: flat(e.position, f.position), patrol: false, speed: WARBAND.walk});
  if (order.kind === 'attack') {
   const foe = foes.find(f => f.id === order.target);
@@ -305,7 +377,10 @@ export function validWarband(e, tick, reach) {
  if (e.kind !== 'skeleton' || !['party', 'rivals'].includes(e.side) || e.battleRun !== undefined || e.hp > WARBAND.hp) return false;
  if (!o || typeof o !== 'object' || !WARBAND_ORDERS.includes(o.kind)) return false;
  const keys = Object.keys(o).sort().join();
- if (Object.keys(w).some(k => !['owner', 'born', 'order', 'cargo'].includes(k))) return false;
+ if (Object.keys(w).some(k => !['owner', 'born', 'order', 'cargo', 'role', 'fuse'].includes(k))) return false;
+ if (w.role !== undefined && !WARBAND_ROLES.includes(w.role)) return false;
+ if (w.fuse !== undefined && (w.role !== 'fusewick' || !Number.isSafeInteger(w.fuse) || w.fuse < 0 || w.fuse > tick)) return false;
+ if (w.role === 'fusewick' && (w.cargo !== undefined || o.kind === 'gather' || e.hp > FUSEWICK.hp)) return false;
  if (w.cargo !== undefined && (!w.cargo || typeof w.cargo !== 'object' || !CARGO_KINDS.includes(w.cargo.kind) || !Number.isSafeInteger(w.cargo.amount) || w.cargo.amount < 1 || w.cargo.amount > WARBAND.haul || Object.keys(w.cargo).length !== 2)) return false; // a load kept through a change of orders is delivered on the next gather
  if (o.kind === 'follow') return keys === 'kind';
  if (o.kind === 'attack') return keys === 'kind,target' && validId(o.target);
@@ -320,5 +395,5 @@ export const restoreWarband = w => {
  const o = w.order;
  const order = o.kind === 'gather' ? {kind: o.kind, job: o.job, point: [...o.point], ...(o.target !== undefined ? {target: o.target, type: o.type, at: [...o.at]} : {})}
   : o.point ? {kind: o.kind, point: [...o.point]} : o.target ? {kind: o.kind, target: o.target} : {kind: o.kind};
- return {owner: w.owner, born: w.born, order, ...(w.cargo ? {cargo: {kind: w.cargo.kind, amount: w.cargo.amount}} : {})};
+ return {owner: w.owner, born: w.born, order, ...(w.cargo ? {cargo: {kind: w.cargo.kind, amount: w.cargo.amount}} : {}), ...(w.role ? {role: w.role} : {}), ...(w.fuse !== undefined ? {fuse: w.fuse} : {})};
 };

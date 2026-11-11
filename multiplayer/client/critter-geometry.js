@@ -203,7 +203,7 @@ export function moleGeometry() {
 export function kegGeometry() {
   const parts = [], WOOD = [.62, .4, .22], L = KEG.length / 2, r = KEG.radius;
   const staves = (x, y, z) => { const a = Math.atan2(z, y), k = .82 + .18 * Math.abs(Math.sin(a * 7)); return Math.abs(x) < .035 ? [.8, .16, .1] : shade(WOOD, k * (1 + .06 * Math.sin(x * 60))); };
-  parts.push([lathe([[r * .8, -L], [r * .94, -L * .55], [r, 0], [r * .94, L * .55], [r * .8, L]], 22), M(0, 0, 0, 0, 0, -Math.PI / 2), staves]);
+  parts.push([lathe([[r * .8, -L], [r * .94, -L * .55], [r * .995, -.045], [r, -.03], [r, .03], [r * .995, .045], [r * .94, L * .55], [r * .8, L]], 22), M(0, 0, 0, 0, 0, -Math.PI / 2), staves]);
   for (const s of [-1, 1]) {
     parts.push([new THREE.CircleGeometry(r * .8, 20), M(s * L, 0, 0, 0, s * Math.PI / 2, 0), [.5, .32, .17]]);
     for (const x of [.62, .9]) parts.push([new THREE.TorusGeometry(r * (x > .8 ? .86 : .97), .011, 5, 26), M(s * L * x, 0, 0, 0, Math.PI / 2, 0), [.22, .21, .22]]);

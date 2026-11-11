@@ -9,7 +9,7 @@ export const SPELL_SCHOOLS = Object.freeze([
   {id:'summon',label:'Summon',job:'Call creatures: foes that drop loot, and allies',spells:['skeleton','squad','golem','awaken','wildwake','rabble']},
   {id:'sky',label:'Sky',job:'Instant strikes and weather',spells:['lightning','frost','starfall','rainfall']},
   // The RTS side: troops of the God's own to muster and lead (shared/warband.js).
-  {id:'command',label:'Command',job:'Muster Forgelings and lead them into battle',spells:['muster']},
+  {id:'command',label:'Command',job:'Muster Forgelings and lead them into battle',spells:['muster','sapper']},
 ].map(s=>Object.freeze({...s,spells:Object.freeze(s.spells)})));
 const SCHOOL_OF = Object.fromEntries(SPELL_SCHOOLS.flatMap(s=>s.spells.map(id=>[id,s.id])));
 export const SPELLS = Object.freeze([
@@ -32,6 +32,8 @@ export const SPELLS = Object.freeze([
   {id:'wildwake',label:'Wild Awakening',cost:40,target:'point',icon:'✤'},
   // Muster: three Dawnhold Forgelings drop out of the forge-light to fight for the caster (shared/warband.js).
   {id:'muster',label:'Muster Forgelings',cost:30,target:'point',icon:'⚒'},
+  // Fusewick: one sapper with an Emberdew keg on its back. Send it at a foe and it blows the lot sky-high (shared/warband.js).
+  {id:'sapper',label:'Muster a Fusewick',cost:40,target:'point',icon:'✹'},
   // Growth Wave: drag a band and a rectangle of trees rises along it (shared/grove-growth.js).
   {id:'wave',label:'Growth Wave',cost:30,target:'line',icon:'⁂'},
   {id:'rainfall',label:'Rainfall',cost:30,target:'point',icon:'☂'}, // world-wide rain: groves bloom faster, Heroes mend
@@ -54,7 +56,7 @@ export const WEAPONS = Object.freeze([
 // Creatures, trees and crystal stay off the forge apron (wider during an
 // expedition for creatures), and trees keep room inside the mountain wall.
 export const FORGE_APRON = 7, EXPEDITION_KEEP_OUT = 12, GROVE_EDGE = 51;
-const APRON_SPELLS = ['grove','ring','crystal','skeleton','squad','golem','rabble','muster'], SUMMONS = ['skeleton','squad','golem','rabble'];
+const APRON_SPELLS = ['grove','ring','crystal','skeleton','squad','golem','rabble','muster','sapper'], SUMMONS = ['skeleton','squad','golem','rabble'];
 export function settleCastPoint(spell, point, {expedition = false} = {}) {
   let [x, y, z] = point;
   if (spell === 'grove' || spell === 'ring') { const edge = godReach(GROVE_EDGE); x = Math.max(-edge, Math.min(edge, x)); z = Math.max(-edge, Math.min(edge, z)); } // the valley's mountain wall; a generated world's own edge
@@ -65,7 +67,7 @@ export function settleCastPoint(spell, point, {expedition = false} = {}) {
 
 // Spatial preview dimensions mirror authoritative spell effects and world-content tree sites.
 export const SPELL_TARGET_SHAPES = Object.freeze({
-  skeleton: { r: 2 }, muster: { r: 2.4, spawns: [[0, -.992], [-.859, .496], [.859, .496]] }, squad: { r: 2.6, spawns: [[-1.4, -1.4], [1.4, -1.4], [-1.4, 1.4], [1.4, 1.4]] }, golem: { r: 2.6 }, rabble: { r: 2.2 },
+  skeleton: { r: 2 }, muster: { r: 2.4, spawns: [[0, -.992], [-.859, .496], [.859, .496]] }, sapper: { r: 1.6, spawns: [[0, 0]] }, squad: { r: 2.6, spawns: [[-1.4, -1.4], [1.4, -1.4], [-1.4, 1.4], [1.4, 1.4]] }, golem: { r: 2.6 }, rabble: { r: 2.2 },
   raise: { r: 6, h: 2 }, lower: { r: 6, h: -2 },
   // Earth lines: kr is the trench lip / wall foot half-width, kh the full depth/height, bank the chasm's outer spoil edge.
   sunder: { line: true, kr: SUNDER.width, kh: -SUNDER.depth, bank: SUNDER.bankOut }, wall: { line: true, kr: RAISE_WALL.width, kh: RAISE_WALL.peak },

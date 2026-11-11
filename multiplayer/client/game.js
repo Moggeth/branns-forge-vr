@@ -69,6 +69,7 @@ import {attachEmberdew,setEmberdewTime} from './emberdew-presentation.js';
 import './ranged-reticle.css';
 import './warband-hud.css';
 import {createWarbandView} from './warband-view.js';
+import {dressFusewick, animateFusewick} from './fusewick-look.js';
 import {createWarbandHud} from './warband-hud.js';
 import {createTimberlineSight} from './timberline-sight.js';
 import {createColliderDebug} from './collider-debug.js';
@@ -222,7 +223,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   const equipment=['axe','pick','hammer','crossbow','bow','limb','wyrmspout','flask','staff','flockwright'];
   // Number keys pick from the hotbar; a held bone (limb) comes only from grabbing one (F), so it has no slot.
   const hotbarSlots=equipment.filter(t=>t!=='limb');
-  const spellKeys={Digit1:'grove',Digit2:'ring',Digit3:'wave',Digit4:'heal',Digit5:'spring',Digit6:'blessing',KeyQ:'raise',KeyE:'lower',KeyR:'wall',KeyT:'sunder',KeyY:'crystal',KeyU:'quake',Digit7:'skeleton',Digit8:'squad',Digit9:'golem',Equal:'rabble',Digit0:'awaken',Minus:'wildwake',KeyF:'muster',KeyZ:'lightning',KeyX:'frost',KeyC:'starfall',KeyV:'rainfall'}; // one keyboard row per school (Grow, Shape, Summon, Sky)
+  const spellKeys={Digit1:'grove',Digit2:'ring',Digit3:'wave',Digit4:'heal',Digit5:'spring',Digit6:'blessing',KeyQ:'raise',KeyE:'lower',KeyR:'wall',KeyT:'sunder',KeyY:'crystal',KeyU:'quake',Digit7:'skeleton',Digit8:'squad',Digit9:'golem',Equal:'rabble',Digit0:'awaken',Minus:'wildwake',KeyF:'muster',KeyH:'sapper',KeyZ:'lightning',KeyX:'frost',KeyC:'starfall',KeyV:'rainfall'}; // one keyboard row per school (Grow, Shape, Summon, Sky)
   let tool = 'axe', swingContact = false, swingReach = 2.5, swingRest = null, swingTarget = null;
   const remoteBatches=new Map();
   const weaponModels = new Map(), weaponTip = new THREE.Vector3(0,.5,-.35);
@@ -826,7 +827,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     entry.visual = model;
     entry.root.add(model);
     if (entry.data.boss === true) underways.dressGuardian(model, 2.8 * BOSS_SCALE); // the Underways' crowned guardian
-    if (forgeling) dressForgelingModel(model, entry.data.id);
+    if (forgeling) { dressForgelingModel(model, entry.data.id, entry.data.warband?.role); if (entry.data.warband?.role === 'fusewick') dressFusewick(model); }
     else if (entry.data.side === 'party' && (entry.data.battleRun !== undefined || entry.data.warband) && ['skeleton', 'golem'].includes(entry.data.kind)) dressForgeling(model, entry.data.kind);
   }
   // Remote Heroes swap the placeholder for the shared hero body; Gods and the local player keep their existing visuals.
@@ -1341,7 +1342,8 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     const woodSound=!!woodAudio?.handles(event);if(woodSound&&!predictedImpact)woodAudio.play(event,listenerPose());if(event.kind==='ent_wake'||event.kind==='ent_root')rootRumble(event);
     const materialSound=!!materialAudio?.handles(event);if(materialSound&&!predictedImpact)materialAudio.play(event,listenerPose(),snapshot.tick);
     if(event.kind==='warband_order'&&event.by===playerId&&event.order==='gather')report(`Your Forgelings set to work: ${({wood:'felling Timber',iron:'quarrying Iron',gems:'cutting Crystal'})[event.job]||'gathering'}. They haul each load to the Forge${role==='hero'?' or to you':''}.`);
-    if(event.kind==='warband_muster'&&event.by===playerId)report(touchEnabled?'Your Forgelings have landed. Tap the Warband button, then tap the land to send them.':'Your Forgelings have landed. Press G (or click one) to command them; right-click to send them.');
+    if(event.kind==='warband_muster'&&event.by===playerId&&event.role==='fusewick')report(touchEnabled?'A Fusewick has landed with its keg. Select it and tap a foe: it runs in, lights the fuse and blows.':'A Fusewick has landed with its keg. Select it and right-click a foe: it runs in, lights the fuse and blows.');
+    else if(event.kind==='warband_muster'&&event.by===playerId)report(touchEnabled?'Your Forgelings have landed. Tap the Warband button, then tap the land to send them.':'Your Forgelings have landed. Press G (or click one) to command them; right-click to send them.');
     if(event.kind==='spell'){spellVisual.play(event);spellAudio?.play(event,earXZ(),role==='god');if((event.spell==='wall'||event.spell==='sunder')&&event.rupture)earthLineFeel(event);}
     // God spells feed the Heroes (shared/god-boons.js): a blue resonance marks each gift; boons spark on the Hero.
     if(event.kind==='bloom_level'){const at=event.position||[0,0,0];spellVisual.play({spell:'bloom_level',position:at,id:`bloom:${event.level}:${snapshot.tick}`,tick:snapshot.tick});spellAudio?.gift({...event,gift:'bloom_level',position:at},earXZ(),true);if(touchEnabled)try{navigator.vibrate?.([20,40,20,40,40]);}catch{}}
@@ -2053,7 +2055,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
           animation.motion = motion;
         }
       }
-      if (entry.enemy) { presentEnemyRoot(entry, renderTick, dt); if (entry.data.warband) warbandView.present(entry, renderTick); }
+      if (entry.enemy) { presentEnemyRoot(entry, renderTick, dt); if (entry.data.warband) { warbandView.present(entry, renderTick); if (entry.data.warband.role) animateFusewick(entry.visual, entry.data, renderTick, dt, critterView.fizz); } }
       else {
         entry.root.position.lerp(entry.target, 1 - Math.exp(-dt * 12));
         entry.root.rotation.y = entry.data.head ? 0 : entry.data.yaw || 0;

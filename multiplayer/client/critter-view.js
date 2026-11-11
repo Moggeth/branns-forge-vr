@@ -333,6 +333,7 @@ export function createCritterView({scene, height = () => 0, quality = 'high', on
       onSound({kind: e.crash ? 'hog_crash' : 'hog_stop', id: e.id, position: at}); dirt(at[0], at[1] + .1, at[2], n(e.crash ? 16 : 8), 1.4, 2);
       if (e.crash) for (let i = 0; i < n(8); i++) chips.emit({x: at[0], y: at[1] + .7, z: at[2], vx: (Math.random() - .5) * 2, vy: 2 + Math.random(), vz: (Math.random() - .5) * 2, life: 1.6, size: .07, grav: -2.4, drag: 1.2, flutter: 3, ground: true, r: .4, g: .66, b: .26});
     } else if (e.kind === 'bramble_nip') onSound({kind: 'hog_nip', id: e.id, position: at});
+    else if (e.kind === 'fusewick_lit') onSound({kind: 'keg_plant', id: e.id, position: at}); // a God's sapper strikes its fuse
     else if (e.kind === 'keg_plant') { onSound({kind: 'keg_plant', id: e.id, position: at}); dirt(at[0], at[1] + .05, at[2], n(6), .6, 1.2); }
   }
 
@@ -374,6 +375,11 @@ export function createCritterView({scene, height = () => 0, quality = 'high', on
     }
     steam.tick(dt, height); sparks.tick(dt, height); chips.tick(dt, height);
   }
+  /** A few fuse sparks and a wisp of smoke at a world point (the Fusewick's burning fuse borrows this pool). */
+  function fizz(x, y, z, strength = 1) {
+    for (let i = 0, k = strength > 1.2 ? 2 : 1; i < k; i++) sparks.emit({x, y, z, vx: (Math.random() - .5) * 1.8, vy: .8 + Math.random() * 1.8, vz: (Math.random() - .5) * 1.8, life: .3 + Math.random() * .3, size: .035 + Math.random() * .035, grav: -5, drag: .6, r: 1.8, g: 1.1, b: .4});
+    if (Math.random() < .2) puff(x, y, z, 0, .5, 0, {size: .05, grow: 2, life: .8, alpha: .35, tint: .5});
+  }
   function stats() { return {corpses: corpses.length, blasts: blastFx.stats().live, pieces: pieces.length, steam: steam.count(), sparks: sparks.count(), chips: chips.count()}; }
   function dispose() {
     for (const k of corpses) endCorpse(k); corpses.length = 0;
@@ -382,5 +388,5 @@ export function createCritterView({scene, height = () => 0, quality = 'high', on
     steam.dispose(); sparks.dispose(); chips.dispose(); tex.dispose();
     for (const g of Object.values(geo)) g.dispose(); for (const m of Object.values(mats)) m.dispose();
   }
-  return {build, update, release, event, tick, stats, dispose};
+  return {build, update, release, event, tick, fizz, stats, dispose};
 }
