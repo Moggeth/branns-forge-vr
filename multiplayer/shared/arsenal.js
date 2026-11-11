@@ -31,7 +31,9 @@ export const createArsenal = () => ({forged: {}});
 /** True when this world uses the weapon ladder (only new Great Wilds worlds). Works on state or snapshot. */
 export const ladderOn = state => record(state?.arsenal);
 /** Ladder weapons this hero has forged, in ladder order. */
-export const forgedWeapons = (state, p) => ladderOn(state) ? [...(state.arsenal.forged[nameKey(p?.name)] || [])] : [...LADDER_TOOLS];
+// Own-property lookups only: a hero called "Constructor" must not read Object.prototype.
+const entry = (forged, key) => (key && Object.hasOwn(forged, key) && Array.isArray(forged[key])) ? forged[key] : [];
+export const forgedWeapons = (state, p) => ladderOn(state) ? [...entry(state.arsenal.forged, nameKey(p?.name))] : [...LADDER_TOOLS];
 /** May this hero draw this weapon? Weapons off the ladder (limb, Flockwright, Stormreel...) follow their own rules. */
 export function weaponOwned(state, p, tool) {
   if (!ladderOn(state) || !LADDER_TOOLS.includes(tool)) return true;
@@ -69,7 +71,7 @@ export function craftWeapon(state, p, message) {
     delete forged[drop];
   }
   for (const [k, n] of Object.entries(next.cost)) p.resources[k] -= n;
-  forged[key] = LADDER_TOOLS.filter(t => t === next.tool || (forged[key] || []).includes(t));
+  forged[key] = LADDER_TOOLS.filter(t => t === next.tool || entry(forged, key).includes(t));
   const rung = LADDER_TOOLS.indexOf(next.tool) + 1;
   return {ok: true, events: [{kind: 'weapon_forged', id: p.id, by: p.id, tool: next.tool, rung, of: LADDER_TOOLS.length,
     position: [p.position[0], p.position[1] + 1.2, p.position[2]]}]};

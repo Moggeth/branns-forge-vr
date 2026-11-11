@@ -1797,7 +1797,8 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
         for (const action of actions) {
           if (action === 'menu') { weapons.cancel(); presses.invalidate(); void renderer.xr.getSession()?.end().then(onMenu); }
           else if (action === 'jump') jumpPending = true;
-          else if (action === 'cycle') { const choices=hotbarSlots.filter(t=>(t!=='flockwright'||ownsFlockwright())&&toolAllowed(t)); equip(choices[(choices.indexOf(tool)+1)%choices.length]); }
+          else if (action === 'cycle') { const me=selfNow(),rung=nextWeapon(snapshot,me),forgeable=rung&&me&&nearForge(me)&&!Object.keys(costShortfall(me.resources,rung.cost)).length?rung.tool:null; // VR has no hotbar: cycling onto an affordable next weapon at the forge forges it
+            const choices=hotbarSlots.filter(t=>(t!=='flockwright'||ownsFlockwright())&&(toolAllowed(t)||t===forgeable)); equip(choices[(choices.indexOf(tool)+1)%choices.length]); }
           else if (action === 'hand') { if (holdingLoose()) release(false, index); else grab(index); }
           else if (action === 'bridge') onAction('buildBridge');
           else if (action === 'interact') interact();

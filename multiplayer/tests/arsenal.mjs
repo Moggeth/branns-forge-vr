@@ -80,6 +80,17 @@ test("Brann's Valley and old saves keep every weapon", () => {
   assert.equal(back.command('o', {type: 'action', action: 'equip', tool: 'wyrmspout', seq: 1}).ok, true);
 });
 
+test('hero names that match Object.prototype keys read as empty', () => {
+  const sim = createSimulation({room: 'A', seed: 41, world});
+  sim.addPlayer({id: 'c', name: 'Constructor', role: 'hero'});
+  const me = sim.adventureWorld().players[0];
+  assert.deepEqual(forgedWeapons(sim.snapshot(), me), []);
+  assert.equal(nextWeapon(sim.snapshot(), me).tool, WEAPON_LADDER[0].tool);
+  assert.equal(sim.command('c', {type: 'action', action: 'equip', tool: 'crossbow', seq: 1}).code, 'not_forged');
+  me.position = withWorld(worldFor(world), () => [0, terrainHeight(sim.adventureWorld(), 0, 3), 3]); pay(me, WEAPON_LADDER[0].cost);
+  assert.equal(sim.command('c', {type: 'action', action: 'craftWeapon', tool: WEAPON_LADDER[0].tool, seq: 2}).ok, true);
+});
+
 test('bad arsenal saves are refused', () => {
   for (const arsenal of [null, [], {forged: []}, {forged: {brann: ['flask']}}, {forged: {brann: ['bow', 'bow']}}, {forged: {Brann: []}}, {forged: {}, extra: 1}])
     assert.throws(() => restoreArsenal({arsenal}), /Invalid arsenal/, JSON.stringify(arsenal));
