@@ -1,13 +1,14 @@
 // The Timberline's flip-up "Wirewidth" sight (2026-11-11), replacing the tall brass range ladder and its number plates.
 //
 // What the operator sees, sighting from the eye point (Socket_ScopeEye) 0.7 m behind the leaf:
-//  - a slim V of brass bars hanging below the sight line. Each bar is a range (25 to 300 m): put the target on the
-//    glowing pip in the bar's middle and the pair comes down on it. The pip heights are the same honest holdovers as the
+//  - an open window between two straight brass rails, crossed by hairline bars below the sight line. Each bar is a range
+//    (25 to 300 m): put the target on the glowing pip in the bar's middle and the pair comes down on it. The pip heights are the same honest holdovers as the
 //    old ladder rungs (client/timberline-ladder.js, from the shared flight), so the shot itself is unchanged.
-//  - each bar is exactly as wide as the bolts' wire is at that range, so the V narrows with distance. Anything between
-//    the bar's tips gets caught by the wire, and a man-sized foe (about a wire wide) that fills a bar is at that range.
-//  - each bar's number rides on a small leaf-shaped tab off one tip (alternating sides), blued iron with the figures cut
-//    in and filled with blue resonance; the V's two rails end in brass fir-tip finials. Nothing stands beside the aim.
+//  - two small glowing ticks on each bar mark how wide the bolts' wire is at that range, so the ticks close in with
+//    distance. Anything between them gets caught by the wire, and a man-sized foe (about a wire wide) that fills them is
+//    at that range. (Mitch, 2026-11-13: rails wider apart for visibility, bars kept thin.)
+//  - each bar's number rides on a small leaf-shaped tab outside one rail (alternating sides), blued iron with the figures
+//    cut in and filled with blue resonance; the rails end in brass fir-tip finials.
 //
 // Mechanism: the leaf hinges on a pin between two iron standards. A crank under the knuckle is tied by a push-rod to a
 // thumb lever at the operator's end, so the leaf lies folded flat when the machine stands idle and is thrown up when
@@ -24,7 +25,7 @@ const HINGE_Y=.17,STANDARD_X=.034;
 const LEVER={pivot:new THREE.Vector2(.10,.26),arm:.034,handle:.075}; // (y, z) in the Elevation frame
 const CRANK=new THREE.Vector2(-.03,.004);                           // leaf-local (y, z) of the push-rod pin
 export const FLIP_SIGHT=Object.freeze({hingeY:HINGE_Y,leafZ:LEAF_Z,raised:0,folded:-Math.PI/2+.06,
- stiffness:150,damping:13,tabW:.018,tabH:.0098,wireHalf:TIMBERLINE_LONG.boltHalf});
+ stiffness:150,damping:13,railX:.03,tabW:.018,tabH:.0098,wireHalf:TIMBERLINE_LONG.boltHalf});
 
 // Half-width of a range bar: the pair's wire half-span seen from the eye, projected onto the leaf.
 export const barHalfWidth=range=>FLIP_SIGHT.wireHalf/range*THROW;
@@ -72,16 +73,18 @@ function buildKit(materials){
  const leafIron=[barrel(.0095,STANDARD_X*2-.016,0,0,0),box(.05,.016,.006,0,.012,0),box(.008,.03,.006,0,-.012,.006),
   rod([0,0,0],[0,CRANK.x,CRANK.y],.004)],leafBrass=[],leafGlow=[];
  const top=L[0],bottom=L[L.length-1],rail=[],y=m=>m.z-HINGE_Y;
- for(const m of L)rail.push([barHalfWidth(m.range)+.0022,y(m)]);
- rail.unshift([rail[0][0]+.0006,y(top)+.007]);rail.push([.004,y(bottom)-.014],[.004,.02]);
- for(const sx of [-1,1])for(let i=0;i<rail.length-1;i++)leafBrass.push(rod([sx*rail[i][0],rail[i][1],0],[sx*rail[i+1][0],rail[i+1][1],0],.0016,5));
- for(const m of L){const w=barHalfWidth(m.range);leafBrass.push(box(2*w+.0044,.0016,.0024,0,y(m)-.004,0));leafGlow.push(pip(y(m),0));}
- // Brass fir-tip finials capping the V's rails just above the nearest bar.
+ // Straight rails a window's width apart, gathering in below the furthest bar to the stem on the knuckle.
+ const RX=FLIP_SIGHT.railX;rail.push([RX,y(top)+.007],[RX,y(bottom)-.006],[.004,.014]);
+ for(const sx of [-1,1])for(let i=0;i<rail.length-1;i++)leafBrass.push(rod([sx*rail[i][0],rail[i][1],0],[sx*rail[i+1][0],rail[i+1][1],0],.0017,6));
+ // Hairline bars rail to rail, the aim pip in the middle and a wire-width tick either side.
+ for(const m of L){const w=barHalfWidth(m.range),by=y(m)-.0034;leafBrass.push(box(2*RX,.0009,.0012,0,by,0));leafGlow.push(pip(y(m),0));
+  for(const sx of [-1,1])leafGlow.push(box(.0009,.0034,.0014,sx*w,by+.0008,0));}
+ // Brass fir-tip finials capping the rails just above the nearest bar.
  for(const sx of [-1,1]){const fx=sx*rail[0][0],fy=rail[0][1],t=new THREE.Shape();
   [[0,0],[.0036,.0035],[.0016,.0035],[.0042,.0075],[.0014,.0075],[.0026,.011],[0,.016],[-.0026,.011],[-.0014,.0075],[-.0042,.0075],[-.0016,.0035],[-.0036,.0035]].forEach(([u,v],i)=>i?t.lineTo(fx+u*.8,fy+v*.8):t.moveTo(fx+u*.8,fy+v*.8));t.closePath();
   const g=new THREE.ExtrudeGeometry(t,{depth:.002,bevelEnabled:false});g.translate(0,0,-.001);leafBrass.push(g);}
- // Number tabs off alternate bar tips: 25 m on the right, 50 m on the left, and so on down the V.
- const tex=tabAtlas(L),tabs=L.map((m,i)=>{const side=i%2?-1:1,x0=side*(barHalfWidth(m.range)+.0028),yc=y(m)-.004,g=new THREE.ExtrudeGeometry(tabShape(x0,side,yc),{depth:.0018,bevelEnabled:false});
+ // Number tabs outside alternate rails: 25 m on the right, 50 m on the left, and so on down the leaf.
+ const tex=tabAtlas(L),tabs=L.map((m,i)=>{const side=i%2?-1:1,x0=side*(RX+.0018),yc=y(m)-.0034,g=new THREE.ExtrudeGeometry(tabShape(x0,side,yc),{depth:.0018,bevelEnabled:false});
   g.translate(0,0,-.0009);const pos=g.attributes.position,uv=g.attributes.uv;
   for(let j=0;j<pos.count;j++){const u=(pos.getX(j)-x0)*side/FLIP_SIGHT.tabW,v=(pos.getY(j)-yc)/FLIP_SIGHT.tabH+.5;uv.setXY(j,side>0?u:1-u,1-(i+1-v)/L.length);}
   return g;});
