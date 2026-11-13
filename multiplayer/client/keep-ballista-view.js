@@ -11,7 +11,7 @@ import {HOME_MANNED, KEEP_BALLISTA, homeBallistaYaw, keepMuzzle, keepShotAt, kee
 import {MANNED} from '../shared/inventions.js';
 import {buildKeepRig, poseKeepRig, prepareKeepKit, rigMuzzle} from './keep-ballista-art.js';
 import {createTimberlineBallista} from '../assets-source/timberline-twinbolt-20261003/runtime/timberline-ballista.js';
-import {addLadderPlates} from './timberline-ladder-plates.js';
+import {addFlipSight} from './timberline-flip-sight.js';
 
 const TIP = {sunlance: 1.8, gnashjaw: 2.56}; // bolt length from its nock (the mesh origin) to its tip
 const STUCK_CAP = 20, STUCK_LIFE = 22, LINK = .13, LINKS = 300;
@@ -88,18 +88,18 @@ export function createKeepBallistaView({root, height = () => 0, timberline = () 
   function adoptTimberline(built) {
     const gltf = timberline(); if (!gltf) return false;
     const machine = createTimberlineBallista(gltf, {castShadow: false}), dais = buildDais();
-    addLadderPlates(machine.nodes);
+    const flipSight = addFlipSight(machine.nodes);
     for (const c of [...built.group.children]) built.group.remove(c);
     const holder = new THREE.Group(); holder.name = 'keep-timberline';
     holder.rotation.y = homeBallistaYaw(built.data.side) - built.group.rotation.y; // the machine's rest heading, world-aligned
     holder.add(dais.group, machine.object); built.group.add(holder);
     holder.traverse(n => { if (n.isMesh) n.userData.targetId = built.data.id; });
     built.head = null; built.bow = null; built.bolt = null;
-    built.keep = {style: 'timberline', machine, dais, holder, yaw: built.data.aimYaw || 0, pitch: built.data.aimPitch || 0};
+    built.keep = {style: 'timberline', machine, dais, holder, flipSight, yaw: built.data.aimYaw || 0, pitch: built.data.aimPitch || 0};
     parts.set(built.data.id, built);
     return true;
   }
-  const release = built => { if (built?.keep) { if (built.keep.machine) { built.keep.machine.dispose(); built.keep.dais.dispose(); } parts.delete(built.data.id); built.keep = null; } };
+  const release = built => { if (built?.keep) { if (built.keep.machine) { built.keep.flipSight?.dispose(); built.keep.machine.dispose(); built.keep.dais.dispose(); } parts.delete(built.data.id); built.keep = null; } };
 
   function sync(s) { snapshot = s; }
 
@@ -243,12 +243,15 @@ export function createKeepBallistaView({root, height = () => 0, timberline = () 
   }
 
   // --- Per frame ------------------------------------------------------------------------------------------
+  let scopedId = null, scopedAmount = 0;
   function poseTimberline(built, dt, camera) {
     const k = built.keep, data = built.data, alive = data.hp > 0;
     // The operator's own predicted aim drives it at once; everyone else eases toward the replicated aim every frame.
     const mine = localAim.get(data.id), want = mine || {yaw: data.aimYaw || 0, pitch: data.aimPitch || 0}, ease = mine ? 1 : 1 - Math.exp(-dt * 7);
     k.yaw += wrap(want.yaw - k.yaw) * ease; k.pitch += (want.pitch - k.pitch) * ease;
     k.machine.aimImmediate(k.yaw, k.pitch);
+    // The flip-up sight is thrown up while someone holds the seat and folds flat when they step off.
+    k.flipSight?.update(dt, !!data.operator && alive, scopedId === data.id ? scopedAmount : 0);
     // seekCycle poses from the absolute cycle age, so an off-screen turret can skip it and still be exact when seen.
     if (inView(camera, k.holder, {radius: 5, lift: 1.5})) k.machine.seekCycle(alive ? gateCycleAge(data, tick) : 99, camera, viewport, {ammo: alive});
     // The inlay glows while a pair sits on the rails and dims through the wind.
@@ -358,6 +361,7 @@ export function createKeepBallistaView({root, height = () => 0, timberline = () 
   }
 
   return {install, adopt, release, sync, event, update, sight, scopeEye, ready: () => !!kit, sightState,
+    setScoped(id, amount = 0) { scopedId = id; scopedAmount = amount; },
     setLocalAim(id, aim) { if (aim) localAim.set(id, aim); else localAim.delete(id); },
     /** The operator's own Sunlance draw: a frame time it started at, or null when released or cancelled. */
     setLocalDraw(id, startMs) { if (startMs === null || startMs === undefined) localDraw.delete(id); else localDraw.set(id, startMs); },
