@@ -11,7 +11,7 @@ const endpoint=process.env.CLOUD_WS_URL||'ws://127.0.0.1:8791/peer/cloud';
 const players=[];
 const live=()=>players.filter(p=>!p.gone);
 async function join(name,{role='hero',room=''}={}){
-  const b=await launch({viewport:{width:320,height:200}});b.name=name;
+  const b=await launch({viewport:{width:320,height:200}});b.name=name;players.push(b);
   await b.page.goto(BASE+'/tests/transport-harness.html');await b.page.waitForFunction(()=>window.makeSession);
   await b.page.evaluate(({endpoint,name,role,room})=>{
     window.makeSession(endpoint,{name,role,room,desktop:true});
@@ -19,7 +19,7 @@ async function join(name,{role='hero',room=''}={}){
     const w=window.watch={last:0,gap:0,rewind:0,lastTick:0,buttons:0};
     window.s.addEventListener('snapshot',e=>{const now=performance.now(),t=e.detail.tick;if(w.last)w.gap=Math.max(w.gap,now-w.last);w.last=now;if(w.lastTick&&t<w.lastTick)w.rewind=Math.max(w.rewind,w.lastTick-t);w.lastTick=t;});
   },{endpoint,name,role,room});
-  await b.page.waitForFunction(()=>window.watch.last>0,null,{timeout:30000});players.push(b);return b;
+  await b.page.waitForFunction(()=>window.watch.last>0,null,{timeout:30000});return b;
 }
 const hostOf=async()=>{for(const p of live())if(await p.page.evaluate(()=>!!window.s.simulation))return p;return null;};
 const reset=()=>Promise.all(live().map(p=>p.page.evaluate(()=>{const w=window.watch;w.gap=0;w.rewind=0;w.last=performance.now();})));
@@ -46,7 +46,7 @@ async function carriesOn(old,label){
 try{
   const a=await join('Host');const room=await a.page.evaluate(()=>window.s.identity.room);
   const god=await join('God',{role:'god',room}),c=await join('Friend',{room});
-  await Promise.all(players.map(p=>p.page.waitForFunction(()=>window.s.connection.roster.size===3&&window.lastTick!==0)));
+  await Promise.all(players.map(p=>p.page.waitForFunction(()=>window.s.connection.roster.size===3&&window.watch.lastTick>0)));
   await god.page.evaluate(()=>window.s.command('cast',{spell:'raise',point:[6,0,6]}));
   await a.page.waitForFunction(()=>window.s.simulation.snapshot().edits.some(e=>e.kind==='raise'),null,{timeout:10000});
   await sleep(1500);record('three-players-and-a-god-edit','pass',{room});
