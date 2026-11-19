@@ -1,3 +1,4 @@
+import {stepEnemies} from '../shared/enemy-behaviour.js';
 import assert from 'node:assert/strict';
 import {performance} from 'node:perf_hooks';
 import {createSimulation,loadSimulation,terrainHeight} from '../shared/simulation.js';
@@ -15,5 +16,21 @@ test('solid starting landmark blocks a melee wind-up',()=>{const r=rig(),b=START
 test('mid-wind-up save restores target, direction and resulting damage exactly',()=>{const r=rig();r.tick(8);const restored=loadSimulation(r.sim.checkpoint());for(let i=0;i<50;i++){r.tick();restored.step();}assert.deepEqual(restored.snapshot(),r.sim.snapshot());const bad=r.sim.checkpoint();bad.enemies[0].attackTarget={};assert.throws(()=>loadSimulation(bad));});
 test('death grants three seconds of protection across save; expired protection allows damage',()=>{const r=rig();r.p.hp=1;r.tick(19);assert.equal(r.p.hp,100);assert.equal(r.p.protectedUntil,r.w.tick+180);const again=loadSimulation(r.sim.checkpoint());assert.equal(again.snapshot().players[0].protectedUntil,r.p.protectedUntil);const until=r.p.protectedUntil;for(let i=0;i<180;i++){r.e.position=[r.p.position[0],r.p.position[1],r.p.position[2]+1.6];r.e.yaw=0;r.e.attackTick=r.w.tick-17;r.e.attackTarget=r.p.id;r.tick();if(r.w.tick<until)assert.equal(r.p.hp,100);}assert.ok(r.p.hp<100);const bad=r.sim.checkpoint();bad.players[0].protectedUntil=bad.tick+181;assert.throws(()=>loadSimulation(bad));});
 test('crowded summons separate deterministically with bounded displacement',()=>{const r=rig();r.p.position=[30,0,-10];r.w.enemies=Array.from({length:12},(_,i)=>createEnemy('e'+i,[30,0,4]));const twin=loadSimulation(r.sim.checkpoint());for(let i=0;i<90;i++){r.tick();twin.step();}assert.deepEqual(twin.snapshot(),r.sim.snapshot());const positions=new Set(r.w.enemies.map(e=>e.position.map(n=>n.toFixed(2)).join(',')));assert.ok(positions.size>=10);assert.ok(r.w.enemies.every(e=>Math.hypot(e.position[0]-30,e.position[2]-4)<5));});
+test('an unobstructed walker probes one direction and a blocked walker checks alternatives',()=>{
+ const target={id:'h',role:'hero',hp:100,position:[0,0,-12]};
+ for(const blocked of [false,true]){
+  const e=createEnemy('walker',[0,0,0]);
+  const state={tick:300,players:[target],enemies:[e]};
+  let probes=0;
+  stepEnemies(state,{ground:()=>0,events:[],damageHero:()=>{},resolve:point=>{
+   if(point===e.position)return; // final body collision
+   probes++;
+   if(blocked&&point[0]===0)point[0]+=.2;
+  }});
+  assert.equal(probes,blocked?5:1);
+  assert.ok(e.position[2]<0);
+  assert.equal(e.position[0]!==0,blocked);
+ }
+});
 test('8-player/64-enemy/64-edit step stays bounded',()=>{const r=rig();for(let i=1;i<8;i++)r.sim.addPlayer({id:'h'+i,role:'hero'});r.w.enemies=Array.from({length:64},(_,i)=>createEnemy('load'+i,[Math.cos(i)*20,0,Math.sin(i)*20]));r.w.edits=Array.from({length:64},(_,i)=>({id:'raise'+i,kind:'raise',x:Math.cos(i)*40,z:Math.sin(i)*40,radius:6,height:2}));const start=performance.now();r.tick(600);const ms=(performance.now()-start)/600;console.log('Worst-population simulation ms/tick:',ms.toFixed(3));assert.ok(ms<16.7);});
 console.log(`${passed} enemy behaviour tests passed in ${((performance.now()-T)/1000).toFixed(3)}s`);

@@ -91,6 +91,8 @@ export function stepEnemies(state,{ground,resolve,damageHero,damageStructure,dam
     for(const angle of [0,.65,-.65,1.25,-1.25]){const c=Math.cos(angle),s=Math.sin(angle),x=vx*c-vz*s,z=vx*s+vz*c;
      const [px,pz]=clampToWorld(e.position[0]+x*.65,e.position[2]+z*.65),probe=[px,e.position[1],pz],before=[...probe];resolve(probe,radius(e));
      if(flat(probe,before)>.025||Math.abs(ground(probe[0],probe[2])-e.position[1])>.8)continue;
+     // Straight ahead has the maximum possible alignment. Check alternatives only if it is blocked.
+     if(angle===0){chosen=[x,z];break;}
      const value=x*vx+z*vz;if(value>score){score=value;chosen=[x,z];}
     }
     if(chosen){
