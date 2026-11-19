@@ -5,6 +5,7 @@ import {createSimulation, loadSimulation, terrainHeight} from '../shared/simulat
 import {worldDescriptor, worldFor} from '../shared/worldgen/registry.js';
 import {chunkContent, chunkOf, isGeneratedTreeId} from '../shared/worldgen/content.js';
 import {worldTrees} from '../shared/world-content.js';
+import {createTreeIndex} from '../shared/trees.js';
 import {withWorld} from '../shared/world-extent.js';
 
 const world = worldDescriptor({kind: 'wilds', seed: 'ci-wilds', preset: 'continent', size: 2048});
@@ -31,6 +32,22 @@ const sb = b.snapshot();
 assert.deepEqual(worldTrees(sb).map(t => t.id), worldTrees(snap).map(t => t.id));
 assert.deepEqual(sb.deposits.map(d => d.id), snap.deposits.map(d => d.id));
 for (let k = 0; k < 20; k++) { const x = far.x + k * 3.1 - 30, z = far.z - k * 2.3 + 20; assert.equal(withWorld(w, () => terrainHeight(snap, x, z)), withWorld(w, () => terrainHeight(sb, x, z))); }
+// Two saves can share a seed and revision while different trees have rotted away.
+{
+  const index = createTreeIndex();
+  const snapshots = live.slice(0, 2).map(tree => ({
+    ...snap, wilds: {...snap.wilds, felled: [[tree.id, snap.tick]], felledRev: 1}
+  }));
+  assert.equal(snapshots.length, 2);
+  for (const i of [0, 1, 0]) {
+    const state = snapshots[i], standing = live[1 - i].id, gone = live[i].id;
+    index.update(state);
+    assert.ok(index.get(standing), 'standing tree remains collidable after switching worlds');
+    assert.equal(index.get(gone), undefined);
+    assert.ok(worldTrees(state).some(t => t.id === standing));
+    assert.ok(!worldTrees(state).some(t => t.id === gone));
+  }
+}
 // A change (a felled tree) persists through a save and comes back when the Hero returns.
 const st = a.adventureWorld(), tree = live[0];
 st.harvestedTrees.push({id: tree.id, cuts: 3, cutHeight: 0.4, felledTick: st.tick, fallYaw: 0, landed: true});

@@ -4,9 +4,20 @@ import {activeChunks, chunkContent, generatedTree, isGeneratedTreeId} from './wo
 // Generated worlds: the live trees are the generated ones in the active chunks around Heroes, minus trees whose
 // stumps have rotted away (state.wilds.felled). Memoised per world + window so repeated calls in a tick are cheap.
 const wildsMemo = {key: '', trees: []};
+// Revisions are local to each save. Use the actual IDs for shared caches and only join them once per mutation.
+const felledKeys = new WeakMap();
+function felledTreeKey(wilds) {
+  const felled = wilds?.felled;
+  if (!felled?.length) return '';
+  const cached = felledKeys.get(felled);
+  if (cached && cached.rev === wilds.felledRev && cached.length === felled.length) return cached.key;
+  const key = felled.map(([id]) => id).join(',');
+  felledKeys.set(felled, {rev: wilds.felledRev, length: felled.length, key});
+  return key;
+}
 export function wildsTreeKey(state) {
   const w = state.world; if (!w) return '';
-  return `${w.seed}|${w.preset}|${w.size}|${activeChunks(state).map(c => c.join(',')).join(';')}|${(state.wilds?.felled || []).length}:${state.wilds?.felledRev || 0}`;
+  return `${w.seed}|${w.preset}|${w.size}|${activeChunks(state).map(c => c.join(',')).join(';')}|${felledTreeKey(state.wilds)}`;
 }
 function wildsTrees(state) {
   const key = wildsTreeKey(state);
