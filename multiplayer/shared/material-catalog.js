@@ -29,6 +29,9 @@ export const ORE_RECIPES=Object.freeze({
  copperOre:Object.freeze({output:'copper',input:1,amount:1,ticks:100}),
  goldOre:Object.freeze({output:'gold',input:1,amount:1,ticks:160})
 });
+// Streamed worlds can hold more live mineral sites. Falling meteors reserve a slot until impact.
+export const depositLimit = state => state?.world ? 192 : 80;
+
 export const DEPOSIT_CATALOG=Object.freeze({
  stone:Object.freeze({label:'Stone boulder',maxHits:3,resource:'stone',amount:2,color:0x92938c}),
  iron:Object.freeze({label:'Iron seam',maxHits:4,resource:'ironOre',amount:4,color:0xb26e4f}),

@@ -3,7 +3,7 @@ import {battleActive,battleSkirmish} from './battle-mode.js';
 // God spells feed the Heroes. Every cast leaves something a Hero can use: real materials to mine or pick
 // up, fruit that heals, or a short boon. Pure and deterministic (authority state only, no clock or RNG).
 // Feeding is its own reward: nothing here pays the God back.
-import {DEPOSIT_CATALOG} from './material-catalog.js';
+import {depositLimit,DEPOSIT_CATALOG} from './material-catalog.js';
 import {SUNDER} from './terrain.js';
 
 export const BOONS = Object.freeze({
@@ -17,7 +17,7 @@ export const BOONS = Object.freeze({
 const flat = (a, b) => Math.hypot(a[0] - b[0], a[2] - b[2]);
 
 function addDeposit(state, kind, x, z, ctx) {
-  if (Math.hypot(x, z) < 7 || state.deposits.length + state.pendingStarfalls.length >= 80) return null;
+  if (Math.hypot(x, z) < 7 || state.deposits.length + state.pendingStarfalls.length >= depositLimit(state)) return null;
   if (state.deposits.some(d => !d.depleted && Math.hypot(d.x - x, d.z - z) < BOONS.seamSpacing)) return null;
   const id = ctx.nextId(state, 'o'), info = DEPOSIT_CATALOG[kind];
   state.deposits.push({id, x, z, kind, hits: 0, maxHits: info.maxHits, depleted: false});

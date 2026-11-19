@@ -1,3 +1,4 @@
+import {depositLimit} from './material-catalog.js';
 import {heroMaxHp} from './hero-progress.js';
 import {MAX_PLAYERS} from './multiplayer-limits.js';
 // Forge Expedition: an optional, cooperative 10-15 minute run layered on the free sandbox.
@@ -121,7 +122,7 @@ function restockStone(adv, world, out) {
   const carried = roster(world).heroes.reduce((n, p) => n + (p.resources?.stone | 0), 0);
   let have = loose + carried + 2 * deposits.filter(d => d.kind === 'stone' && !d.depleted).length;
   // Depleted expedition ores (xv ids) are reusable slots, so endless rematches stay inside the 80-deposit cap; world/user ores are never evicted.
-  const free = 80 - deposits.length - (Array.isArray(world?.pendingStarfalls) ? world.pendingStarfalls.length : 0) + deposits.filter(questOreReusable).length;
+  const free = depositLimit(world) - deposits.length - (Array.isArray(world?.pendingStarfalls) ? world.pendingStarfalls.length : 0) + deposits.filter(questOreReusable).length;
   for (let i = 0; have < adv.need.stone && i < 8 && i < free; i++, have += 2) {
     const a = .45 + i * 2.39996, r = 6.5 + (i % 2) * 1.5;
     out.intents.push({type: 'deposit', kind: 'stone', id: `xv${adv.run}r${i}`, x: Math.cos(a) * r, z: Math.sin(a) * r});
@@ -377,8 +378,8 @@ export function applyAdventureIntents(state, intents, {createEnemy, terrainHeigh
       if (state.enemies.length >= 64 || taken(it.id)) { skipped.push(it.id); continue; }
       state.enemies.push({...createEnemy(it.id, [it.x, terrainHeight(state, it.x, it.z), it.z], it.kind),emergeTick:state.tick}); applied++;
     } else if (it.type === 'deposit') {
-      // The save validator caps deposits + pending starfalls at 80 together.
-      const full = () => state.deposits.length + (state.pendingStarfalls?.length | 0) >= 80;
+      // Falling meteors reserve slots in the same budget as deposits.
+      const full = () => state.deposits.length + (state.pendingStarfalls?.length | 0) >= depositLimit(state);
       if (full()) { const old = state.deposits.findIndex(questOreReusable); if (old >= 0) state.deposits.splice(old, 1); }
       if (full() || taken(it.id)) { skipped.push(it.id); continue; }
       state.deposits.push(it.kind === 'stone' ? {id: it.id, x: it.x, z: it.z, kind: 'stone', hits: 0, maxHits: 3, depleted: false} : {id: it.id, x: it.x, z: it.z, kind: 'meteor', hits: 0, maxHits: 5, depleted: false}); applied++;

@@ -27,7 +27,7 @@ import {keepCarve,inKeepApproach} from './keep-sites.js';
 // The keeps (with their carved bowl, pass and hollow) and the shared tavern's yard stay clear of wild trees and new ore.
 const insideHome=(x,z,margin=0)=>keepCarve(x,z)>.02||Object.values(HOME_SITES).some(([a,b])=>Math.hypot(x-a,z-b)<HOME.domeRadius+margin)||Math.hypot(x-NEUTRAL_TAVERN.at[0],z-NEUTRAL_TAVERN.at[1])<8+margin;
 import {clearLandmarkTrees,STARTING_SITES} from './starting-world.js';
-import {DEPOSIT_CATALOG} from './material-catalog.js';
+import {depositLimit,DEPOSIT_CATALOG} from './material-catalog.js';
 import {MAP_EXTRAS, moved} from './map-layout.js';
 // Deterministic world presentation data.  This file deliberately has no clock or RNG.
 const hash = (seed, n) => { let x = (seed ^ Math.imul(n + 1, 0x9e3779b9)) >>> 0; x ^= x >>> 16; x = Math.imul(x, 0x85ebca6b); x ^= x >>> 13; return x >>> 0; };
@@ -48,7 +48,7 @@ export const initialDeposits = () => [
  * Skip occupied/protected ground and places a player is watching at close range.
  */
 export function renewGeology(state,ctx,events=[]){
- if(!Number.isSafeInteger(state.tick)||state.tick<=0||state.tick%7200||!(state.players||[]).length||!Array.isArray(state.deposits)||state.deposits.length+(state.pendingStarfalls?.length||0)>=80)return false;
+ if(!Number.isSafeInteger(state.tick)||state.tick<=0||state.tick%7200||!(state.players||[]).length||!Array.isArray(state.deposits)||state.deposits.length+(state.pendingStarfalls?.length||0)>=depositLimit(state))return false;
  const cycle=state.tick/7200,id=`renewal${cycle}`;
  if(state.deposits.some(d=>d.id===id))return false;
  const kinds=['stone','iron','crystal','stone','iron','mithril'],kind=kinds[(cycle-1)%kinds.length];

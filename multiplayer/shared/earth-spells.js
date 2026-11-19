@@ -2,7 +2,7 @@
 // line into timed capsule segments; the authority stores them as terrain edits with a rupture front and a lifetime,
 // so the ground rises or tears open at the speed the player sees, then shatters or closes after a minute.
 import {terrainHeight,createSunderRupture,wallSpec,earthLineSegments,wallSegmentRadius} from './terrain.js';
-import {DEPOSIT_CATALOG} from './material-catalog.js';
+import {depositLimit,DEPOSIT_CATALOG} from './material-catalog.js';
 import {wallCasts,shatterWall} from './weapon-specials.js';
 
 export const EARTH_LINES=Object.freeze(['wall','sunder']);
@@ -37,7 +37,7 @@ export function castEarthLine(state,p,kind,id,start,end,ctx,events) {
       wall:{a:q.a,b:q.b,h0:q.h0,h1:q.h1,expireTick,owner:p.id}});
     // Every rampart segment can be quarried; mining one out sinks just that segment, opening a breach. A world already
     // full of deposits still gets its wall (mana is the only gate), just without the extra quarry stone.
-    if(kind==='wall'&&state.deposits.length+state.pendingStarfalls.length<80)state.deposits.push({id:ctx.nextId(state,'o'),x:q.x,z:q.z,kind:'stone',hits:0,maxHits:DEPOSIT_CATALOG.stone.maxHits,depleted:false,special:'wall',editId});
+    if(kind==='wall'&&state.deposits.length+state.pendingStarfalls.length<depositLimit(state))state.deposits.push({id:ctx.nextId(state,'o'),x:q.x,z:q.z,kind:'stone',hits:0,maxHits:DEPOSIT_CATALOG.stone.maxHits,depleted:false,special:'wall',editId});
   });
   return {rupture,expireTick,plan,position:[(plan.start[0]+plan.end[0])/2,terrainHeight(state,(plan.start[0]+plan.end[0])/2,(plan.start[1]+plan.end[1])/2),(plan.start[1]+plan.end[1])/2]};
 }

@@ -53,6 +53,34 @@ assert.throws(() => loadSimulation({...saved, wilds: {...saved.wilds, felled: [[
   let key = ''; for (let cx = -3; cx < 3; cx++) for (let cz = -3; cz < 3; cz++) for (const t of chunkContent(gw, cx, cz).trees) key += `${t.id}@${t.x},${t.z};`;
   assert.equal(createHash('sha1').update(key).digest('hex').slice(0, 16), '0439287206a7c80d', 'generated tree ids keep their saved positions');
 }
+// Generated worlds share the 192-slot mineral budget across preview, commands, streaming and restore.
+{
+  const {spellUnavailable} = await import('../client/spell-availability.js');
+  const sim = make();
+  sim.addPlayer({id:'g', role:'god'});
+  const state = sim.adventureWorld(), god = state.players.find(p => p.id === 'g');
+  const cast = seq => sim.command('g', {seq, type:'cast', spell:'crystal', point:[25,0,25]});
+  state.players[0].position = [far.x, 0, far.z];
+  for (let i=0; i<20; i++) sim.step();
+  const rock = state.deposits.find(d => d.id.startsWith('wr'));
+  Object.assign(rock, {hits:rock.maxHits, depleted:true});
+  assert.equal(cast(1).ok, true);
+  for (let i=0; i<20; i++) sim.step();
+  assert.ok(state.wilds.spent.some(([id]) => id === rock.id), 'casting before the next streaming tick preserves the mined rock timer');
+  assert.ok(!state.deposits.some(d => d.id === rock.id && !d.depleted));
+  while (state.deposits.length < 191) {
+    const n = state.deposits.length;
+    state.deposits.push({id:'extra'+n, kind:'stone', x:10, z:10, maxHits:3, hits:0, depleted:false});
+  }
+  god.mana = 100;
+  assert.equal(spellUnavailable(state, god, 'crystal'), '');
+  assert.equal(cast(2).ok, true);
+  assert.equal(state.deposits.length, 192);
+  god.mana = 100;
+  assert.equal(spellUnavailable(state, god, 'crystal'), 'Deposit limit reached');
+  assert.equal(cast(3).code, 'world_limit');
+  assert.doesNotThrow(() => loadSimulation(sim.checkpoint()));
+}
 // The arena is untouched.
 const arena = createSimulation({room: 'A', seed: 41}); arena.addPlayer({id: 'x', role: 'hero'}); arena.step();
 assert.equal(arena.snapshot().world, undefined);

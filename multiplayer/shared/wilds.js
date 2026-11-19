@@ -10,7 +10,7 @@
 // Everything is plain JSON, bounded, and validated in restoreWilds.
 import {worldFor} from './worldgen/registry.js';
 import {activeChunks, chunkContent, depositFor, isGeneratedRockId, isGeneratedTreeId, generatedRock, CHUNK} from './worldgen/content.js';
-import {DEPOSIT_CATALOG, MATERIAL_KEYS} from './material-catalog.js';
+import {depositLimit,DEPOSIT_CATALOG, MATERIAL_KEYS} from './material-catalog.js';
 import {registerWorldMode} from './world-modes.js';
 import {sitesFromEntrances} from './underways/sites.js';
 
@@ -86,7 +86,7 @@ export function syncWildsContent(state, world = worldFor(state)) {
     if (d.depleted) { if (!spent.has(d.id)) { w.spent.push([d.id, state.tick]); spent.add(d.id); } return live.has(d.id) && referenced(state, d.id); }
     return live.has(d.id) || d.hits > 0; // partly mined rocks stay until finished
   });
-  const cap = 192 - (state.pendingStarfalls?.length || 0);
+  const cap = depositLimit(state) - (state.pendingStarfalls?.length || 0);
   for (const id of live) {
     if (have.has(id) || spent.has(id) || state.deposits.length >= cap) continue;
     const r = generatedRock(world, id); if (r) state.deposits.push(depositFor(r));

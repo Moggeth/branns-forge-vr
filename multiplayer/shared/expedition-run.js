@@ -7,6 +7,7 @@
 //         -> route ... -> heart (the final destination) -> won | returned | fallen.
 // Resets each run: the run world, hero level/XP/talents, boons, kit, inventory and the unbanked haul.
 // Persists (each player's device, client/run-meta.js): banked Embers, Hall of Embers unlocks, codex and bests.
+import {depositLimit} from './material-catalog.js';
 import {BOONS, BOON_IDS, BOON_LIMIT, KITS, KIT_IDS, cleanHall, validBoonList, HALL_IDS, HALL} from './run-boons.js';
 import {MAX_PLAYERS} from './multiplayer-limits.js';
 
@@ -238,7 +239,7 @@ function startFight(state, run, n, heroes, ctx, out) {
     for (let i = 0; i < shards; i++) {
       const id = `rx${run.seed % 100000}s${run.seq++}`, a = i * Math.PI * 2 / shards + (mix(run.seed, n.id) % 100) / 50;
       const x = n.x + Math.cos(a) * 2.2, z = n.z + Math.sin(a) * 2.2;
-      if (state.deposits.length + (state.pendingStarfalls?.length | 0) >= 80) break;
+      if (state.deposits.length + (state.pendingStarfalls?.length | 0) >= depositLimit(state)) break;
       state.deposits.push({id, x, z, kind: 'meteor', hits: 0, maxHits: 5, depleted: false});
       run.shards.push(id);
     }
@@ -257,7 +258,7 @@ function startFight(state, run, n, heroes, ctx, out) {
       // The Shardback's heartstones: crystal pillars round the arena that mend it while any still stands.
       for (let i = 0; i < boss.stones; i++) {
         const id = `rx${run.seed % 100000}s${run.seq++}`, a = i * Math.PI * 2 / boss.stones + (mix(run.seed, 'stones') % 100) / 50;
-        if (state.deposits.length + (state.pendingStarfalls?.length | 0) >= 80) break;
+        if (state.deposits.length + (state.pendingStarfalls?.length | 0) >= depositLimit(state)) break;
         state.deposits.push({id, x: n.x + Math.cos(a) * 8, z: n.z + Math.sin(a) * 8, kind: 'crystal', hits: 0, maxHits: 5, depleted: false});
         run.shards.push(id);
       }

@@ -4,7 +4,7 @@
 // pick to break it gets the ore. Rarity is tiered by depth: copper and iron along the meadow edge, gold and mithril
 // further in, rare star veins up on the mountain foot itself.
 // Deterministic: no clock or RNG, only state.seed, slot and tick, so replays and peers agree.
-import {DEPOSIT_CATALOG} from './material-catalog.js';
+import {depositLimit,DEPOSIT_CATALOG} from './material-catalog.js';
 import {STARTING_SITES} from './starting-world.js';
 import {inKeepApproach} from './keep-sites.js';
 import {worldTrees} from './world-content.js';
@@ -91,7 +91,7 @@ export function stepVeins(state, ctx, events = []) {
     if (old && state.tick < old.respawnTick) continue;
     // The spent vein becomes an ordinary depleted tombstone, or vanishes when nothing references it.
     const drop = !!old && ctx.retained?.({...old, vein: undefined, respawnTick: undefined}) === false;
-    if (state.deposits.length + (state.pendingStarfalls?.length || 0) - (drop ? 1 : 0) >= 80) continue; // shared deposit budget
+    if (state.deposits.length + (state.pendingStarfalls?.length || 0) - (drop ? 1 : 0) >= depositLimit(state)) continue; // shared deposit budget
     const spot = placeVein(state, ctx, slot, {previous: old, initial: !old});
     if (!spot) continue;
     if (old) { delete old.vein; delete old.respawnTick; if (drop) state.deposits.splice(state.deposits.indexOf(old), 1); }

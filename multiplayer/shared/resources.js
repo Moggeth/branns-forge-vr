@@ -5,6 +5,7 @@ import {nextEntityId} from './entity-id.js';
 import {isTestingGift,giftContents} from './testing-supplies.js';
 import {BLOOM,addBloom} from './bloom.js';
 import {MATERIAL_KEYS,emptyMaterials,restoreMaterials,DEPOSIT_CATALOG,materialLabel} from './material-catalog.js';
+import {isGeneratedRockId} from './worldgen/content.js';
 import {isVein} from './ore-veins.js';
 // Shared collection and spending: authority validates role, range and benefit before consuming.
 import {collectLog,chopTree} from './trees.js';
@@ -115,7 +116,8 @@ export function retainedDepositPredicate(state){
  ]);
  const activeQuest=['camp','star','rekindle'].includes(state.adventure?.stage)?`xv${state.adventure.run}`:null;
  const liveEdits=new Set((state.edits||[]).map(e=>e.id));
- return d=>!d.depleted||isVein(d)||referenced.has(d.id)||(activeQuest&&d.id.startsWith(activeQuest))||(d.editId&&liveEdits.has(d.editId));
+ // Streaming records a mined generated rock's regrowth timer before releasing its slot.
+ return d=>!d.depleted||(state.wilds&&isGeneratedRockId(d.id))||isVein(d)||referenced.has(d.id)||(activeQuest&&d.id.startsWith(activeQuest))||(d.editId&&liveEdits.has(d.editId));
 }
 // Preview the exact post-reclamation budget without changing world state. Pending
 // meteors reserve their eventual deposit slots, just as the authority does.

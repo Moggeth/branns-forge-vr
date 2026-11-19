@@ -14,7 +14,7 @@ const PVP_DAMAGE=Object.freeze({axe:22,pick:20,hammer:34,limb:18});
 import {MAX_PLAYERS} from './multiplayer-limits.js';
 export {MAX_PLAYERS} from './multiplayer-limits.js';
 import {STRUCTURES,createInventions,inventionAction,stepInventions,restoreInventions,resolveInventions,inventionFloor,damageInvention} from './inventions.js';
-import {MATERIAL_KEYS,emptyMaterials,restoreMaterials,DEPOSIT_CATALOG,depositReward} from './material-catalog.js';
+import {depositLimit,MATERIAL_KEYS,emptyMaterials,restoreMaterials,DEPOSIT_CATALOG,depositReward} from './material-catalog.js';
 import {baseHeight,terrainHeight,moveOnTerrain,resolveTerrainBoundary,settleTerrainContents,createSunderRupture,validateTerrainRuptures,restoreTerrainEdit,hasActiveTerrain,validateWallSegment,PICK_WALL,RAISE_WALL,makeTerrainRoom,restoreTerrainBake} from './terrain.js';
 import {collapseMinedWall,stepCrystalWalls,WALL_DEPOSITS,RIDGE_KINDS} from './weapon-specials.js';
 import {castEarthLine,earthLineEdits} from './earth-spells.js';
@@ -64,7 +64,6 @@ import {worldMode} from './world-modes.js';
 import {WARBAND,FUSEWICK,warbandAction,musterWarband,rallyWarband,warbandRoom,fusewickRoom,validWarband,restoreWarband,stepWarbandWork,warbandStrike} from './warband.js';
 import {treeIdSet} from './world-content.js';
 // Deposits a world may hold at once (generated worlds keep a live window of rocks around every Hero).
-const depositCap = state => state?.world ? 192 : 80;
 import {createRun,stepRun,runAction,restoreRun} from './expedition-run.js';
 import {validBoonList} from './run-boons.js';
 import {arenaOpenGround,arenaCamp} from './run-sites.js';
@@ -427,9 +426,9 @@ function instantiate(state) {
       if (spell==='sapper' && fusewickRoom(state,p.id)<=0) return fail(warbandRoom(state,p.id)<=0?'warband_full':'fusewick_full');
       if ((['skeleton','squad','golem','rabble','muster','sapper'].includes(spell) && state.enemies.length+(spell==='squad'?4:1)>MAX_WORLD) ||
           (['grove','ring','wave'].includes(spell) && state.groves.length >= MAX_WORLD) ||
-          (['raise','lower','sunder','wall'].includes(spell) && state.edits.length + state.pendingStarfalls.length + (line?lineCount:1) > MAX_WORLD) || (spell==='crystal' && state.deposits.length+state.pendingStarfalls.length>=80) ||
+          (['raise','lower','sunder','wall'].includes(spell) && state.edits.length + state.pendingStarfalls.length + (line?lineCount:1) > MAX_WORLD) || (spell==='crystal' && state.deposits.length+state.pendingStarfalls.length>=depositLimit(state)) ||
           (spell === 'starfall' && state.edits.length + state.pendingStarfalls.length >= MAX_WORLD) ||
-          (spell === 'starfall' && (state.pendingStarfalls.length >= 8 || state.deposits.length+state.pendingStarfalls.length>=80))) return fail('world_limit');
+          (spell === 'starfall' && (state.pendingStarfalls.length >= 8 || state.deposits.length+state.pendingStarfalls.length>=depositLimit(state)))) return fail('world_limit');
       // Growth spells grow each tree on the open ground nearest its aim; only a spot with no room at all refuses.
       const grown=['grove','ring','wave'].includes(spell)?growthPlan(state,spell,point,{start:message.start,end:message.end}):null;
       if(grown&&!grown.length)return fail('no_room');
@@ -527,7 +526,7 @@ function instantiate(state) {
         for(const b of state.inventions.structures)if(distance(b.position,at)<=5)damageInvention(state,b.id,90,null,events,pending.side||'party');
         state.edits.push({id: pending.id, kind: 'starfall', x: pending.x, z: pending.z, radius: 5, height: -1});
         const awakens = meteorAwakens(state.seed,pending.id) && state.enemies.length < MAX_WORLD;
-        if (!awakens && state.deposits.length < depositCap(state)) state.deposits.push({id:`${pending.id}_meteor`,x:pending.x,z:pending.z,kind:'meteor',hits:0,maxHits:5,depleted:false});
+        if (!awakens && state.deposits.length < depositLimit(state)) state.deposits.push({id:`${pending.id}_meteor`,x:pending.x,z:pending.z,kind:'meteor',hits:0,maxHits:5,depleted:false});
         addFuel(state,at,2,.35,!battleSkirmish(state));if(!battleSkirmish(state))applyHeat(state,at,5,1,fireContext);
         if (awakens) { const enemy=createEnemy(`${pending.id}_creature`,[pending.x,terrainHeight(state,pending.x,pending.z),pending.z],'golem'); Object.assign(enemy,{meteorBorn:true,unfurlTick:state.tick}); state.enemies.push(enemy); events.push({kind:'meteor_unfurl',id:enemy.id,position:[...enemy.position],tick:state.tick}); }
         liftActors(state); events.push(event('cast', at, pending.id));events.push({kind:'spell',spell:'starfall',phase:'impact',position:at,id:pending.id,tick:state.tick});
@@ -626,7 +625,7 @@ function loadState(saved, descriptor) {
   const deposits = saved.deposits === undefined ? initialDeposits() : saved.deposits;
   const pickups = saved.pickups === undefined ? [] : saved.pickups;
   const bridges = saved.bridges === undefined ? [] : saved.bridges;
-  if (!Array.isArray(harvested) || !Array.isArray(deposits) || !Array.isArray(pickups) || !Array.isArray(bridges) || harvested.length > (saved.world ? 640 : 256) || deposits.length + saved.pendingStarfalls.length > depositCap(saved) || pickups.length > 256 || bridges.length > 32) throw Error('Invalid simulation content');
+  if (!Array.isArray(harvested) || !Array.isArray(deposits) || !Array.isArray(pickups) || !Array.isArray(bridges) || harvested.length > (saved.world ? 640 : 256) || deposits.length + saved.pendingStarfalls.length > depositLimit(saved) || pickups.length > 256 || bridges.length > 32) throw Error('Invalid simulation content');
   for (const p of saved.players) {
     if (!record(p) || !unique(p.id) || typeof p.name !== 'string' || !p.name || p.name.length > 24 ||
         !['hero', 'god'].includes(p.role) || !validPosition(p.position) || !finite(p.yaw) || Math.abs(p.yaw) > Math.PI + 0.000001 ||

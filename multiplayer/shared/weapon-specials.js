@@ -4,12 +4,12 @@ import {terrainHeight,settleTerrainContents,PICK_WALL,createSunderRupture,sunder
 import {axeCleave} from './axe-cleave.js';
 import {specialCooldown} from './special-cooldowns.js';
 import {hasTalent,talentRank} from './hero-progress.js';
-import {DEPOSIT_CATALOG,depositReward} from './material-catalog.js';
+import {depositLimit,DEPOSIT_CATALOG,depositReward} from './material-catalog.js';
 // Geode Burst (pick talent): an ending crystal wall bursts into shards that wound and toss foes beside it.
 export const GEODE_BURST=Object.freeze({radius:2.6,damage:70});
 // Geode Burst ranks I, II, III: [radius, damage].
 export const GEODE_RANKS=Object.freeze([[2.6,70],[3.2,90],[3.8,110]]);
-export const SPECIAL_LIMITS=Object.freeze({cooldown:240,edits:64,deposits:80}); // cooldown: pick (see special-cooldowns.js)
+export const SPECIAL_LIMITS=Object.freeze({cooldown:240,edits:64,deposits:depositLimit(null)}); // cooldown: pick (see special-cooldowns.js)
 const fail=code=>({ok:false,code,events:[]});
 // Pick of Riches: each segment of a Stonewhisper ridge is a real mineral that the pick's resonance tears up out of the
 // ground, mined like any other seam. Mostly common stone and ore, and every cast surfaces at least one rich seam. Star
@@ -63,7 +63,7 @@ function crystalWall(state,p,ctx,m,hitEnemyPart) {
   if(!activeWorld()&&[plan.start,plan.end].some(q=>Math.abs(q[0])>46||Math.abs(q[1])>46))return fail('outside_world');
   const n=plan.segments.length;
   makeTerrainRoom(state,n+state.pendingStarfalls.length);
-  if(state.edits.length+state.pendingStarfalls.length+n>SPECIAL_LIMITS.edits||state.deposits.length+state.pendingStarfalls.length+n>SPECIAL_LIMITS.deposits)return fail('world_limit');
+  if(state.edits.length+state.pendingStarfalls.length+n>SPECIAL_LIMITS.edits||state.deposits.length+state.pendingStarfalls.length+n>depositLimit(state))return fail('world_limit');
   const position=[p.position[0],terrainHeight(state,p.position[0],p.position[2]),p.position[2]],editIds=[],depositIds=[],events=[];
   // At most PICK_WALL.standing of a caster's walls stand: the oldest still-standing one shatters to make room.
   const standing=[...wallCasts(state,p.id,'pick_wall').values()].filter(list=>list.some(e=>e.wall.expireTick>state.tick)).sort((a,b)=>a[0].rupture.startTick-b[0].rupture.startTick);

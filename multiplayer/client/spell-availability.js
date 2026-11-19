@@ -1,3 +1,4 @@
+import {depositLimit} from '../shared/material-catalog.js';
 import {SPELLS} from '../shared/spells.js';
 import {depositCapacityUsed} from '../shared/resources.js';
 import {ENT, ENT_SPELLS, entTargets} from '../shared/ents.js';
@@ -29,6 +30,6 @@ export function spellUnavailable(world,player,id,{point,lineCount=earthLineEdits
     if((world.enemies||[]).filter(e=>e.kind==='ent').length>=ENT.maxAwake||enemies>=64)return 'Ent limit reached';
   }
   if(id==='starfall'&&pending>=8)return 'Meteor limit reached';
-  if(['crystal','starfall'].includes(id)&&depositCapacityUsed(world)>=80)return 'Deposit limit reached';
+  if(['crystal','starfall'].includes(id)&&depositCapacityUsed(world)>=depositLimit(world))return 'Deposit limit reached';
   return '';
 }
