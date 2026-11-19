@@ -7,7 +7,7 @@ import {createTerrainGeometryUpdater} from '../client/terrain-geometry.js';
 import {spellUnavailable} from '../client/spell-availability.js';
 import {SPELLS,settleCastPoint} from '../shared/spells.js';
 import {expeditionRunning} from '../shared/adventure.js';
-import {createSimulation} from '../shared/simulation.js';
+import {loadSimulation,createSimulation} from '../shared/simulation.js';
 import {createEnemy} from '../shared/combat.js';
 import {depositCapacityUsed,reclaimDepletedDeposits} from '../shared/resources.js';
 import {terrainHeight,terrainFrameKey,terrainDirtyEdits,createSunderRupture,foundationTerrainKey,terrainRenderVertex} from '../shared/terrain.js';
@@ -53,9 +53,32 @@ for(const stage of ['idle','camp','star','rekindle','victory'])for(const id of [
 
 // Execute the actual small game closures with controlled dependencies, without a browser/renderer.
 // This tests the integration code itself rather than copying its endpoint or dirty-region algorithm.
+import {godReach, withWorld} from '../shared/world-extent.js';
+import {worldDescriptor, worldFor} from '../shared/worldgen/registry.js';
 const game=readFileSync(new URL('../client/game.js',import.meta.url),'utf8');
 function closure(name,until,env){const start=game.indexOf('function '+name+'('),end=game.indexOf(until,start);assert.ok(start>=0&&end>start,name+' source boundary');return new Function('env','with(env){return '+game.slice(start,end).trim()+';}')(env);}
-function previewFixture(id,point,castStart=null){const f=fixture();const env={THREE,active:true,role:'god',warbandCommanding:false,cursor:{visible:true},snapshot:f.world,playerId:'g',spell:id,hitPoint:new THREE.Vector3(...point),castStart:castStart?new THREE.Vector3(...castStart):null,spellUnavailable,isLineSpell:()=>['sunder','wall','wave'].includes(id),earthLineEdits,GROWTH_SPELLS:['grove','ring','wave'],GROWTH,waveLine,growthPreview:(p,a,b)=>growthPlan(f.world,id,p,{start:a,end:b})};Object.assign(env,{ENT_SPELLS,entPreviewTrees:p=>entTargets(worldTrees(f.world),f.world.harvestedTrees,id,p),settleCastPoint,expeditionRunning,heightAt:(x,z,edits)=>terrainHeight({...f.world,edits},x,z)});env.settledPoint=closure('settledPoint','function fitLine',env);env.waveTap=closure('waveTap','function fitLine',env);env.fitLine=closure('fitLine','function targetPreview',env);return {...f,env,preview:closure('targetPreview','function cancelCast',env)};}
+function previewFixture(id,point,castStart=null){const f=fixture();const env={THREE,godReach,active:true,role:'god',warbandCommanding:false,cursor:{visible:true},snapshot:f.world,playerId:'g',spell:id,hitPoint:new THREE.Vector3(...point),castStart:castStart?new THREE.Vector3(...castStart):null,spellUnavailable,isLineSpell:()=>['sunder','wall','wave'].includes(id),earthLineEdits,GROWTH_SPELLS:['grove','ring','wave'],GROWTH,waveLine,growthPreview:(p,a,b)=>growthPlan(f.world,id,p,{start:a,end:b})};Object.assign(env,{ENT_SPELLS,entPreviewTrees:p=>entTargets(worldTrees(f.world),f.world.harvestedTrees,id,p),settleCastPoint,expeditionRunning,heightAt:(x,z,edits)=>terrainHeight({...f.world,edits},x,z)});env.settledPoint=closure('settledPoint','function fitLine',env);env.waveTap=closure('waveTap','function fitLine',env);env.fitLine=closure('fitLine','function targetPreview',env);return {...f,env,preview:closure('targetPreview','function cancelCast',env)};}
+// Both point and line previews use the generated map extent and centre the tap on the player's aim.
+check('generated world far casting',()=>{
+ const descriptor=worldDescriptor({kind:'wilds',seed:'spell-reach',preset:'continent',size:2048});
+ const generated=worldFor(descriptor),sim=createSimulation({world:descriptor});sim.addPlayer({id:'g',role:'god'});
+ withWorld(generated,()=>{
+  let seq=0;
+  for(const [id,from] of [['raise',null],['sunder',[119,0,91]],['wall',null],['wave',null]]){
+   const f=previewFixture(id,[124,0,91],from);
+   f.env.snapshot=sim.adventureWorld(); f.env.snapshot.players[0].mana=100;
+   f.env.growthPreview=(p,a,b)=>growthPlan(f.env.snapshot,id,p,{start:a,end:b});
+   const p=f.preview();assert.equal(p.valid,true,id);
+   if(p.start)assert.ok(p.start[0]>100&&p.end[0]>100,id+' keeps the line at the aimed spot');
+   const result=sim.command('g',{type:'cast',seq:++seq,spell:id,point:p.point,...(!p.fallback&&p.start?{start:p.start,end:p.end}:{})});
+   assert.equal(result.ok,true,result.code);
+  }
+  const outside=[generated.extent+1,0,0], state=sim.adventureWorld();state.players[0].mana=100;
+  assert.equal(spellUnavailable(state,state.players[0],'raise',{point:outside}),'Outside the world');
+  assert.equal(sim.command('g',{seq:++seq,type:'cast',spell:'raise',point:outside}).code,'invalid_cast');
+  assert.doesNotThrow(()=>loadSimulation(sim.checkpoint()));
+ });
+});
 // Lines are never refused: under 0.5 m becomes the default 6 m line, over 18 m is shortened.
 for(const id of ['sunder','wall'])for(const n of [.499,.5,2.5,2.501,17.999,18,18.001,30])check(id+'/explicit-length/'+n,()=>{const f=previewFixture(id,[n,30,16],[0,-30,16]),p=f.preview(),result=f.sim.command('g',{type:'cast',seq:1,spell:id,point:p.point,...(p.fallback?{}:{start:p.start,end:p.end})});assert.equal(p.valid,true);assert.equal(p.valid,result.ok,result.code);if(result.ok){assert.equal(f.world.edits.length,earthLineSegments(n<.5?6:Math.min(n,17.99)));assert.equal(p.fallback,n<.5);assert.equal(lineKernels(p.start[0],p.start[2],p.end[0],p.end[2],p.fallback).length,f.world.edits.length);}});
 for(const id of ['sunder','wall'])for(const point of [[16,0,16],[55,0,55],[0,0,0],[.0001,0,0]])check(id+'/fallback/'+point,()=>{const f=previewFixture(id,point);f.player.position=[0,0,0];f.player.yaw=.7;const p=f.preview(),result=f.sim.command('g',{type:'cast',seq:1,spell:id,point});assert.equal(p.valid,result.ok);assert.equal(p.fallback,true);assert.equal(f.world.edits.length,earthLineSegments(6));const event=result.events.find(e=>e.kind==='spell');for(const k of ['start','end'])for(const axis of [0,2])assert.ok(Math.abs(p[k][axis]-event[k][axis])<1e-12,`${k} XZ preview must match authority`);assert.equal(lineKernels(p.start[0],p.start[2],p.end[0],p.end[2],p.fallback).length,earthLineSegments(6));});

@@ -7,3 +7,4 @@ title: Golems, mining and impact dust
 - Striking wood, stone and other surfaces kicks up the intended puff of dust again.
 - In generated worlds, Crystal Bloom, Starfall and quarry walls can use all 192 mineral slots. Mined rocks keep their regrowth timer when someone casts nearby.
 - Large groups of enemies use less host processing time when their path ahead is clear.
+- God spell previews now follow your aim beyond the valley in generated worlds, including tapped walls and Growth Waves.

@@ -1,6 +1,6 @@
 // Shared catalogue: the tray and authoritative cast validation use one vocabulary.
 import {ENT} from './ents.js';
-import {godReach} from './world-extent.js';
+import {godReach, posLimit} from './world-extent.js';
 import {RAISE_WALL,SUNDER} from './terrain.js';
 // The four schools of God magic, in spell-bar order. Each spell belongs to exactly one.
 export const SPELL_SCHOOLS = Object.freeze([
@@ -57,6 +57,12 @@ export const WEAPONS = Object.freeze([
 // expedition for creatures), and trees keep room inside the mountain wall.
 export const FORGE_APRON = 7, EXPEDITION_KEEP_OUT = 12, GROVE_EDGE = 51;
 const APRON_SPELLS = ['grove','ring','crystal','skeleton','squad','golem','rabble','muster','sapper'], SUMMONS = ['skeleton','squad','golem','rabble'];
+export function validCastPoint(point) {
+  return Array.isArray(point) && point.length === 3 && point.every(Number.isFinite)
+    && Math.abs(point[0]) <= godReach() && Math.abs(point[2]) <= godReach()
+    && Math.abs(point[1]) <= Math.max(1000, posLimit());
+}
+
 export function settleCastPoint(spell, point, {expedition = false} = {}) {
   let [x, y, z] = point;
   if (spell === 'grove' || spell === 'ring') { const edge = godReach(GROVE_EDGE); x = Math.max(-edge, Math.min(edge, x)); z = Math.max(-edge, Math.min(edge, z)); } // the valley's mountain wall; a generated world's own edge

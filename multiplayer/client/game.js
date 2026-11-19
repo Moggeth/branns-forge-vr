@@ -1089,7 +1089,7 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
   // a drawn line longer than 18 m is shortened and a tiny one becomes the default line.
   function settledPoint(id,x,z){const [sx,,sz]=settleCastPoint(id,[x,0,z],{expedition:expeditionRunning(snapshot.adventure)});return [sx,heightAt(sx,sz,snapshot.edits),sz];}
   // A Growth Wave tap grows a full band across the view, sent as an explicit line so the authority plants the same band.
-  function waveTap(point){const player=snapshot.players.find(p=>p.id===playerId),dx=point[0]-(player?.position[0]??0),dz=point[2]-(player?.position[2]??0),d=Math.hypot(dx,dz),ux=d>.001?dx/d:-Math.sin(player?.yaw??0),uz=d>.001?dz/d:-Math.cos(player?.yaw??0),h=GROWTH.wave.tapLength/2,c=v=>THREE.MathUtils.clamp(v,-55,55);return [[c(point[0]-uz*h),point[1],c(point[2]+ux*h)],[c(point[0]+uz*h),point[1],c(point[2]-ux*h)]];}
+  function waveTap(point){const player=snapshot.players.find(p=>p.id===playerId),dx=point[0]-(player?.position[0]??0),dz=point[2]-(player?.position[2]??0),d=Math.hypot(dx,dz),ux=d>.001?dx/d:-Math.sin(player?.yaw??0),uz=d>.001?dz/d:-Math.cos(player?.yaw??0),h=GROWTH.wave.tapLength/2,reach=godReach(),c=v=>THREE.MathUtils.clamp(v,-reach,reach);return [[c(point[0]-uz*h),point[1],c(point[2]+ux*h)],[c(point[0]+uz*h),point[1],c(point[2]-ux*h)]];}
   function fitLine(start,end){const dx=end[0]-start[0],dz=end[2]-start[2],d=Math.hypot(dx,dz);return d<=18?end:[start[0]+dx/d*17.99,end[1],start[2]+dz/d*17.99];}
   function targetPreview(){
     if(!active||role!=='god'||!cursor.visible||warbandCommanding)return null; // commanding the Warband: clicks are orders, not casts
@@ -1097,12 +1097,12 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
     let point=isLineSpell()?hit:settledPoint(spell,hit[0],hit[2]),start,end,fallback=false,lineCount=earthLineEdits();
     if(isLineSpell()){
       if(castStart&&Math.hypot(castStart.x-hit[0],castStart.z-hit[2])>=.5){start=castStart.toArray();end=point=fitLine(start,hit);lineCount=earthLineEdits(start,end);}
-      else {const dx=point[0]-(player?.position[0]??0),dz=point[2]-(player?.position[2]??0),d=Math.hypot(dx,dz),ux=d>.001?dx/d:-Math.sin(player?.yaw??0),uz=d>.001?dz/d:-Math.cos(player?.yaw??0),clamp=v=>THREE.MathUtils.clamp(v,-55,55);
+      else {const dx=point[0]-(player?.position[0]??0),dz=point[2]-(player?.position[2]??0),d=Math.hypot(dx,dz),ux=d>.001?dx/d:-Math.sin(player?.yaw??0),uz=d>.001?dz/d:-Math.cos(player?.yaw??0),reach=godReach(),clamp=v=>THREE.MathUtils.clamp(v,-reach,reach);
         start=[clamp(point[0]-uz*3),point[1],clamp(point[2]+ux*3)];end=[clamp(point[0]+uz*3),point[1],clamp(point[2]-ux*3)];fallback=true;}
     }
     let trees;if(ENT_SPELLS.includes(spell)){trees=entPreviewTrees(point);if(spell==='awaken'&&trees[0])point=[trees[0].x,heightAt(trees[0].x,trees[0].z,snapshot.edits),trees[0].z];}
     if(GROWTH_SPELLS.includes(spell)){const drawn=spell==='wave'?(fallback||Math.hypot(end[0]-start[0],end[2]-start[2])<GROWTH.wave.minLength?waveTap(point):[start,end]):[];if(spell==='wave'){[start,end]=waveLine(point,drawn[0],drawn[1]);fallback=false;}trees=growthPreview(point,drawn[0],drawn[1]);}
-    return {spell,point,start,end,fallback,trees,valid:(fallback||(Math.abs(start?.[0]??0)<=55&&Math.abs(start?.[2]??0)<=55))&&!spellUnavailable(snapshot,player,spell,{point,lineCount,trees})};
+    return {spell,point,start,end,fallback,trees,valid:(fallback||(Math.abs(start?.[0]??0)<=godReach()&&Math.abs(start?.[2]??0)<=godReach()))&&!spellUnavailable(snapshot,player,spell,{point,lineCount,trees})};
   }
   function cancelCast() { castStart = null; quickKey = null; castRevision++; }
   function castAt(point,finish=false) {

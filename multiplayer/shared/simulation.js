@@ -27,7 +27,7 @@ import {resolveDeposits} from './colliders.js';
 import {addFuel,applyHeat,quenchFire,fireContact,flareBurst,stepFire,restoreFire} from './fire.js';
 // Browser-authoritative, deterministic 60 Hz room simulation. No DOM, sockets, or secrets.
 import {worldTrees, restoreTreeRoots, initialDeposits, renewGeology} from './world-content.js';
-import {SPELL_COST as COST,SPELL_BLOOM,settleCastPoint} from './spells.js';
+import {SPELL_COST as COST,SPELL_BLOOM,settleCastPoint,validCastPoint} from './spells.js';
 import {BLOOM,bloomLevel,addBloom,stepBloom,restoreBloom} from './bloom.js';
 import {strikeWaygate,stepWaygate,restoreWaygate} from './waygate.js';
 import {strikeGeode,stepGeodes,restoreGeodes} from './geode-outcrop.js';
@@ -58,7 +58,7 @@ import {inUnderway,resolveUnderway} from './underways/space.js';
 import './underways/world.js';
 import {openUnderway,enterUnderway,stepUnderways,strikeUnderway,emptyUnderways,restoreUnderways,validUnderwayEnemy,underwayEnemyFields} from './underways/rules.js';
 import {worldFor, restoreWorldDescriptor} from './worldgen/registry.js';
-import {thingLimit, extentLimit, posLimit, withWorld} from './world-extent.js';
+import {godReach, thingLimit, extentLimit, posLimit, withWorld} from './world-extent.js';
 import {newWildsState, stepWilds, restoreWilds, wildsDepositKnown, wildsOrigin, wildsFacing} from './wilds.js';
 import {worldMode} from './world-modes.js';
 import {WARBAND,FUSEWICK,warbandAction,musterWarband,rallyWarband,warbandRoom,fusewickRoom,validWarband,restoreWarband,stepWarbandWork,warbandStrike} from './warband.js';
@@ -82,7 +82,6 @@ const cleanName = value => (typeof value === 'string' ? value : 'Guest').trim().
 // The Underways' pocket dungeons sit in a reserved band far off the map (shared/underways/space.js).
 const onMap = (x, z) => Math.abs(x) <= extentLimit() && Math.abs(z) <= extentLimit() || inUnderway(x, z);
 const validPoint = p => Array.isArray(p) && p.length === 3 && p.every(finite) && onMap(p[0], p[2]) && Math.abs(p[1]) <= Math.max(1000, posLimit());
-const castPoint = p => validPoint(p) && Math.abs(p[0]) <= thingLimit() && Math.abs(p[2]) <= thingLimit(); // god spells stay on the open map
 const record = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const validId = id => typeof id === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(id);
 const validPosition = p => Array.isArray(p) && p.length === 3 && p.every(finite) &&
@@ -411,10 +410,10 @@ function instantiate(state) {
       if (p.role !== 'god') return fail('role_required');
       const spell = message.spell;
       const line=spell==='sunder'||spell==='wall';
-      if(line && (message.start!==undefined||message.end!==undefined) && (!castPoint(message.start)||!castPoint(message.end)||distance(message.start,message.end)<.5||distance(message.start,message.end)>18))return fail('invalid_cast');
-      if(spell==='wave' && (message.start!==undefined||message.end!==undefined) && (!castPoint(message.start)||!castPoint(message.end)))return fail('invalid_cast');
+      if(line && (message.start!==undefined||message.end!==undefined) && (!validCastPoint(message.start)||!validCastPoint(message.end)||distance(message.start,message.end)<.5||distance(message.start,message.end)>18))return fail('invalid_cast');
+      if(spell==='wave' && (message.start!==undefined||message.end!==undefined) && (!validCastPoint(message.start)||!validCastPoint(message.end)))return fail('invalid_cast');
       const lineCount=line?earthLineEdits(message.start,message.end):1;
-      if (!Object.hasOwn(COST, spell) || !castPoint(message.point)) return fail('invalid_cast');
+      if (!Object.hasOwn(COST, spell) || !validCastPoint(message.point)) return fail('invalid_cast');
       // Mana is the only rule that refuses a cast; placement rules move it instead.
       const point = settleCastPoint(spell, message.point, {expedition: expeditionRunning(state.adventure)});
       if (bloomLevel(state.bloom) < SPELL_BLOOM[spell]) return fail('bloom_locked');
@@ -442,8 +441,8 @@ function instantiate(state) {
       const idNew = nextId(state, spell[0]);
       const x = point[0], z = point[2], at = [x, terrainHeight(state, x, z), z], events = [event('cast', at, idNew)];
       const dx=x-p.position[0],dz=z-p.position[2],d=Math.hypot(dx,dz),ux=d>.001?dx/d:-Math.sin(p.yaw),uz=d>.001?dz/d:-Math.cos(p.yaw);
-      const start=line?(message.start||[clamp(x-uz*3,-thingLimit(),thingLimit()),at[1],clamp(z+ux*3,-thingLimit(),thingLimit())]):null;
-      const end=line?(message.end||[clamp(x+uz*3,-thingLimit(),thingLimit()),at[1],clamp(z-ux*3,-thingLimit(),thingLimit())]):null;
+      const start=line?(message.start||[clamp(x-uz*3,-godReach(),godReach()),at[1],clamp(z+ux*3,-godReach(),godReach())]):null;
+      const end=line?(message.end||[clamp(x+uz*3,-godReach(),godReach()),at[1],clamp(z-ux*3,-godReach(),godReach())]):null;
       const earth=line?castEarthLine(state,p,spell,idNew,start,end,{nextId},events):null;
       events.push({kind:'spell',spell,id:idNew,tick:state.tick,position:[...at],...(spell==='starfall'?{phase:'launch'}:{}),...(line?{start,end,rupture:earth.rupture,expireTick:earth.expireTick,by:p.id}:{})});
       if (spell === 'skeleton'||spell==='golem') state.enemies.push({...createEnemy(idNew,at,spell==='golem'?'golem':'skeleton'),emergeTick:state.tick});
