@@ -53,8 +53,9 @@ func _initialize(): run.call_deferred()
 func run():
 	var began=Time.get_ticks_usec()
 	var game=Harness.new(); root.add_child(game); game.diagnostic_offline=true
+	game.desktop_release_mode="throw"
 	var stub=Stub.new(); game.add_child(stub); stub.extras=stub; stub.rope=stub
-	for key in ["qol","adventure","living","firecraft","workshop","enchantments","siegebird","zone_details","button_feedback","item_actions","tuning"]: game.set(key,stub)
+	for key in ["qol","adventure","living","firecraft","workshop","enchantments","siegebird","zone_details","guardians","button_feedback","item_actions","tuning"]: game.set(key,stub)
 	game.rig=Node3D.new(); game.add_child(game.rig)
 	game.camera=Camera3D.new(); game.rig.add_child(game.camera); game.camera.position.y=1.7
 	game.desktop_hand=Node3D.new(); game.rig.add_child(game.desktop_hand); game.desktop_hand.position.y=1.7

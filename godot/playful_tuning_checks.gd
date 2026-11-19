@@ -17,6 +17,7 @@ class Game extends Node3D:
 	var adventure=Adventure.new()
 	var playful_feedback=null
 	var playful_encounters=null
+	var desktop_release_mode="throw"
 	var desktop_hand=Node3D.new()
 	var camera=Node3D.new()
 	func initialize():

@@ -51,6 +51,7 @@ class Game:
 	var living=Travel.new()
 	var item_actions=Actions.new()
 	var firecraft=Fire.new()
+	var heat_contacts=null
 	var desktop_hand=Node3D.new()
 	var hands=[]
 	var camera=Camera3D.new()
@@ -58,6 +59,7 @@ class Game:
 	var notices=[]
 	func _notice(message,_seconds=0): notices.append(message)
 	func aim_source(hand): return hand
+	func hand_socket(hand): return hand
 	func initialize():
 		for child in [playful_encounters,cargo_playground,playful_tools,magnetic_wand,living,rig,firecraft,desktop_hand]: add_child(child)
 		rig.add_child(camera); camera.position.y=1.7

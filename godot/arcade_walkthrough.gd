@@ -67,7 +67,7 @@ func run(owner_game):
 		game.camera.look_at(target.global_position+Vector3.UP*.25)
 		game.desktop_hand.global_transform=game.camera.global_transform
 		toy._home(); toy.last_camera_position=game.camera.global_position; toy.mode=1
-		toy.retrieve(game.desktop_hand); game._grip(game.desktop_hand,true)
+		toy.retrieve(game.desktop_hand); game._desktop_release(true)
 		for i in range(220):
 			await step()
 			if toy.state=="held": break

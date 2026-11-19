@@ -10,9 +10,12 @@ class FakeGame:
 	var rig:Node3D
 	var item_actions=FakeActions.new()
 	var living=null
+	var heat_contacts=null
+	var desktop_hand:Node3D
 	var notices=[]
 	func _notice(message): notices.append(message)
 	func aim_source(hand): return hand
+	func hand_socket(hand): return hand
 var checks=0
 var failures=[]
 func check(condition,message):

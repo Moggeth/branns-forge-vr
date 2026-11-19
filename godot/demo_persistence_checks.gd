@@ -73,7 +73,7 @@ func run(game,phase:String):
 			game.desktop_hand.global_transform=game.camera.global_transform
 			var toy=game.playful_tools
 			toy._home(); toy.last_camera_position=game.camera.global_position; toy.mode=1
-			toy.retrieve(game.desktop_hand); game._grip(game.desktop_hand,true)
+			toy.retrieve(game.desktop_hand); game._desktop_release(true)
 			for step in range(220):
 				toy.tick(.02)
 				if toy.state=="held": break

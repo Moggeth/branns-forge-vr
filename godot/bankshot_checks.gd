@@ -23,12 +23,14 @@ class Game:
 	var playful_feedback=null
 	var bankshot
 	var camera=Node3D.new()
+	var desktop_release_mode="throw"
 	var desktop_hand=Node3D.new()
 	var notices=[]
 	func initialize():
 		add_child(adventure); add_child(living); add_child(camera); add_child(desktop_hand)
 		var zone=Node3D.new(); add_child(zone); adventure.zone_groups.forge_yard=zone
 	func _notice(message,_seconds=0): notices.append(message)
+	func _desktop_hero_has_keyboard_focus(): return true
 	func hand_socket(hand): return hand
 	func aim_source(hand): return hand
 	func _ray(_source,_length): return {}
