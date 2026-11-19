@@ -126,7 +126,7 @@ import {createVRAdventurePanel} from './vr-adventure-panel.js';
 import {aimIndex, triggerRole, moveIndexes, buttonActions, createPressRouter} from './vr-input-policy.js';
 import {createExpeditionPresentation} from './expedition-presentation.js';
 import {createRunPresentation,dressBoss} from './run-presentation.js';
-import {BOSS} from '../shared/run-boss.js';
+import {bossScale} from '../shared/run-boss.js';
 import {prepareAsset, setWeaponGrip, FPS_WEAPON_POSE, weaponForward, weaponTip as modelTip, updateWeaponPresentation} from './asset-pose.js';
 import {createOrchardPresentation} from './orchard-presentation.js';
 import {createLarimarCoveView} from './larimar-cove-view.js';

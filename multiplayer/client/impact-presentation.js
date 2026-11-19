@@ -17,35 +17,35 @@ const PROFILES = {
   stone: {
     chips: 7, sparks: 2, dust: 3, cone: 1.2, speed: [1.4, 3.6], size: [0.010, 0.026],
     shape: [1.0, 0.6, 0.85], palette: ['#2f2d2b', '#4a443d', '#6b5e4b', '#9a7a45'],
-    spark: ['#fff1d0', '#e9b46a'], dust: ['#6f6659', '#8f7b57'], dustSize: [0.025, 0.06], dustAlpha: 0.2,
+    spark: ['#fff1d0', '#e9b46a'], dustPalette: ['#6f6659', '#8f7b57'], dustSize: [0.025, 0.06], dustAlpha: 0.2,
   },
   metal: {
     chips: 2, sparks: 14, dust: 1, cone: 1.05, speed: [3.0, 7.0], size: [0.006, 0.012],
     shape: [0.9, 0.25, 0.7], palette: ['#565c63', '#7b838b', '#3b4046'],
-    spark: ['#fff6df', '#ffc572'], dust: ['#77746f'], dustSize: [0.02, 0.04], dustAlpha: 0.12,
+    spark: ['#fff6df', '#ffc572'], dustPalette: ['#77746f'], dustSize: [0.02, 0.04], dustAlpha: 0.12,
   },
   bone: {
     chips: 6, sparks: 0, dust: 3, cone: 1.25, speed: [1.2, 3.2], size: [0.008, 0.02],
     shape: [1.6, 0.35, 0.6], palette: ['#f2e9d2', '#e0d3b4', '#c9ba98', '#f8f1e0'],
-    spark: ['#ffffff', '#ffffff'], dust: ['#e6dcc6', '#d6c9aa'], dustSize: [0.02, 0.05], dustAlpha: 0.17,
+    spark: ['#ffffff', '#ffffff'], dustPalette: ['#e6dcc6', '#d6c9aa'], dustSize: [0.02, 0.05], dustAlpha: 0.17,
   },
   wood: {
     // Long fresh splinters (pale heartwood) mixed with darker bark flakes.
     chips: 9, sparks: 0, dust: 3, cone: 1.35, speed: [1.5, 3.8], size: [0.010, 0.026],
     shape: [2.6, 0.26, 0.42], palette: ['#b07a3e', '#8b5a2b', '#e6c48c', '#d2a56a', '#f0d8a8', '#5d3a20'],
-    spark: ['#ffffff', '#ffffff'], dust: ['#d8b67c', '#a8834f'], dustSize: [0.02, 0.055], dustAlpha: 0.17,
+    spark: ['#ffffff', '#ffffff'], dustPalette: ['#d8b67c', '#a8834f'], dustSize: [0.02, 0.055], dustAlpha: 0.17,
   },
   earth: {
     // Clods and grit: chunky, low and heavy, with a brown puff that hangs a moment.
     chips: 6, sparks: 0, dust: 5, cone: 1.0, speed: [0.9, 2.6], size: [0.012, 0.03],
     shape: [1.0, 0.75, 0.9], palette: ['#5a4630', '#6e5638', '#47382a', '#5f6b34'],
-    spark: ['#ffffff', '#ffffff'], dust: ['#8a7356', '#7a6a4e'], dustSize: [0.04, 0.11], dustAlpha: 0.24,
+    spark: ['#ffffff', '#ffffff'], dustPalette: ['#8a7356', '#7a6a4e'], dustSize: [0.04, 0.11], dustAlpha: 0.24,
   },
   crystal: {
     // Glassy shards that catch the light, a few cold sparkles.
     chips: 7, sparks: 4, dust: 2, cone: 1.15, speed: [1.8, 4.2], size: [0.008, 0.02],
     shape: [0.55, 1.8, 0.55], palette: ['#9fe6ff', '#5fb8ff', '#d8f6ff', '#7fd8e8'],
-    spark: ['#f2fdff', '#7fd0ff'], dust: ['#bfe9ff'], dustSize: [0.02, 0.05], dustAlpha: 0.12,
+    spark: ['#f2fdff', '#7fd0ff'], dustPalette: ['#bfe9ff'], dustSize: [0.02, 0.05], dustAlpha: 0.12,
   },
 };
 // Contact glint colour per material (hot core of the moment of contact). Missing = no glint.
@@ -54,7 +54,7 @@ for (const k of MATERIALS) {
   const p = PROFILES[k];
   p.paletteRgb = p.palette.map(hex);
   p.sparkRgb = p.spark.map(hex);
-  p.dustRgb = p.dust.map(hex);
+  p.dustRgb = p.dustPalette.map(hex);
 }
 const FLASH_RGB = Object.fromEntries(Object.entries(FLASH).map(([k, v]) => [k, hex(v)]));
 
