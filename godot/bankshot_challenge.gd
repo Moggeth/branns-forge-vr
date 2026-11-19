@@ -3,7 +3,7 @@ extends Node
 const ART=preload("res://world_zones.gd")
 const SCENE=preload("res://workshop_scene.gd")
 const CENTER=Vector3(165,0,65)
-const LANDING=CENTER+Vector3(0,0,6)
+const LANDING=CENTER+Vector3(0,0,5) # Clear of the neighbouring Starfall Ridge collider.
 const TARGETS=[Vector3(3,1.5,2),Vector3(-3,1.8,1),Vector3(2.2,1.3,0)]
 const SAVE="user://bankshot_challenge.json"
 const FIELDS=["schema","revision","discovered","stage","shots","completed","medal","bestShots","replays"]
@@ -66,7 +66,7 @@ func _build():
 	ART.cyl(medal,Vector3.ZERO,.26,.1,"ffd37c","cylinder",.25).rotation.x=PI/2
 	ART.label(medal,"THE BANKSHOT BELL\nA bounce well earned",Vector3(0,.65,0),20)
 	if game.get("playful_feedback")!=null:
-		game.playful_feedback.register_hint("bankshot",board,"BANKSHOT BELL","E: throw. Click: power / recall. Bounce off the teal panel first.","Release grip: throw. Trigger: power / recall. Panel, then bell.",Vector3(0,1.4,0))
+		game.playful_feedback.register_hint("bankshot",board,"BANKSHOT BELL","X throws. Click changes power or recalls. Bounce off the teal panel first.","Release grip: throw. Trigger: power / recall. Panel, then bell.",Vector3(0,1.4,0))
 
 func _solid(pos,size,color):
 	ART.box(court,pos,size,color); ART.body(court,pos,size,"solid")
