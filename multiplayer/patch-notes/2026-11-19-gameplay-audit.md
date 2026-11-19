@@ -10,3 +10,4 @@ title: Golems, mining and impact dust
 - God spell previews now follow your aim beyond the valley in generated worlds, including tapped walls and Growth Waves.
 - Winning a forge raid now preserves other materials in storage. Older raid saves affected by this bug can reopen with their readable balances intact.
 - A fallen Fusewick’s keg still goes off once if you save or change hosts just before it bursts.
+- Great Wilds camps now wait until their full reward fits on the ground. Parties reaching several camps at once share the 24-guard limit.

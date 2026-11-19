@@ -156,19 +156,24 @@ function encounters(state, world, w, ctx, events) {
   for (const [siteId, ids] of Object.entries(w.guards)) {
     const alive = ids.filter(id => state.enemies.some(e => e.id === id));
     if (alive.length) { w.guards[siteId] = alive; continue; }
+    const site = world.discoveries.find(d => d.id === siteId);
+    if (!site || cleared.has(siteId)) { delete w.guards[siteId]; continue; }
+    const loot = (REWARDS[site.kind] || REWARDS.camp)(site.tier).filter(([kind,amount]) =>
+      amount > 0 && (kind === 'apple' || MATERIAL_KEYS.includes(kind)));
+    if (state.pickups.length + loot.length > 256) {
+      w.guards[siteId] = []; // The site remains cleared of guards while its reward waits for space.
+      continue;
+    }
     delete w.guards[siteId];
-    const site = world.discoveries.find(d => d.id === siteId); if (!site || cleared.has(siteId)) continue;
     cleared.add(siteId); w.cleared.push(siteId);
-    const loot = (REWARDS[site.kind] || REWARDS.camp)(site.tier);
     loot.forEach(([kind, amount], i) => {
-      if (amount <= 0 || state.pickups.length >= 256 || (kind !== 'apple' && !MATERIAL_KEYS.includes(kind))) return;
       const a = i * 2.39996, x = site.x + Math.cos(a) * 1.4, z = site.z + Math.sin(a) * 1.4;
       state.pickups.push({id: ctx.nextId(state, 'p'), kind, x, z, y: ctx.terrainHeight(state, x, z), amount});
     });
     events.push({kind: 'wilds_cleared', id: siteId, name: site.name, tier: site.tier, position: [site.x, ctx.terrainHeight(state, site.x, site.z), site.z]});
   }
   // Wake guards at sites a Hero approaches.
-  const awake = Object.values(w.guards).reduce((n, l) => n + l.length, 0);
+  let awake = Object.values(w.guards).reduce((n, l) => n + l.length, 0);
   for (const site of world.discoveries) {
     if (cleared.has(site.id) || w.guards[site.id]) continue;
     if (!heroes.some(p => Math.hypot(p.position[0] - site.x, p.position[2] - site.z) < WILDS.wakeRadius)) continue;
@@ -186,6 +191,7 @@ function encounters(state, world, w, ctx, events) {
       e.emergeTick = state.tick; state.enemies.push(e); ids.push(id);
     });
     w.guards[site.id] = ids;
+    awake += ids.length;
     events.push({kind: 'wilds_ambush', id: site.id, name: site.name, tier: site.tier, count: ids.length, position: [site.x, ctx.terrainHeight(state, site.x, site.z), site.z]});
   }
 }

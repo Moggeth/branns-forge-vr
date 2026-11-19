@@ -81,6 +81,37 @@ assert.throws(() => loadSimulation({...saved, wilds: {...saved.wilds, felled: [[
   assert.equal(cast(3).code, 'world_limit');
   assert.doesNotThrow(() => loadSimulation(sim.checkpoint()));
 }
+// Clearing a camp at the pickup cap waits until its whole reward fits, even over a host handoff.
+{
+  const sim=make(), state=sim.adventureWorld(), camp=w.discoveries.find(s=>s.kind==='camp');
+  state.wilds.guards[camp.id]=[];
+  state.pickups=Array.from({length:255},(_,i)=>({id:'full'+i,kind:'stone',x:0,y:0,z:0,amount:1}));
+  state.tick=29;
+  const cleared=e=>e.kind==='wilds_cleared'&&e.id===camp.id;
+  assert.ok(!sim.step().some(cleared));
+  assert.equal(state.pickups.length,255);
+  const resumed=loadSimulation(sim.checkpoint()), next=resumed.adventureWorld();
+  next.pickups.splice(-2);
+  let payouts=0;
+  for(let i=0;i<60;i++)payouts+=resumed.step().filter(cleared).length;
+  assert.equal(payouts,1);
+  assert.equal(next.pickups.length,256);
+  assert.deepEqual(next.pickups.slice(-3).map(p=>p.kind),['wood','ironOre','apple']);
+}
+// Many Heroes can reach new camps on the same tick. Each new group consumes the shared guard budget.
+{
+  const descriptor=worldDescriptor({...world,size:4096});
+  const sim=createSimulation({world:descriptor}), state=sim.adventureWorld();
+  const camps=worldFor(descriptor).discoveries.filter(s=>s.kind==='camp'||s.kind==='ruin').slice(0,18);
+  for(const [i,site] of camps.entries()){
+    sim.addPlayer({id:'visit'+i,role:'hero'});
+    state.players.at(-1).position=[site.x,0,site.z];
+  }
+  state.tick=29;
+  sim.step();
+  const guards=Object.values(state.wilds.guards).flat();
+  assert.ok(guards.length>=20&&guards.length<=24, 'shared guard limit: '+guards.length);
+}
 // The arena is untouched.
 const arena = createSimulation({room: 'A', seed: 41}); arena.addPlayer({id: 'x', role: 'hero'}); arena.step();
 assert.equal(arena.snapshot().world, undefined);
