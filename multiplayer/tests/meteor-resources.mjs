@@ -29,7 +29,10 @@ test('Meteor kill pays exactly six gems once and no second hit can duplicate rew
 });
 test('Full pickup pool preserves rare reward over save and releases it when space returns',()=>{
  const {s,w}=cast(yes);w.pickups=Array.from({length:256},(_,i)=>({id:`cap${i}`,kind:'wood',amount:1,x:40,z:40,y:terrainHeight(w,40,40)}));strikeDead(w,w.enemies[0]);assert.equal(w.pickups.length,256);assert.equal(w.meteorRewards.length,1);
- const resumed=loadSimulation(s.checkpoint()),r=resumed.adventureWorld();r.pickups.pop();resumed.step();assert.equal(r.pickups.length,256);assert.equal(r.meteorRewards.length,0);assert.equal(r.pickups.at(-1).amount,6);
+ const resumed=loadSimulation(s.checkpoint()),r=resumed.adventureWorld();r.pickups.pop();resumed.step();assert.equal(r.pickups.length,255);
+ assert.equal(r.meteorRewards.length,1,'gems and star ore wait for two free slots');
+ r.pickups.pop();resumed.step();assert.equal(r.pickups.length,256);
+ assert.equal(r.pickups.at(-2).kind,'starOre');assert.equal(r.pickups.at(-1).kind,'gems');assert.equal(r.meteorRewards.length,0);assert.equal(r.pickups.at(-1).amount,6);
 });
 test('Enemy capacity leaves a normal mineable meteor instead of exceeding the simulation cap',()=>{
  const f=fixture(yes);f.s.command('g',{type:'cast',seq:1,spell:'starfall',point:[25,0,25]});for(let i=0;i<64;i++)f.w.enemies.push(createEnemy(`capEnemy${i}`,[45,0,-45]));for(let i=0;i<48;i++)f.s.step();assert.equal(f.w.enemies.length,64);assert.ok(f.w.deposits.some(d=>d.id==='s1_meteor'));loadSimulation(f.s.checkpoint());
@@ -39,12 +42,12 @@ test('Malformed meteor metadata and overflowing rewards rejected',()=>{
  const cp=s.checkpoint();cp.meteorRewards=[{id:'bad',x:0,z:0,amount:999}];assert.throws(()=>loadSimulation(cp));
 });
 test('Hero resources benefit health, forge and weapon readiness; no-benefit and distant spends reject',()=>{
- const {w,h,cmd,s}=fixture();h.resources={wood:9,stone:6,gems:3};assert.equal(cmd('h','useResource',{kind:'wood'}).code,'not_needed');h.hp=50;assert.ok(cmd('h','useResource',{kind:'wood'}).ok);assert.equal(h.hp,85);assert.equal(h.resources.wood,6);
+ const {w,h,cmd,s}=fixture();Object.assign(h.resources,{wood:9,stone:6,gems:3});assert.equal(cmd('h','useResource',{kind:'wood'}).code,'not_needed');h.hp=50;assert.ok(cmd('h','useResource',{kind:'wood'}).ok);assert.equal(h.hp,85);assert.equal(h.resources.wood,6);
  w.shrine.hp=25;assert.equal(cmd('h','useResource',{kind:'stone'}).code,'too_far');h.position=[0,0,3];assert.ok(cmd('h','useResource',{kind:'stone'}).ok);assert.equal(w.shrine.hp,60);assert.equal(h.resources.stone,4);
  h.specialTick=w.tick;h.heat=.8;assert.ok(cmd('h','useResource',{kind:'gems'}).ok);assert.equal(h.hp,100);assert.equal(h.heat,0);assert.equal(h.specialTick,-1000);assert.equal(h.resources.gems,2);assert.equal(cmd('h','useResource',{kind:'gems'}).code,'not_needed');assert.deepEqual(loadSimulation(s.checkpoint()).snapshot().players[0].resources,h.resources);
 });
 test('Forged resource names and already-ready non-melee tools cannot consume gems',()=>{
- const {h,cmd}=fixture();h.resources.gems=2;for(const kind of ['__proto__','toString',null,{}])assert.equal(cmd('h','useResource',{kind}).code,'invalid_resource');h.tool='bow';h.specialTick=0;assert.equal(cmd('h','useResource',{kind:'gems'}).code,'not_needed');h.tool='wyrmspout';h.specialTick=-180;assert.equal(cmd('h','useResource',{kind:'gems'}).code,'not_needed');assert.equal(h.resources.gems,2);
+ const {h,cmd}=fixture();h.resources.gems=2;for(const kind of ['__proto__','toString',null,{}])assert.equal(cmd('h','useResource',{kind}).code,'invalid_resource');h.tool='bow';h.specialTick=-1000;assert.equal(cmd('h','useResource',{kind:'gems'}).code,'not_needed');h.tool='wyrmspout';h.specialTick=-1000;assert.equal(cmd('h','useResource',{kind:'gems'}).code,'not_needed');assert.equal(h.resources.gems,2);
 });
 test('God carried resources all have useful spends and disabled forge can be mended',()=>{
  const {w,g,cmd,s}=fixture();g.resources={wood:3,stone:2,gems:1};w.shrine.hp=0;w.shrine.disabledUntil=480;assert.ok(cmd('g','useResource',{kind:'wood'}).ok);assert.equal(w.shrine.hp,20);assert.equal(w.shrine.disabledUntil,0);assert.ok(cmd('g','useResource',{kind:'stone'}).ok);assert.equal(w.shrine.hp,55);g.mana=30;assert.ok(cmd('g','useResource',{kind:'gems'}).ok);assert.equal(g.mana,70);assert.deepEqual(g.resources,{wood:0,stone:0,gems:0});loadSimulation(s.checkpoint());

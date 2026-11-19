@@ -230,6 +230,8 @@ npm run lint
 npm run build:check
 ```
 
+For the browser CI suite, run `npm ci` in `multiplayer/`, then `npm ci --prefix ../assets/asset-lab` for the GLB validator. Run `npm run lint` and `node tests/ci.mjs`. Each check runs in its own process. The historical integration and load checks below use a dedicated server.
+
 Tests make disposable rooms; use a dedicated instance/state directory, not a
 populated deployment. `TEST_WS_URL` chooses the server and `TEST_ORIGIN` supplies
 the exact permitted origin. Production-origin coverage adds

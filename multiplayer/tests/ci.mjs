@@ -7,6 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {performance} from 'node:perf_hooks';
 
 const suite = [
+  'creature-state','forge','meteor-resources','fire-presentation',
   'lossless-textures','readiness-cache','environment-delivery','progressive-assets','mobile-render-budget','asset-delivery','compile-world','rigid-weapon-batch',
   'room-directory','room-capacity','../peer/capacity-test','room-service-gate','cloud-directory-lifecycle','public-room-directory','peer-encoding','frame-inbox','session-publication','terrain-geometry','network-capacity','battle-mode','battle-presentation','hero-pose-performance',
   'proximity-voice','voice-recovery','voice-topology','voice-zones','ice-servers','battle-model','checkpoint-delta','host-handover','adventure-capacity','battle-renderer-contact',
@@ -40,9 +41,8 @@ const suite = [
 // Assertions that disagree with current gameplay (or need assets/tools absent in CI).
 // Fix each one and move it into `suite`; never move a passing check out of `suite`.
 const stale = [
-  'batching','creature-state','dom-contract','expedition-persistence',
-  'expedition-real-play','forge','meteor-resources','solo-settlement',
-  'fire-presentation', // needs assets/asset-lab gltf-validator install
+  'batching','dom-contract','expedition-persistence',
+  'expedition-real-play','solo-settlement',
 ];
 
 // Not listed: browser-*.mjs and cloud-transport (Playwright), run/load/network/gateway/production

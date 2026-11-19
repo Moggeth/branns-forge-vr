@@ -27,16 +27,16 @@ const direct=createEnemy('fire1',[0,0,0]),fireState={enemies:[direct],fireCells:
 let fireDamage=0;
 const fireCtx={terrainHeight:()=>0,damageEnemy:(_state,_enemy,amount)=>{fireDamage+=amount;}};
 fireContact(fireState,{kind:'flame'}, {point:[0,1,0],normal:[0,1,0],targetId:'fire1',part:'rightLeg'},fireCtx);
-assert.equal(fireDamage,4);
+assert.equal(fireDamage,5);
 assert.ok(direct.scorch.rightLeg>0&&direct.scorch.leftLeg===0,'direct fire blackens the contacted bone first');
 fireState.tick=30;fireState.fireCells.push({x:0,z:0,fuel:1,heat:1,burning:true,wetUntil:0,expiresTick:1800});
 stepFire(fireState,fireCtx,[]);
-assert.ok(direct.scorch.leftLeg>0&&direct.scorch.torso>0,'ground fire climbs from both legs toward torso');
+assert.ok(direct.scorch.leftLeg>0&&direct.scorch.rightLeg>0&&direct.scorch.torso===0,'ground fire scorches the exposed legs and spares the torso above it');
 
 const fallen=createEnemy('fall1',[0,0,0]);
-const state={enemies:[fallen],detachedParts:[],embeds:[],players:[],tick:45};
+const state={pickups:[],enemies:[fallen],detachedParts:[],embeds:[],players:[],tick:45};
 let next=0;const events=[];
-assert.equal(hitEnemyPart(state,fallen,'head',38,{point:[0,1.7,0],normal:[0,0,1],energy:1.4},{nextId:()=>`d${++next}`},events,{projectile:true}),true);
+assert.equal(hitEnemyPart(state,fallen,'head',38,{point:[0,1.7,0],normal:[0,0,1],energy:1.4},{terrainHeight:()=>0,nextId:()=>`d${++next}`},events,{projectile:true}),true);
 assert.equal(state.enemies.length,0);assert.equal(state.detachedParts.length,PARTS.length);
 assert.ok(state.detachedParts.every(part=>part.velocity[2]<0),'the killing blow carries every bone in its direction');
 assert.ok(new Set(state.detachedParts.map(part=>part.velocity.join(','))).size>3,'bones receive varied collapse momentum');
