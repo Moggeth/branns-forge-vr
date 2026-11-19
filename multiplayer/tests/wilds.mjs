@@ -129,6 +129,24 @@ assert.throws(() => loadSimulation({...saved, wilds: {...saved.wilds, felled: [[
   const guards=Object.values(state.wilds.guards).flat();
   assert.ok(guards.length>=20&&guards.length<=24, 'shared guard limit: '+guards.length);
 }
+// A full pickup pool can leave many cleared sites waiting. Keep the checkpoint valid until space opens.
+{
+  const descriptor = worldDescriptor({...world, size: 8192});
+  const sim = createSimulation({world: descriptor});
+  sim.addPlayer({id: 'hero', role: 'hero'});
+  const state = sim.adventureWorld(), sites = worldFor(descriptor).discoveries;
+  const nextSite = sites[64];
+  state.wilds.guards = Object.fromEntries(sites.slice(0, 64).map(site => [site.id, []]));
+  state.pickups = Array.from({length: 256}, (_, i) => ({id: 'full'+i, kind: 'stone', x: 0, y: 0, z: 0, amount: 1}));
+  state.players[0].position = [nextSite.x, 0, nextSite.z];
+  state.tick = 29;
+  sim.step();
+  assert.equal(Object.keys(state.wilds.guards).length, 64);
+  const resumed = loadSimulation(sim.checkpoint()), after = resumed.adventureWorld();
+  after.pickups.length = 0;
+  for (let i = 0; i < 30; i++) resumed.step();
+  assert.ok(after.wilds.guards[nextSite.id], 'arrival is retried when a waiting encounter pays out');
+}
 // The arena is untouched.
 const arena = createSimulation({room: 'A', seed: 41}); arena.addPlayer({id: 'x', role: 'hero'}); arena.step();
 assert.equal(arena.snapshot().world, undefined);

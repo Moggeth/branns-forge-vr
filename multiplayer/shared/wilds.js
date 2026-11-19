@@ -22,7 +22,7 @@ export const WILDS = Object.freeze({
   harvestSoftCap: 480,           // compaction starts once this many harvest records exist
   discoverRadius: 46,            // metres to "find" a site
   wakeRadius: 52,                // metres at which a camp's guards rise
-  maxGuards: 24,
+  maxGuards: 24, maxActiveSites: 64,
 });
 const DISCOVERY_XP = {settlement: 20, landmark: 25, discovery: 15, entrance: 20, region: 30};
 // Guards by site kind and tier (tier 0 sites near the start are friendly practice).
@@ -173,14 +173,18 @@ function encounters(state, world, w, ctx, events) {
     events.push({kind: 'wilds_cleared', id: siteId, name: site.name, tier: site.tier, position: [site.x, ctx.terrainHeight(state, site.x, site.z), site.z]});
   }
   // Wake guards at sites a Hero approaches.
-  let awake = Object.values(w.guards).reduce((n, l) => n + l.length, 0);
+  const groups = Object.values(w.guards);
+  let activeSites = groups.length, awake = groups.reduce((n, ids) => n + ids.length, 0);
   for (const site of world.discoveries) {
+    if (activeSites >= WILDS.maxActiveSites) break;
     if (cleared.has(site.id) || w.guards[site.id]) continue;
     if (!heroes.some(p => Math.hypot(p.position[0] - site.x, p.position[2] - site.z) < WILDS.wakeRadius)) continue;
     const kinds = (GUARDS[site.kind] || GUARDS.camp)(site.tier);
     if (!kinds.length) {
       // Unguarded sites (groves, easy caches) pay out as soon as they are reached.
-      w.guards[site.id] = []; continue;
+      w.guards[site.id] = [];
+      activeSites++;
+      continue;
     }
     if (awake + kinds.length > WILDS.maxGuards || state.enemies.length + kinds.length > 64) continue;
     const ids = [];
@@ -191,6 +195,7 @@ function encounters(state, world, w, ctx, events) {
       e.emergeTick = state.tick; state.enemies.push(e); ids.push(id);
     });
     w.guards[site.id] = ids;
+    activeSites++;
     awake += ids.length;
     events.push({kind: 'wilds_ambush', id: site.id, name: site.name, tier: site.tier, count: ids.length, position: [site.x, ctx.terrainHeight(state, site.x, site.z), site.z]});
   }
@@ -210,7 +215,7 @@ export function restoreWilds(saved) {
   if (!Array.isArray(v.spent) || v.spent.length > WILDS.spentKeep || !v.spent.every(f => isPair(f, isGeneratedRockId) && f[1] <= tick)) throw Error('Invalid wilds spent');
   const ids = list => Array.isArray(list) && list.length <= WILDS.foundKeep && list.every(id => typeof id === 'string' && SITE_ID.test(id)) && new Set(list).size === list.length;
   if (!ids(v.found) || !ids(v.cleared)) throw Error('Invalid wilds sites');
-  if (!v.guards || typeof v.guards !== 'object' || Array.isArray(v.guards) || Object.keys(v.guards).length > 64) throw Error('Invalid wilds guards');
+  if (!v.guards || typeof v.guards !== 'object' || Array.isArray(v.guards) || Object.keys(v.guards).length > WILDS.maxActiveSites) throw Error('Invalid wilds guards');
   for (const [k, list] of Object.entries(v.guards)) if (!SITE_ID.test(k) || !Array.isArray(list) || list.length > 8 || !list.every(id => typeof id === 'string' && /^wg_[A-Za-z0-9_-]{1,56}$/.test(id))) throw Error('Invalid wilds guards');
   if (v.felledRev !== undefined && !Number.isSafeInteger(v.felledRev)) throw Error('Invalid wilds');
   return {v: 1, felled: v.felled.map(f => [...f]), spent: v.spent.map(f => [...f]), found: [...v.found], cleared: [...v.cleared],
