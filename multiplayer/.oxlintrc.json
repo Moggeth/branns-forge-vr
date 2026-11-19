@@ -1,0 +1,21 @@
+{
+  "ignorePatterns": ["tests/**", "assets-source/**", "public/**", "dist/**", "dist-check/**", "node_modules/**"],
+  "categories": {"correctness": "off"},
+  "env": {"browser": true, "node": true},
+  "globals": {"__BRANN_BUILD__": "readonly"},
+  "overrides": [
+    {
+      "files": ["cloud/worker.js"],
+      "globals": {"WebSocketPair": "readonly", "WebSocketRequestResponsePair": "readonly"}
+    }
+  ],
+  "rules": {
+    "no-undef": "error",
+    "no-dupe-keys": "error",
+    "no-unreachable": "error",
+    "no-constant-binary-expression": "error",
+    "no-func-assign": "error",
+    "no-self-assign": "error",
+    "valid-typeof": "error"
+  }
+}

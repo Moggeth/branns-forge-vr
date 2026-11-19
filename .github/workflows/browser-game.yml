@@ -27,6 +27,7 @@ jobs:
           cache: npm
           cache-dependency-path: multiplayer/package-lock.json
       - run: npm ci --no-audit --no-fund
+      - run: npm run lint
       - run: npm run build:check
       - run: node tests/ci.mjs
       - name: Patch notes entry for game changes

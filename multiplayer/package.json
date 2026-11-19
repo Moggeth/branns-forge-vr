@@ -14,7 +14,8 @@
     "test:load": "node tests/load.mjs",
     "test:network": "node tests/network.mjs",
     "test:gateway": "node tests/gateway.mjs",
-    "prebuild": "node tests/asset-dependencies.mjs"
+    "prebuild": "node tests/asset-dependencies.mjs",
+    "lint": "oxlint ."
   },
   "dependencies": {
     "qrcode": "1.5.4",
@@ -22,6 +23,7 @@
     "ws": "8.22.0"
   },
   "devDependencies": {
+    "oxlint": "1.94.0",
     "sharp": "0.35.5",
     "vite": "8.3.2"
   },

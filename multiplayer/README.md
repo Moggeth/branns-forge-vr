@@ -226,6 +226,7 @@ npm run test:network
 npm test
 npm run test:gateway
 npm run test:load
+npm run lint
 npm run build:check
 ```
 
