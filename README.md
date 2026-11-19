@@ -14,6 +14,8 @@ Backend recovery and transport limits: [resilience notes](docs/BACKEND-RESILIENC
 
 # Brann's Forge - current browser game
 
+The November gameplay audit covers save recovery, multiplayer handoff, enemy simulation cost and outstanding checks. [Results and reproduction steps](docs/VERIFICATION.md#november-2026-gameplay-audit).
+
 Current gameplay fixes: [Stumpling roots, Phoenix aim/fire, gold recovery and first-use preparation](docs/GAMEPLAY-CONTACT-FIXES-20261004.md).
 
 Tree chopping fix: [standing ghost tree diagnosis and regression](docs/TREE-GHOST-FIX-20261004.md).

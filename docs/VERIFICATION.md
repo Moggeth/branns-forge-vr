@@ -1,4 +1,43 @@
-# Verification and recovery evidence — 2026-09-12
+# Verification and recovery evidence
+
+## November 2026 gameplay audit
+
+All 245 required browser-game checks passed locally. Five former advisory checks now run on pull requests. The initial static pass examined 850 tracked scripts. A seven-rule Oxlint gate now checks 404 files in the browser game and its supporting scripts. The production and diagnostic Vite builds passed. Vite still flags chunks above its 500 kB warning threshold.
+
+| Scenario | Observed result |
+| --- | --- |
+| Saved golem on desktop and touch-emulated Chromium | The production build resumed a solo checkpoint, presented a creature and advanced through 10 snapshots on both viewports with zero browser errors. This fixture calls the recovery handler directly because the compact welcome screen hides the older save controls. Separate desktop and touch checks entered solo through the visible Play button. |
+| Three Chromium peers and a local Workers emulator | The terrain edit survived backgrounding the host, closing its tab and terminating its browser. The first two handoffs took 61 and 67 ms. Crash recovery took 4.15 s and rewound 24 simulation ticks for the remaining peer. |
+| Dedicated Godot multiplayer proof | 32 loopback clients sent 4,544 commands during an 8.36 s window with zero protocol errors. |
+| Save boundaries | Verified raid payouts, ore at capacity, pending Fusewick events, camp rewards when the pickup pool is full and forest collisions in distinct same-seed saves. Older raid saves retain readable balances. Balances already serialized as null recover to zero when the full known corruption pattern matches. |
+| Native game and service | The full native verifier passed in 386.6 s, including 109 service tests, the audio host and Godot integration. The checks exercised throw and recall, forge interactions, Bankshot travel and fresh-process demo, festival and arcade progression. |
+
+### Host simulation performance
+
+On this Windows machine, five independent runs at each revision (395dd82 and 26a0d4a) of the same 600-tick scene with eight players, 64 enemies and 64 terrain edits had median costs of **1.991 ms/tick before** and **1.027 ms/tick after**. A separate 180-tick replay checked enemy position, yaw and attack tick at every step. Collision probes fell from 69,120 to 23,040 on open terrain and to 29,728 on obstructed terrain. Each replay produced the same trajectory digest as its baseline.
+
+### Repeating the checks
+
+The 245-check run took 182.4 s. The production build took 20.9 s and the diagnostic build took 1.2 s. From `multiplayer/`, run the following with the locked dependencies. The asset-lab package supplies the GLB validator used by the fire presentation check.
+
+```sh
+npm ci
+npm ci --prefix ../assets/asset-lab
+npm run lint
+npm run build
+npm run build:check
+node tests/ci.mjs
+node tests/ci.mjs --stale
+node tests/enemy-behaviour.mjs
+```
+
+For the saved-golem check, serve the production build with `npm exec vite preview`, set `ACCEPT_BASE` to its local address and run `node tests/browser-solo-golem.mjs` with the repository's Playwright configuration. For host handoff, use Vite dev and a fresh local Wrangler instance. Run `node tests/browser-host-handover.mjs`. Give the directory test a separate worker instance. Sharing one immediately after the room capacity test exhausted its normal join rate limit and returned HTTP 429. The directory and browser tests passed with independent fixtures and the original limits.
+
+Run `Verify Brann.ps1` from the repository root for the native game. A fresh worktree needs Godot 4.7.2 and a headless editor import before native tests can resolve assets. Desktop throw fixtures must use the game's X release path or explicitly select throw mode in a unit fixture. E drops the item. Updating the fixtures surfaced a travel failure in Bankshot. The old arrival capsule intersected Starfall Ridge geometry. The new arrival is one metre farther inside the court and passed the full scene collision query. The Bankshot test also needs 0.5 s after scene teardown for the dummy mixer to release its last WAV playbacks. Three verbose runs completed without an audio leak warning.
+
+### Outstanding coverage
+
+Four advisory browser suites still fail. They cover earlier tree batching and growth assumptions (`batching`), the former lobby control inventory (`dom-contract`), a three-material expedition ledger (`expedition-real-play`) and the earlier settlement stockpile and damage model (`solo-settlement`). Physical WebXR, physical mobile hardware, WAN behaviour and the preserved Unity draft remain unverified.
 
 2026-10-15: [Cold opening](COLD-START-20261015.md) records byte-exact model packing, render-target preparation, browser fallback/rotation acceptance, measured bounds and failed-strategy lessons.
 
