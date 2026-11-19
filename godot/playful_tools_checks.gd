@@ -43,12 +43,14 @@ class Game extends Node3D:
 	var enchantments=null
 	var playful_encounters=Encounter.new()
 	var playful_feedback=null
+	var desktop_release_mode="throw"
 	var desktop_hand=Node3D.new()
 	var camera=Node3D.new()
 	func initialize():
 		add_child(adventure); add_child(living); add_child(playful_encounters)
 		add_child(desktop_hand); add_child(camera)
 		var zone=Node3D.new(); add_child(zone); adventure.zone_groups.forge_yard=zone
+	func _desktop_hero_has_keyboard_focus(): return true
 	func hand_socket(hand): return hand
 	func aim_source(hand): return hand
 	func _notice(_text,_duration=0): pass
