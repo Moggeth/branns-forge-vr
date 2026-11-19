@@ -731,6 +731,16 @@ function loadState(saved, descriptor) {
   for(const b of state.inventions.structures){if(contentIds.has(b.id))throw Error('Duplicate structure');contentIds.add(b.id);}
   state.deposits = deposits.map(({id,x,z,kind,hits,maxHits,depleted,special,editId,vein,respawnTick})=>({id,x,z,kind,hits,maxHits,depleted,...(special?{special}:{}),...(editId?{editId}:{}),...(vein!==undefined?{vein}:{}),...(respawnTick!==undefined?{respawnTick}:{})}));
   state.meteorRewards=copy(meteorRewards);
+  if(saved.warbandPops!==undefined){
+    const pops=saved.warbandPops;
+    if(!Array.isArray(pops)||pops.length>MAX_WORLD)throw Error('Invalid pending warband blasts');
+    state.warbandPops=pops.map(b=>{
+      if(!record(b)||contentIds.has(b.id)||!validId(b.id)||!validId(b.owner)||
+         !['party','rivals'].includes(b.side)||!validPoint(b.position))throw Error('Invalid pending warband blast');
+      contentIds.add(b.id);
+      return {id:b.id,owner:b.owner,side:b.side,position:[...b.position]};
+    });
+  }
   state.pickups = pickups.map(({id,kind,x,z,y,amount,side})=>({id,kind,x,z,y,amount,...(side?{side}:{})}));
   state.bridges = bridges.map(({id,x,z,y,yaw})=>({id,x,z,y,yaw}));
   if(saved.landmarks!==undefined&&typeof saved.landmarks!=='boolean')throw Error('Invalid landmark version');

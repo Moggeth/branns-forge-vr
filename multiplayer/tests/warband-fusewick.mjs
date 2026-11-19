@@ -2,7 +2,8 @@
 // Run: node tests/warband-fusewick.mjs
 import assert from 'node:assert/strict';
 import {createSimulation, loadSimulation} from '../shared/simulation.js';
-import {createEnemy} from '../shared/combat.js';
+import {createEnemy, hitEnemyPart} from '../shared/combat.js';
+import {nextEntityId} from '../shared/entity-id.js';
 import {FUSEWICK, warbandOf, fusewick} from '../shared/warband.js';
 import {createBattle} from '../shared/battle-mode.js';
 import {SPELL_SCHOOLS, SPELLS} from '../shared/spells.js';
@@ -50,17 +51,17 @@ assert.doesNotThrow(() => loadSimulation(sim.checkpoint()), 'the stuck arrow is 
 // The terrain budget is nearly full with a Starfall still falling: the crater must make room for both.
 for (let i = 0; S.edits.length + 1 < 64; i++) S.edits.push({id: `fill${i}`, kind: 'raise', x: -60 + (i % 8) * 6, z: -60 + Math.floor(i / 8) * 6, radius: 6, height: 2});
 S.pendingStarfalls.push({id: 'sf_pending', x: -40, z: -40, radius: 5, impactTick: S.tick + 6000, side: 'party'});
-let lit = null, blast = null, deaths = new Set();
+const lit = new Map();
+let blast = null, deaths = new Set();
 for (let i = 0; i < 60 * 30 && !blast; i++) {
  for (const ev of sim.step()) {
-  if (ev.kind === 'fusewick_lit') lit ||= ev;
+  if (ev.kind === 'fusewick_lit') lit.set(ev.id, ev.tick);
   if (ev.kind === 'critter_blast' && ev.style === 'keg') blast = ev;
   if (ev.kind === 'death') deaths.add(ev.id);
  }
 }
-assert.ok(lit, 'the fuse was lit');
 assert.ok(blast, 'the keg went off');
-assert.ok(blast.tick - lit.tick >= FUSEWICK.fuseTicks - 1 || true);
+assert.equal(blast.tick - lit.get(blast.id), FUSEWICK.fuseTicks, 'the same sapper detonates when its fuse expires');
 for (const ev of steps(3)) if (ev.kind === 'death') deaths.add(ev.id);
 assert.ok(deaths.has('wild1'), 'the target broke');
 assert.ok(!S.enemies.includes(foe));
@@ -101,4 +102,18 @@ assert.ok(ev, 'cast resolved');
 assert.ok(popped, 'a felled Fusewick still blows');
 assert.equal(warbandOf(S, 'g').filter(fusewick).length, 0);
 
+// A death on the last frame before a host handoff must still resolve once on the new host.
+assert.ok(cast('sapper',[18,0,20]).ok);
+const fallen=warbandOf(S,'g').find(fusewick);
+hitEnemyPart(S,fallen,'torso',1000,{side:'rivals'},{nextId:nextEntityId,terrainHeight:()=>0},[]);
+const pending=sim.checkpoint();
+assert.equal(pending.warbandPops[0].id,fallen.id);
+const restored = loadSimulation(pending);
+const queuedBlast = e => e.kind==='critter_blast' && e.id===fallen.id;
+assert.equal(restored.step().filter(queuedBlast).length,1);
+assert.equal(loadSimulation(restored.checkpoint()).step().filter(queuedBlast).length,0);
+for(const entries of [[...pending.warbandPops,...pending.warbandPops],
+ [{...pending.warbandPops[0],position:[0,NaN,0]}], [{...pending.warbandPops[0],side:'other'}]]) {
+ assert.throws(()=>loadSimulation({...pending,warbandPops:entries}),/warband/i);
+}
 console.log(JSON.stringify({status: 'pass', crater: crater.radius}));

@@ -9,3 +9,4 @@ title: Golems, mining and impact dust
 - Large groups of enemies use less host processing time when their path ahead is clear.
 - God spell previews now follow your aim beyond the valley in generated worlds, including tapped walls and Growth Waves.
 - Winning a forge raid now preserves other materials in storage. Older raid saves affected by this bug can reopen with their readable balances intact.
+- A fallen Fusewick’s keg still goes off once if you save or change hosts just before it bursts.
