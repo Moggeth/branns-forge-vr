@@ -104,6 +104,6 @@ func run():
 	loaded.free(); game.playful_tools.sound.stop()
 	# AudioServer releases WAV playback on its mixing boundary, not scene frames.
 	await create_timer(.1).timeout
-	game.free(); await create_timer(.1).timeout
+	game.free(); await create_timer(.5).timeout
 	print("BANKSHOT_CHECKS checks=",checks," failures=",failures.size()," elapsed_seconds=",(Time.get_ticks_usec()-began)/1000000.0)
 	quit(0 if failures.is_empty() else 1)
