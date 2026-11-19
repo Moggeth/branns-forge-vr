@@ -1,8 +1,9 @@
-// Persistent-world expedition safety: bounded quest-ore reuse at the 80-deposit cap, user/world ores never evicted,
+// Persistent-world expedition safety: bounded quest-ore reuse at the 80-deposit cap, live ores never evicted,
 // a leaving Hero's carried gems stay in the world, and a parked reconnect never duplicates inventory.
 import assert from 'node:assert/strict';
 import {createSimulation, loadSimulation} from '../shared/simulation.js';
 import {WorldSession} from '../client/session.js';
+import {emptyMaterials} from '../shared/material-catalog.js';
 
 const t0 = performance.now();
 const startRun = (sim, id, seq) => sim.command(id, {type: 'adventure', seq, action: 'start'});
@@ -13,7 +14,7 @@ const json = value => JSON.parse(JSON.stringify(value));
   const base = createSimulation({room: 'CAPREUSE', seed: 41}).checkpoint();
   // Exhaust the new sanctuary cache as well as ore: this case specifically tests mineable restocking.
   base.pickups = base.pickups.filter(q => q.kind !== 'stone');
-  const world = base.deposits.map(d => ({...d, hits: d.maxHits, depleted: true}));
+  const world = base.deposits.map(d => d.kind === 'stone' ? {...d, hits: d.maxHits, depleted: true} : d);
   const quest = Array.from({length: 80 - world.length}, (_, i) => ({id: `xv0q${i}`, kind: 'stone', x: -40 + (i % 9) * 3, z: -40 + Math.floor(i / 9) * 3, hits: 3, maxHits: 3, depleted: true}));
   const sim = loadSimulation({...base, deposits: [...world, ...quest]});
   sim.addPlayer({id: 'h', name: 'Hero', role: 'hero'});
@@ -22,7 +23,8 @@ const json = value => JSON.parse(JSON.stringify(value));
   const fresh = cp.deposits.filter(d => d.kind === 'stone' && !d.depleted);
   assert.ok(fresh.length * 2 >= cp.adventure.need.stone, `restocked ${fresh.length} boulders for need ${cp.adventure.need.stone}`);
   assert.ok(cp.deposits.length + cp.pendingStarfalls.length <= 80, 'deposit cap holds');
-  for (const d of world) assert.ok(cp.deposits.some(x => x.id === d.id), `world ore ${d.id} kept`);
+  for (const d of world) assert.equal(cp.deposits.some(x => x.id === d.id), !d.depleted, `live world ore retained and exhausted ore reclaimed: ${d.id}`);
+  assert.ok(!cp.deposits.some(d => d.id.startsWith('xv0q')), 'spent quest slots are reclaimed');
   assert.doesNotThrow(() => loadSimulation(json(cp)), 'restocked world restores strictly');
 }
 // Loose starting caches count toward camp supply; no redundant boulder is spawned.
@@ -34,15 +36,15 @@ const json = value => JSON.parse(JSON.stringify(value));
   assert.equal(sim.checkpoint().deposits.filter(d=>!d.depleted).length,0);
   assert.ok(cp.pickups.filter(q=>q.kind==='stone').reduce((n,q)=>n+q.amount,0)>=sim.checkpoint().adventure.need.stone);
 }
-// 2. Cap full of non-expedition ores: nothing is evicted; the run still starts (God tithe or mined stone covers it).
+// 2. Cap full of live non-expedition ores: nothing is evicted; the run still starts (God tithe or mined stone covers it).
 {
   const base = createSimulation({room: 'CAPKEEP', seed: 41}).checkpoint();
-  const extra = Array.from({length: 80 - base.deposits.length}, (_, i) => ({id: `ore${100 + i}`, kind: 'stone', x: -40 + (i % 9) * 3, z: 30 + Math.floor(i / 9) * 2, hits: 3, maxHits: 3, depleted: true}));
+  const extra = Array.from({length: 80 - base.deposits.length}, (_, i) => ({id: `ore${100 + i}`, kind: 'stone', x: -40 + (i % 9) * 3, z: 30 + Math.floor(i / 9) * 2, hits: 0, maxHits: 3, depleted: false}));
   const before = [...base.deposits, ...extra];
   const sim = loadSimulation({...base, deposits: before});
   sim.addPlayer({id: 'h', name: 'Hero', role: 'hero'});
   assert.equal(startRun(sim, 'h', 1).ok, true);
-  assert.deepEqual(sim.checkpoint().deposits.map(d => d.id), before.map(d => d.id), 'user/world ores are never evicted');
+  assert.deepEqual(sim.checkpoint().deposits.map(d => d.id), before.map(d => d.id), 'live user/world ores are never evicted');
 }
 // 3. Ten Hero-only rematches with every quest boulder mined out: the cap holds and each camp is restocked.
 {
@@ -99,7 +101,7 @@ const json = value => JSON.parse(JSON.stringify(value));
     connection.roster.get('two').online = true; connection.emit('peer_joined', {id: 'two'});
     const back = s.simulation.checkpoint().players.find(p => p.id === 'two');
     assert.equal(back.hp, 40); assert.equal(back.tool, 'pick'); assert.equal(back.seq, 17);
-    assert.deepEqual(back.resources, {wood: 0, stone: 0, gems: 0}, 'parked record returns empty-handed');
+    assert.deepEqual(back.resources, emptyMaterials(), 'parked record returns empty-handed');
     assert.deepEqual(owned(), total, 'no duplicated inventory after reconnect');
   } finally { s.dispose(); }
 }
