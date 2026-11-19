@@ -278,7 +278,11 @@ export function stepSettlement(state,ctx,events,recent=[]){
  const lost=state.shrine.hp<=0||raid.elapsed>=SETTLEMENT_RULES.raidTicks;
  if(lost||!raid.foes.length){
   s.lastResult=lost?'defeat':'victory';s.cooldownUntil=state.tick+180;
-  if(!lost){const reward={wood:4+Math.min(4,s.completed),stone:3+Math.min(3,s.completed),gems:1};for(const k of PACK)s.stock[k]=Math.min(999,s.stock[k]+reward[k]);s.completed=Math.min(999,s.completed+1);events.push({kind:'forge_reward',...reward,position:[...state.shrine.position]});}
+  if(!lost){
+   const reward={wood:4+Math.min(4,s.completed),stone:3+Math.min(3,s.completed),gems:1};
+   for(const [kind,amount] of Object.entries(reward))s.stock[kind]=Math.min(999,s.stock[kind]+amount);
+   s.completed=Math.min(999,s.completed+1);events.push({kind:'forge_reward',...reward,position:[...state.shrine.position]});
+  }
   else state.enemies=state.enemies.filter(e=>!raid.foes.includes(e.id));
   s.encounter=null;events.push({kind:'forge_result',result:s.lastResult,position:[...state.shrine.position]});
  }
@@ -310,6 +314,12 @@ export function settlementView(world,playerId){
 export function restoreSettlement(value,tick,ids,enemyIds=new Set()){
  if(value===undefined)return createSettlement();
  const bad=()=>{throw Error('Invalid settlement');},record=v=>v&&typeof v==='object'&&!Array.isArray(v),exact=(v,keys)=>record(v)&&Object.keys(v).length===keys.length&&keys.every(k=>Object.hasOwn(v,k));
+ // Older raid wins added undefined to every non-reward material. JSON stores the resulting NaNs as null.
+ const otherMaterials=PACK.filter(k=>!['wood','stone','gems'].includes(k));
+ if(value?.completed>0 && record(value.stock) && otherMaterials.every(k=>value.stock[k]===null||Number.isNaN(value.stock[k]))){
+  value={...value,stock:{...value.stock}};
+  for(const k of otherMaterials)value.stock[k]=0;
+ }
  if(!exact(value,['v','stock','workers','level','defenses','completed','encounter','lastResult','cooldownUntil','delivered'])||value.v!==1||!record(value.stock)||Object.keys(value.stock).some(k=>!PACK.includes(k))||!PACK.every(k=>value.stock[k]===undefined||integer(value.stock[k],0,999))||!integer(value.level,0,3)||!integer(value.defenses,0,3)||!integer(value.completed,0,999)||!integer(value.delivered,0,1e9)||!integer(value.cooldownUntil,0,tick+180)||!['','victory','defeat'].includes(value.lastResult)||!Array.isArray(value.workers)||value.workers.length>4)bad();
  for(const w of value.workers){
   if(!exact(w,['id','position','yaw','job','phase','cargo','targetId','workTicks','stuckTicks','bestDistance','avoidId','avoidUntil'])||typeof w.id!=='string'||w.id.length>64||!/^worker\d+$/.test(w.id)||ids.has(w.id)||!Array.isArray(w.position)||w.position.length!==3||!w.position.every((v,i)=>bounded(v,i===1?-posLimit():-thingLimit(),i===1?posLimit():thingLimit()))||!bounded(w.yaw,-Math.PI,Math.PI)||!PACK.includes(w.job)||!['seeking','travelling','working','returning','sheltering','store_full','no_resource','blocked'].includes(w.phase)||!integer(w.cargo,0,2)||typeof w.targetId!=='string'||!/^[-A-Za-z0-9_]{0,64}$/.test(w.targetId)||!integer(w.workTicks,0,59)||!integer(w.stuckTicks,0,120)||!bounded(w.bestDistance,0,160)||typeof w.avoidId!=='string'||!/^[-A-Za-z0-9_]{0,64}$/.test(w.avoidId)||!integer(w.avoidUntil,0,tick+1200))bad();

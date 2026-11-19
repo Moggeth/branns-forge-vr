@@ -1,6 +1,31 @@
 import assert from 'node:assert/strict';
 import {createSimulation,loadSimulation,terrainHeight} from '../shared/simulation.js';
 import {createEnemy} from '../shared/combat.js';
+// Finishing a raid must leave every stock balance usable and saveable, including materials outside the reward.
+{
+ const raid=createSimulation();raid.addPlayer({id:'god',role:'god'});
+ const initial=raid.adventureWorld();
+ const stock=initial.settlement.stock;
+ // A full communal store leaves raid rewards in settlement stock for the next transfer.
+ for(const k of Object.keys(stock))initial.inventions.stockpiles.party[k]=999;
+ Object.assign(stock,{iron:17,wood:998,starOre:2});
+ initial.settlement.encounter={wave:1,elapsed:30,killed:2,foes:[]};
+ assert.ok(raid.step().some(e=>e.kind==='forge_reward'));
+ assert.equal(stock.wood,999);assert.equal(stock.stone,3);assert.equal(stock.gems,1);
+ assert.equal(stock.iron,17);assert.equal(stock.starOre,2);
+ const save=raid.checkpoint();
+ assert.deepEqual(loadSimulation(save).checkpoint().settlement.stock,stock);
+ const nonRewardKeys=Object.keys(stock).filter(k=>!['wood','stone','gems'].includes(k));
+ for(const missing of [NaN,null]){
+  const legacy=structuredClone(save);
+  for(const k of nonRewardKeys)legacy.settlement.stock[k]=missing;
+  const fixed=loadSimulation(legacy).checkpoint().settlement.stock;
+  assert.equal(fixed.wood,999);assert.equal(fixed.stone,3);assert.equal(fixed.gems,1);
+  assert.ok(nonRewardKeys.every(k=>fixed[k]===0));
+ }
+ const malformed=structuredClone(save);malformed.settlement.stock.iron=null;
+ assert.throws(()=>loadSimulation(malformed),/settlement/i);
+}
 const initial=createSimulation();initial.addPlayer({id:'god',role:'god'});initial.addPlayer({id:'hero',role:'hero'});
 for(let i=0;i<4;i++)assert.equal(initial.command('god',{type:'action',seq:i+1,action:'forgeSummon'}).ok,true);
 const fixture=initial.checkpoint();
