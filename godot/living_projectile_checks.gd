@@ -9,6 +9,7 @@ class Grips extends RefCounted:
 	func is_stowed(_body):return false
 class Tuning extends RefCounted:
 	var runtime_overrides={}
+	func release_velocity(_hand, _throw): return Vector3.ZERO
 class Museum extends RefCounted:
 	func tick(_delta):pass
 	func sync(_snapshot):pass
@@ -18,8 +19,10 @@ class Occupier extends RefCounted:
 	func busy(candidate):return candidate==hand
 class Game extends Node3D:
 	var living
+	var adventure={"zone":"orchard","formation":{}}
 	var camera=Camera3D.new()
 	var rig=Node3D.new()
+	var desktop_release_mode="throw"
 	var desktop_hand=Node3D.new()
 	var hands=[]
 	var held={}
@@ -110,6 +113,9 @@ func run():
 	await step(30)
 	check(runtime.busy(hand) and engine.held[str(hand.get_instance_id())].entry.node==ring.node,"Recall catches exact original instance")
 	check(engine.projectiles.flights.is_empty(),"Catch clears flight state")
+	if not runtime.busy(hand):
+		finish(start)
+		return
 	# Real thin geometry hit drives only package-local configured rule targets.
 	var wall=WorldZones.body(game,Vector3(-3,1.2,5.8),Vector3(2,2,.08),"solid")
 	await physics_frame;await physics_frame
