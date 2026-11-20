@@ -1,22 +1,35 @@
 # Brann’s native smithy
 
-Choose **Adventure** in the Brann’s Forge Launcher, then desktop or VR. The forge is the starting destination. Return through a home gate or choose Forge Yard from the travel map. The launcher’s Stop and Logs controls apply to this scene. Godot also writes `user://logs/game.log`.
+Choose **Adventure** in **Brann’s Forge Launcher**, then desktop or VR. Start in Forge Yard. Walk toward Brann for the starter hammer and the commission ledger, east to the armory, or across the courtyard to the gateways. A home gate or Forge Yard on the travel map brings you back. The launcher’s Stop and Logs controls apply to Adventure. Native logs also live in `user://logs/game.log`.
 
-## Walking the yard
+[Before and after, Brann and the armory](../assets/smithy-source/review/smithy.jpg) · [All nine courtyard gateways](../assets/smithy-source/review/gates.jpg)
 
-Brann’s handoff bench is beside his anvil. The ledger behind the bench offers talk, voice, forge progression and invention. The tool board is on the other side of the hearth. Practice dummies share a western lane. Seven gates face the open central court. The eastern aisle leads to the armory directory.
+## The yard and the collection
 
-Each of nine bays accommodates six physical display positions. When the first 54 addresses fill, use the directory to turn to another folio on the same floor. Stand numbers continue across folios. A returned weapon goes back to its original address. A weapon you hold, wear or drop stays with you when someone turns the directory. The starter hammer remains beside Brann. The guide and the commission completion message report where a docked item can be found. The pre-existing `user://collection_homes.json` preserves order across launches.
+The central paths connect Brann’s anvil, the seven expedition gates and the eastern armory. The western practice lane, Living Museum and Bellworks Fair each have their own approach. Foliage, cradles and the quarry backdrop leave those routes clear. The 206 m valley is scenery. Traversal uses a separate walkable floor.
 
-## Running the native checks
+There are nine armory bays with six numbered stands each. Bays open as the collection grows. Beyond 54 addresses, use the directory beside the entrance to turn the folio. Numbers continue across folios. Held, belted and dropped equipment stays in the world. A recalled weapon goes back to its original address, and the starter hammer keeps its own handoff bench beside Brann. Existing `user://collection_homes.json` files preserve item order. The resource guide and Brann’s completion notice also give the stand and folio.
 
-From this repository, use the bundled Godot 4.7.2 console executable with `--headless --xr-mode off --audio-driver Dummy --path godot`. Append one of these script commands.
+The commission ledger provides talk, voice, workshop upgrades and invention. On completion Brann strikes the billet three times before the creation becomes available at its assigned stand. His hammer uses the visible striking face as the contact point. The furnace, chimney, impact sparks, layered strike sounds, gaze, eyelids, breathing and speech movement are driven by the native game.
 
-- `--script res://smithy_checks.gd -- --world-builder-preview` runs the real offline game with 127 registered items. It probes floor support and capsule clearance through every gate into every bay, tests active and archived physics, checks the four commission buttons, and plays a complete three-strike handoff.
-- `--script res://portal_visual_checks.gd -- --visual-script=res://portal_kit/portal_kit.gd` checks all travel links and the gateway artwork against walkable and ray-selectable clearance.
-- `--script res://portal_walkthrough_checks.gd` checks desktop and tracked-head crossing, cancellation, exits and cooldowns.
-- With graphical Godot, omit `--headless` and use `--script res://forge_yard_art_review.gd -- --world-builder-preview`. The 15 screenshots land in `outputs/forge-yard-review/`. An absolute destination can be supplied with `--smithy-review-output=...`. Use the complete workshop fixture, including its tier and recipe availability, for repeatable populated armory shots.
+## Art and destination windows
 
-The physics checks found an invisible ridge from the neighbouring quarry and a dummy stand in the yard-to-armory aisle. Distant terrain tagged as a backdrop is excluded from generated decoration collision. A stand’s front control has its own physical depth, so stand on the visitor side to probe it. Use real scene rays, floor heights and the player capsule after changing the layout. A desktop capture cannot verify headset tracking or comfort.
+The runtime kit has 43 GLBs, including Brann and his hammer, workshop buildings, fixtures, training equipment, stands, valley scenery and gateway frames. The corresponding Blender scripts and art handoffs live under [assets/smithy-source](../assets/smithy-source/). Embedded material textures stay inside the imported assets. The grounds artwork also supplies the two side-door frames.
 
-The twelve gateway windows are baked from the actual native destinations. To regenerate them after changing a landscape, run graphical Godot with `--xr-mode off --audio-driver Dummy --path godot --script res://portal_kit/bake_destination_views.gd -- --world-builder-preview`. The bake writes `godot/portal_kit/views/*.webp`. Import them once in the editor before packaging. Playing the game reads one small texture per destination.
+Twelve core destinations have individually modeled frames and their own moving veil patterns. Real views of those destinations and both side rooms are baked into 14 small WebPs. The windows use bounded parallax and respond to approach, crossing and arrival. The nearest gates add light and particles. The 22 core travel links retain their original walk-through and ray actions.
+
+To regenerate windows after changing a destination, run graphical Godot with `--xr-mode off --audio-driver Dummy --path godot --script res://portal_kit/bake_destination_views.gd -- --world-builder-preview`. Append `--views=forge_yard,museum,bellworks` to refresh just those three. Import the changed files in the editor before packaging or testing. Mounting labels use runtime state. Keep the authored plaque artwork free of sample orders or quest text.
+
+## Reproducing the native checks
+
+Use the bundled Godot 4.7.2 console executable. From the repository, start with `--headless --xr-mode off --audio-driver Dummy --path godot`, followed by one of the options below.
+
+- `--script res://smithy_checks.gd -- --world-builder-preview` loads the real offline game, creates 127 registered items, and checks 1,799 points along walkable routes. It also exercises three folios, held and recalled tools, the four ledger controls, the workshop upgrade, the two side doors and Brann’s three-strike handoff.
+- `--script res://portal_visual_checks.gd -- --visual-script=res://portal_kit/portal_kit.gd` checks 22 live travel links, including opening geometry and ray access. `--script res://portal_walkthrough_checks.gd` checks desktop and tracked-head crossing, cancellation, exits and cooldowns.
+- `-- --expedition-check` exercises zone travel, resources, fog restoration and horizon geometry. The Forge Yard’s five valley meshes are excluded individually from weather overlays. The stream uses the project’s animated water surface.
+- `-- --playful-check` uses the real Bellworks gate, controls, return trip, bank shot and museum interactions. On desktop, E takes or drops Sunskipper, X throws it and a click recalls it.
+- With graphical Godot, omit `--headless` and add `--script res://forge_yard_art_review.gd -- --world-builder-preview`. This writes 19 in-game views and logs visible draw and primitive counts by view. The default directory is `outputs/forge-yard-review/`. Override it with `--smithy-review-output=<absolute path>`. The review loads the built-in workshop fixture with available recipes and uses the live hammer and gameplay camera.
+
+If an aisle becomes impassable, inspect nearby scenery collision and the front depth of the stand buttons with the real player capsule. If an imported meadow is white, inspect both the glTF colour channel and the imported material’s vertex-colour flag. An earlier portal frame looked clear in a still while its decorations intersected the opening. Check the actual mesh opening and travel physics after frame edits. If the Bankshot landing is blocked, inspect the shipped Starfall Ridge collision manifest. Its three observatory skyline cliffs sit beyond the walkable zone and must stay visual-only. The travel log records the blocking body. Source, manifest and live court must agree. For changes to the integrated checks, compile their GDScript directly with `--check-only` before running the full scene.
+
+Desktop results and simulated tracked-head crossings are available. Physical headset comfort and performance require a headset playtest.

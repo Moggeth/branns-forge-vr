@@ -2356,3 +2356,7 @@ See [measurements, exact lighting and first-pick verification](COLD-START-PICK-2
 
 
 Lossless texture delivery (2026-10-15): see docs/LOSSLESS-DOWNLOADS-20261015.md for smaller first downloads, exact geometry/pixel checks, original-file fallbacks, browser acceptance, timings and release evidence.
+
+## Native smithy and armory
+
+[Native routes, collection, gate checks and in-game captures](NATIVE-SMITHY.md) cover the Adventure starting area.
