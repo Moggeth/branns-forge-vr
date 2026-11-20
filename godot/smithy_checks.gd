@@ -56,6 +56,10 @@ func _run() -> void:
 		collection.register(item)
 		archive_items.append(item)
 	for i in 3: await physics_frame
+	var chimney := game.adventure.zone_groups.forge_yard.find_child("ForgeSmoke", true, false) as Node3D
+	chimney._process(0.17)
+	for mote in chimney.motes:
+		check(mote.scale.length() < 0.045, "Furnace embers must stay centimetre-sized as they fade")
 	var gate_count := 0
 	var crossing := Vector3(0,0,4)
 	walk_segment(Layout.SPAWN, crossing, "spawn to courtyard")

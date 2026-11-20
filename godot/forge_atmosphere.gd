@@ -41,7 +41,7 @@ func _process(delta):
 		puff.material_override.albedo_color.a=sin(PI*t)*0.42*(1.0-t)
 	for i in range(motes.size()):
 		var t=fposmod(clock/2.8+float(i)/6.0,1.0)
-		motes[i].position=Vector3(sin(i*2.4+t*3)*0.20,-5.7+t*0.65,0.48+cos(i)*0.12)
-		motes[i].scale=Vector3.ONE*sin(PI*t)
+		motes[i].position=Vector3(sin(i*2.4+t*3)*0.20,-6.85+t*0.65,0.48+cos(i)*0.12)
+		motes[i].scale=Vector3.ONE*0.018*sin(PI*t)
 	if ember!=null:
 		ember.emission_energy_multiplier=2.0+0.12*sin(clock*5.3)+0.07*sin(clock*11.1)
