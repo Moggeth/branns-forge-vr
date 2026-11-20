@@ -439,6 +439,7 @@ func _ready():
 		weather=preload("res://weather_runtime.gd").new(); add_child(weather); weather.setup(self)
 	heat_contacts=preload("res://heat_contacts.gd").new(); add_child(heat_contacts); heat_contacts.setup(self)
 	if ember_gallery!=null: ember_gallery.register_heat_targets()
+	preload("res://smithy_layout.gd").set_label_ranges(adventure.zone_groups.forge_yard)
 	if lab_mode:
 		animation_lab=preload("res://animation_lab.gd").new()
 		add_child(animation_lab)

@@ -152,6 +152,7 @@ func ensure_home(id:String,title:String)->Dictionary:
 	hint.pixel_size=0.002; hint.width=620; hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 	var home={"stand":stand,"item":null,"status":status,"id":id,"page":page,"slot":index,"hint":hint}
 	homes[id]=home
+	Layout.set_label_ranges(stand)
 	update_directory()
 	return home
 

@@ -197,7 +197,7 @@ static func _build_items(game: Node, state: Dictionary, items: Array) -> void:
 		_native_item(game, held, str(held.get_meta("id", held.name)), seen_ids, items)
 
 static func _docked_address(game: Node, id: String, state: String) -> String:
-	if game.collection == null: return state
+	if game.collection == null or state == "Held": return state
 	var home: Dictionary = game.collection.homes.get(id, {})
 	var item: Node3D = home.get("item")
 	if is_instance_valid(item) and game.collection.is_docked(item):
@@ -328,6 +328,8 @@ static func _build_director_costs(game: Node, view: Node, costs: Array) -> void:
 			elif float(view.budget) < float(card.cost): status = "Need %.1f more Sparks" % (float(card.cost) - float(view.budget))
 			elif int(card.count) > 0 and live + int(card.count) > 9: status = "Too many enemies on the field"
 			else: status = "Ready · choose an approach"
-		costs.append({"name": str(card.name).capitalize(),
+		var card_title := str(card.name).capitalize()
+		if kind == "golem": card_title += " (War Director)"
+		costs.append({"name": card_title,
 			"cost": "%d Sparks · %.0f s cooldown" % [int(card.cost), float(card.cooldown)],
 			"state": status, "description": "War Director Sparks are separate from Orchard Mana."})

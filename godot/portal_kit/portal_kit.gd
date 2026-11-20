@@ -27,7 +27,7 @@ const ZONES := {
 }
 
 @export var zone_id := ""
-@export var near_distance := 16.0     # full detail + motes + light inside this
+@export var near_distance := 8.5     # full detail + motes + light inside this
 @export var far_distance := 42.0      # cheap LOD mesh beyond this
 @export var cull_distance := 120.0
 @export var mote_amount := 18
@@ -45,6 +45,7 @@ var _motes: GPUParticles3D
 var _burst: GPUParticles3D
 var _light: OmniLight3D
 var _tier := -1
+var _dormant := false
 var _tick := 0.0
 var _swell := 0.0
 var _swell_target := 0.0
@@ -203,8 +204,8 @@ func _apply_tier(t: int) -> void:
 	_tier = t
 	_near.visible = t <= 1
 	_far.visible = t == 2
-	_motes.emitting = t == 0
-	_light.visible = t == 0
+	_motes.emitting = t == 0 and not _dormant
+	_light.visible = t == 0 and not _dormant
 	_mat_near.set_shader_parameter("lod_detail", 1.0 if t == 0 else 0.0)
 	visible = t != 3
 
@@ -212,6 +213,9 @@ func _process(delta: float) -> void:
 	_tick -= delta
 	if _tick <= 0.0:
 		_tick = 0.25
+		if not get_parent_node_3d().is_visible_in_tree():
+			_apply_tier(3)
+			return
 		var cam := get_viewport().get_camera_3d()
 		if cam != null:
 			var to_cam := cam.global_position - global_position
@@ -223,7 +227,7 @@ func _process(delta: float) -> void:
 				var front := local.z
 				var near_gate := 1.0 - smoothstep(1.0, 4.5, sqrt(front * front + lateral * lateral))
 				_swell_target = near_gate if front > -0.3 else 0.0
-	if _tier == 3:
+	if _tier == 3 or _dormant:
 		return
 	_swell = move_toward(_swell, _swell_target, delta * 1.6)
 	_mat_near.set_shader_parameter("swell", _swell)
@@ -231,6 +235,7 @@ func _process(delta: float) -> void:
 
 ## Entrance swell: called when the player commits to the gate. Surface bulges and flares, then settles open.
 func play_entrance() -> void:
+	if _dormant: return
 	if _swell_tween:
 		_swell_tween.kill()
 	_refresh_tier_now()
@@ -247,6 +252,7 @@ func _finish_entrance() -> void:
 
 ## Exit release: called on the destination gate as the player arrives. Ring sweeps outward, burst of motes leaves.
 func play_exit() -> void:
+	if _dormant: return
 	if _release_tween:
 		_release_tween.kill()
 	_refresh_tier_now()
@@ -273,5 +279,9 @@ func _flash(peak: float, seconds: float) -> void:
 
 ## Dormant gates (locked/unavailable): dim surface, no motes.
 func set_dormant(dormant: bool) -> void:
+	_dormant = dormant
+	if _flash_tween: _flash_tween.kill()
 	_mat_near.set_shader_parameter("energy", 0.25 if dormant else 1.0)
-	_motes.emitting = (not dormant) and _tier == 0
+	_mat_far.set_shader_parameter("energy", 0.25 if dormant else 1.0)
+	_motes.emitting = not dormant and _tier == 0
+	_light.visible = not dormant and _tier == 0

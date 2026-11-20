@@ -134,7 +134,10 @@ func strike():
 	var point=hammer.to_global(HAMMER_FACE)
 	# Coprime step visits all eight timbres without immediate repetition.
 	play_sound(impacts[(strike_count*3)%impacts.size()],point,-18.0)
-	flourish(point,7,Color("ffbc60"),0.30)
+	if billet.is_visible_in_tree():
+		game.impact_feedback.emit_contact({"target":billet, "point":point, "normal":Vector3.UP,
+			"energy":7.0, "relative_velocity":Vector3(0,-4,1.2), "tool_material":"steel",
+			"material":"metal", "play_sound":false, "leave_mark":false})
 	if strike_count==1: print("FORGE_STRIKE contact_error_m=",point.distance_to(CONTACT)," sound_variants=",impacts.size())
 
 func flourish(point:Vector3,count:int,color:Color,life:float):

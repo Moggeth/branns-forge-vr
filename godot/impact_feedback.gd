@@ -129,8 +129,9 @@ func emit_contact(event: Dictionary) -> bool:
 				"scale": float(spec.get("size", 0.04)) * rng.randf_range(0.75, 1.2),
 				"spin": Vector3(rng.randf(), rng.randf(), rng.randf()) * 7.0,
 				"color": Color(spec.get("tint", Color.WHITE)).lightened(rng.randf_range(0.0, 0.12))})
-	_sound(sound_material if sound_material in MATERIALS else material, point, strength, bool(event.get("glance", false)))
-	_mark(target, point, normal, material, strength)
+	if event.get("play_sound", true):
+		_sound(sound_material if sound_material in MATERIALS else material, point, strength, bool(event.get("glance", false)))
+	if event.get("leave_mark", true): _mark(target, point, normal, material, strength)
 	emitted += 1
 	return true
 

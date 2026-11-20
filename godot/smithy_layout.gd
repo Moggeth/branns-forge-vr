@@ -42,3 +42,13 @@ static func clear_dressing(point: Vector3) -> bool:
 	for i in DESTINATIONS.size():
 		if point.distance_squared_to(gate_position(i)) < 5.76: return true
 	return false
+
+## Keep inscriptions readable at their fixture without flooding the view from the gate garden.
+static func set_label_ranges(branch: Node3D) -> void:
+	for child in branch.find_children("*", "Label3D", true, false):
+		var label := child as Label3D
+		var at := label.global_position
+		if not YARD_BOUNDS.has_point(Vector2(at.x,at.z)) or label.visibility_range_end > 0: continue
+		var letter_height := label.pixel_size * label.font_size
+		label.visibility_range_end = clampf(letter_height * 72.0, 3.4, 13.0)
+		label.visibility_range_end_margin = 0.6

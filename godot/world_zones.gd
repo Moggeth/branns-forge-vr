@@ -233,7 +233,9 @@ static func portal(root: Node3D, data: Dictionary, zone: String, pos: Vector3, t
 	var visuals := preload("res://portal_kit/portal_kit.gd").create(target) as Node3D
 	visuals.name = "PortalVisuals"
 	n.add_child(visuals)
-	label(n,str(data.zones[target].name).to_upper(),Vector3(0,3.4,0.0),20)
+	var nameplate := label(n,str(data.zones[target].name).to_upper(),Vector3(0,3.48,0.0),20)
+	nameplate.visibility_range_end = 20.0
+	nameplate.visibility_range_end_margin = 1.2
 	# A ray-targetable area keeps the travel action usable while the player can
 	# physically step into the gateway. The old central StaticBody blocked it.
 	var interaction := Area3D.new()
