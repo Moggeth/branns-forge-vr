@@ -59,6 +59,12 @@ func _run() -> void:
 	var stand: Node3D = game.collection.homes.quarry_pick.stand
 	frames.append(["display",stand.to_global(Vector3(0.88,1.57,1.58)),stand.to_global(Vector3(-0.1,1.1,0)),53.0])
 	frames.append(["hammer_strike", Vector3(-1.90,1.62,-1.9), Vector3(-0.32,1.39,-3.37), 49.0])
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--smithy-motion-output="):
+			var motion_dir := arg.trim_prefix("--smithy-motion-output=")
+			var captured := await _capture_motion(game,view,camera,frames,motion_dir)
+			quit(0 if captured else 1)
+			return
 	var counts := {}
 	var failures: Array[String] = []
 	for frame in frames:
@@ -68,7 +74,10 @@ func _run() -> void:
 		# Distance tiers and character gaze consult the actual gameplay camera.
 		game.camera.global_transform = camera.global_transform
 		for gate in game.scene.portals:
-			gate.get_node("PortalVisuals")._process(0.25)
+			var art = gate.get_node("PortalVisuals")
+			art._process(0.25)
+			if gate.get_meta("target_zone") == "sky_garden":
+				art._mat_near.set_shader_parameter("storm_phase",0.64 if frame[0] == "sky_garden" else -1.0)
 		if frame[0] == "hammer_strike":
 			game.workshop_delivery.set_process(false)
 			game.workshop_delivery.billet.show()
@@ -81,3 +90,35 @@ func _run() -> void:
 			failures.append(str(frame[0]))
 	print("FORGE_YARD_ART_REVIEW ", JSON.stringify({"views": frames.size(), "failures": failures, "draw_calls_and_primitives":counts}))
 	quit(0 if failures.is_empty() else 1)
+
+## Use --fixed-fps 24 to record the same simulation cadence as the encoded clip.
+func _capture_motion(game: Node3D, view: SubViewport, camera: Camera3D, views: Array, output: String) -> bool:
+	if DirAccess.make_dir_recursive_absolute(output) != OK: return false
+	view.size = Vector2i(896,560)
+	var by_name := {}
+	for frame in views: by_name[frame[0]] = frame
+	var number := 0
+	var strikes_before: int = game.workshop_delivery.strike_count
+	for cut in [["smithy",42],["hammer_strike",71],["armory_interior",39],["sky_garden",108]]:
+		var shot: Array = by_name[cut[0]]
+		var base: Vector3 = shot[1]
+		var aim: Vector3 = shot[2]
+		camera.global_position = base
+		camera.look_at(aim,Vector3.UP)
+		camera.fov = shot[3]
+		game.workshop_delivery.finishing = cut[0] == "hammer_strike"
+		var sweep := camera.global_basis.x * (0.13 if cut[0] == "hammer_strike" else 0.35)
+		for frame in int(cut[1]):
+			var progress := float(frame) / maxf(1.0,cut[1] - 1.0)
+			camera.global_position = base + sweep * (smoothstep(0.0,1.0,progress) - 0.5)
+			camera.look_at(aim,Vector3.UP)
+			game.camera.global_transform = camera.global_transform
+			await process_frame
+			await RenderingServer.frame_post_draw
+			if view.get_texture().get_image().save_jpg(output.path_join("%04d.jpg" % number),0.92) != OK:
+				return false
+			number += 1
+	game.workshop_delivery.finishing = false
+	var strikes: int = game.workshop_delivery.strike_count - strikes_before
+	print("SMITHY_MOTION_REVIEW ",JSON.stringify({"frames":number,"strikes":strikes}))
+	return strikes >= 3

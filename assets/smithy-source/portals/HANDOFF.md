@@ -31,7 +31,7 @@ Emissive: `M_Hearth` (hearthlight orange), `M_Crystal`, `M_BogLight`, `M_StarLig
 ## Shader `portal_surface.gdshader`
 - **Uniforms:** keeps every uniform from the reference shader, plus `theme` (0–11), `destination_view` (source_color, filter_linear_mipmap, repeat_disable), `view_strength`, `parallax_depth` and `refract_amount`.
 - **Destination view:** shows clearly at the centre, under a soft veil. Bounded view parallax (≤0.06 UV) and field refraction (≤0.018 UV). The view is zoomed 6% so the parallax never shows the image edges.
-- **Front vs rear:** the front shows the full destination. The rear shows it mirrored, at 55% strength, cooler and denser.
+- **Front vs rear:** the front shows the full destination. The rear shows it mirrored, at reduced strength, cooler and denser.
 - **Rim:** sculpted, with a bright lip, a dark undercut and a soft halo.
 - **Entrance and exit:** `swell` bulges the surface toward +Z and clears and brightens the centre. `release` sends one soft ring outward.
 - **Distance detail:** `lod_detail` 0 turns off the noise and refraction and keeps only the analytic pattern.

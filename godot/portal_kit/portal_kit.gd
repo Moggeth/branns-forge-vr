@@ -78,6 +78,8 @@ func _ready() -> void:
 	_mat_near.set_shader_parameter("theme", ZONES.keys().find(zone_id))
 	_mat_near.set_shader_parameter("destination_view", load(ROOT + "views/" + view_id + ".webp"))
 	_mat_near.set_shader_parameter("view_strength", 0.94)
+	if pocket_frame.is_empty() and zone_id in ["sky_garden", "cloudbreak_keep"]:
+		_mat_near.set_shader_parameter("storm_amount", 1.0)
 	_mat_near.set_shader_parameter("edge_color", glow_color)
 	_mat_near.set_shader_parameter("core_color", glow_color.lerp(Color.WHITE, 0.38))
 	_mat_near.set_shader_parameter("deep_color", glow_color.darkened(0.6))

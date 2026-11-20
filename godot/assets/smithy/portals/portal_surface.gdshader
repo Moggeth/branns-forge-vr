@@ -1,5 +1,6 @@
 shader_type spatial;
 // Brann's Forge VR - portal veil surface (replacement for reference.gdshader; same uniform interface + theme + destination_view).
+// + optional storm rim lightning (storm_amount, storm_phase); storm_amount = 0 reproduces reference exactly.
 // Mesh contract (node "Veil" in every <zone_id>.glb):
 //   COLOR.r = 0 at the aperture rim, 1 at the centre (smoothstepped ring falloff)
 //   UV      = aperture-space 0..1, Godot top-left orientation (UV.y = 0 at the top of the opening)
@@ -28,6 +29,9 @@ uniform sampler2D destination_view : source_color, filter_linear_mipmap, repeat_
 uniform float view_strength : hint_range(0.0, 1.0) = 0.78;   // how clearly the destination reads at the centre
 uniform float parallax_depth : hint_range(0.0, 0.2) = 0.06;  // bounded parallax of the destination image (UV units)
 uniform float refract_amount : hint_range(0.0, 0.05) = 0.018; // bounded field distortion of the destination
+// --- storm (optional rim lightning; Sky Garden = theme 5, Cloudbreak Keep = theme 11 only) ---
+uniform float storm_amount : hint_range(0.0, 1.0) = 0.0;   // 0 = byte-identical to reference; integration sets 1 on the two gates
+uniform float storm_phase : hint_range(-1.0, 1.0) = -1.0;  // <0 = live (TIME + time_offset); 0..1 = frozen cycle phase for GPU tests
 
 float hash21(vec2 p) {
 	p = fract(p * vec2(123.34, 456.21));
@@ -39,6 +43,89 @@ float vnoise(vec2 p) {
 	vec2 f = fract(p);
 	f = f * f * (3.0 - 2.0 * f);
 	return mix(mix(hash21(i), hash21(i + vec2(1, 0)), f.x), mix(hash21(i + vec2(0, 1)), hash21(i + vec2(1, 1)), f.x), f.y);
+}
+
+// ---------------- storm lightning ----------------
+const float STORM_PERIOD = 4.0;   // seconds per charge/bloom/decay cycle (jittered to ~3.3-4.7 s apart)
+
+// jagged rim offset in d-space for a given arc coordinate and bolt seed
+float storm_jag(float s, float seed, float t) {
+	return (vnoise(vec2(s * 7.0, seed)) - 0.5) * 0.075
+	     + (vnoise(vec2(s * 23.0 + t * 0.35, seed + 7.1)) - 0.5) * 0.028;
+}
+// thin glowing line: sharp core + soft halo, distance in d units
+float storm_line(float dist, float w) {
+	return w / (abs(dist) + w) * smoothstep(w * 14.0, 0.0, abs(dist));
+}
+// returns rgb energy for the storm; a = polar angle (top of aperture = -PI/2), d = rim depth
+vec3 storm_light(int th, float a, float d, float t, float vis) {
+	// cycle + bounded per-event phase jitter
+	float n;
+	float f;
+	if (storm_phase >= 0.0) {
+		n = 0.0;
+		f = clamp(storm_phase, 0.0, 1.0);
+	} else {
+		n = floor(t / STORM_PERIOD);
+		float jit = (hash21(vec2(n, 3.7)) - 0.5) * 0.3;     // +-0.15 cycle -> events 3.4..4.6 s apart
+		f = clamp(fract(t / STORM_PERIOD) - jit, 0.0, 1.0);
+	}
+	float seed = hash21(vec2(n, 11.3)) * 40.0;
+	// envelope: slow charge (0..0.55), bloom (~0.62), decay (to 0.95), dormant tail
+	float charge = smoothstep(0.05, 0.55, f);
+	float env = smoothstep(0.35, 0.62, f) * (1.0 - smoothstep(0.66, 0.95, f));
+	float glow_env = charge * (1.0 - smoothstep(0.7, 0.98, f));
+
+	// arc placement: centred on the upper rim, swinging onto a side
+	float centre = -1.5708 + (hash21(vec2(n, 5.9)) - 0.5) * 2.0;
+	float span = 0.85 + hash21(vec2(n, 8.2)) * 0.35;
+	float dir = hash21(vec2(n, 2.4)) > 0.5 ? 1.0 : -1.0;
+	float da = a - centre;
+	da -= 6.2832 * floor((da + 3.1416) / 6.2832);           // wrap to -PI..PI
+	float u = da * dir / span * 0.5 + 0.5;                    // 0..1 along the bolt
+	if (u < -0.2 || u > 1.2) return vec3(0.0);
+	float in_arc = smoothstep(-0.02, 0.06, u) * smoothstep(1.02, 0.94, u);
+	float head = smoothstep(0.12, 0.6, f) * 1.08;             // the filament travels as it charges
+	float grown = smoothstep(head, head - 0.06, u);
+
+	float base = 0.11 + 0.02 * sin(u * 3.1416);
+	float main_d = base + storm_jag(da, seed, t);
+	float w = 0.0035;
+	float bolt = storm_line(d - main_d, w);
+
+	// two forks peeling inward from the main filament
+	float br = 0.0;
+	for (int k = 0; k < 2; k++) {
+		float fk = float(k);
+		float uf = 0.28 + 0.38 * fk + (hash21(vec2(n, 20.0 + fk)) - 0.5) * 0.12;
+		float bu = (u - uf) / (0.22 - 0.05 * fk);              // 0..1 along the branch
+		if (bu > 0.0 && bu < 1.0) {
+			float bd = storm_jag(da + uf * 9.0, seed + 3.0 + fk * 5.0, t) * 0.7
+			         + main_d + bu * (0.07 + 0.03 * fk) + (vnoise(vec2(bu * 9.0, seed + fk)) - 0.5) * 0.02;
+			float taper = 1.0 - bu;
+			br += storm_line(d - bd, w * (0.4 + 0.6 * taper)) * taper * step(uf, head);
+		}
+	}
+
+	// soft charging halo hugging the rim (never reaches the centre)
+	float halo = exp(-pow((d - base) * 14.0, 2.0)) * in_arc;
+	float shimmer = 0.85 + 0.15 * sin(t * 2.3 + u * 6.0);   // smooth, no strobing
+	float filament = (bolt + br * 0.8) * in_arc * grown;
+
+	vec3 hot;
+	vec3 tint;
+	if (th == 5) {          // sky garden: sky blue
+		hot = vec3(0.86, 0.95, 1.0);
+		tint = vec3(0.38, 0.72, 1.0);
+	} else {                // cloudbreak keep: pale gold core, violet halo
+		hot = vec3(1.0, 0.94, 0.76);
+		tint = vec3(0.72, 0.55, 1.0);
+	}
+	vec3 c = hot * filament * (0.25 * charge + 1.6 * env) * shimmer
+	       + mix(tint, hot, 0.25) * filament * 0.35 * glow_env
+	       + tint * halo * (0.10 * glow_env + 0.30 * env);
+	c *= smoothstep(0.42, 0.25, d);                           // keep the landscape clear in the centre
+	return c * vis;
 }
 
 varying float v_depth;
@@ -152,4 +239,15 @@ void fragment() {
 	float a_base = opacity * (0.55 + 0.25 * pattern * (1.0 - see) + 0.35 * rim + lip * 0.3 + see * 0.35);
 	a_base = mix(a_base, 0.94, see);
 	ALPHA = clamp(a_base * clamp(energy, 0.0, 1.0) * (1.0 + 0.2 * swell) + ring * 0.4, 0.0, 1.0) * smoothstep(0.0, 0.03, d + 0.03);
+
+	// storm: additive rim lightning, fully skipped at storm_amount 0 and on every other theme
+	if (storm_amount > 0.0 && (theme == 5 || theme == 11)) {
+		float dist = length(v_view_obj);
+		float vis = mix(0.3, 1.0, smoothstep(7.0, 2.5, dist)) * mix(0.55, 1.0, lod_detail);   // calm far, vivid near
+		vis *= front ? 1.0 : 0.6;
+		vec3 st = storm_light(theme, a, d, t, vis) * storm_amount * clamp(energy, 0.0, 1.5);
+		float lum = max(st.r, max(st.g, st.b));
+		ALBEDO += st;
+		ALPHA = max(ALPHA, clamp(lum * 0.9, 0.0, 1.0) * clamp(energy, 0.0, 1.0));
+	}
 }
