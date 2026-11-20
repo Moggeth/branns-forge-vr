@@ -400,7 +400,11 @@ func safe_travel(destination:Vector3)->bool:
 	var feet:Vector3=floor_hit.position+Vector3.UP*0.04
 	var capsule=CapsuleShape3D.new(); capsule.radius=0.22; capsule.height=1.65
 	var query=PhysicsShapeQueryParameters3D.new(); query.shape=capsule; query.collision_mask=1; query.transform=Transform3D(Basis.IDENTITY,feet+Vector3.UP*0.87)
-	if not space.intersect_shape(query,1).is_empty(): game._notice("The landing is obstructed."); return false
+	var blockers: Array = space.intersect_shape(query,1)
+	if not blockers.is_empty():
+		print("TRAVEL_BLOCKED destination=",destination," floor=",floor_hit.collider.get_path()," obstacle=",blockers[0].collider.get_path())
+		game._notice("The landing is obstructed.")
+		return false
 	# Hidden region geometry still collides: reveal the zone owning a valid landing.
 	var landing_node:Node=floor_hit.collider
 	while landing_node!=null:

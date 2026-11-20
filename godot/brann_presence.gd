@@ -10,6 +10,10 @@ var glance_next=5.0
 var glance_until=0.0
 var glance_side=1.0
 var pupils=[]
+var lids: Array[Node3D] = []
+var chest: Node3D
+var next_blink := 3.0
+var blink := -1.0
 @export var departure_grace_seconds=6.0
 @export var conversation_max_distance=6.0
 @export var gaze_follow_speed=3.0
@@ -17,8 +21,10 @@ var pupils=[]
 
 func setup(owner_game):
 	game=owner_game
-	for part in game.scene.brann.get_meta("speech_head").get_children():
-		if part.get_meta("pupil",false): pupils.append({"node":part,"home":part.position})
+	var smith: Node3D = game.scene.brann
+	pupils = smith.get_meta("eyes")
+	chest = smith.find_child("Body", true, false)
+	for lid_name in ["LidL", "LidR"]: lids.append(smith.find_child(lid_name, true, false))
 
 func proximity():
 	var p=game.camera.global_position-game.scene.brann.global_position
@@ -56,8 +62,19 @@ func tick(delta):
 	head.rotation.y=lerp_angle(head.rotation.y,yaw,clampf(delta*gaze_follow_speed,0,1))
 	head.rotation.x=lerpf(head.rotation.x,pitch+nod,clampf(delta*gaze_follow_speed,0,1))+sin(game.elapsed*11)*game.speech_level*0.002
 	head.rotation.z=sin(game.elapsed*6)*game.speech_level*0.012
-	for pupil in pupils:
-		pupil.node.position=pupil.home+Vector3(clampf(yaw-head.rotation.y,-0.3,0.3)*0.025,clampf(-pitch,-0.3,0.3)*0.02,0)
+	for eye in pupils:
+		eye.rotation.y = clampf(yaw - head.rotation.y, -0.30, 0.30)
+		eye.rotation.x = clampf(pitch - head.rotation.x, -0.15, 0.15)
+	var breath := sin(float(game.elapsed) * TAU * 0.22) * 0.012
+	chest.scale = Vector3(1.0 + 0.6*breath, 1.0 + 0.25*breath, 1.0 + breath)
+	next_blink -= delta
+	if next_blink <= 0.0:
+		blink = 0.0
+		next_blink = 4.25 + 1.75 * sin(float(game.elapsed)*0.79)
+	if blink >= 0.0:
+		blink = minf(1.0, blink + delta / 0.16)
+		for lid in lids: lid.rotation.x = 1.35 * sin(PI * blink)
+		if blink >= 1.0: blink = -1.0
 	var color=Color("74837c")
 	var caption=""
 	match status:
@@ -68,9 +85,10 @@ func tick(delta):
 	if phase=="leaving": caption="Heading out?"
 	var rune=game.scene.brann.get_meta("presence_rune")
 	var pulse=1.0+sin(game.elapsed*4)*0.12 if status in ["opening","connecting"] else 1.0+game.speech_level*0.25
-	rune.scale=Vector3(0.075,0.09,0.035)*pulse
-	rune.material_override.albedo_color=color
-	rune.material_override.emission_enabled=status!="idle"
-	rune.material_override.emission=color
-	rune.material_override.emission_energy_multiplier=0.5
+	rune.scale = Vector3.ONE * pulse
+	var glow: StandardMaterial3D = game.scene.brann.get_meta("presence_glow")
+	glow.albedo_color = color
+	glow.emission_enabled = status != "idle"
+	glow.emission = color
+	glow.emission_energy_multiplier = 0.5
 	game.scene.brann.get_meta("presence_label").text=caption

@@ -110,7 +110,7 @@ func tick(delta: float):
 		mesh.set_instance_transform(i,Transform3D(rotation.scaled(Vector3.ONE*size),mote.position))
 	_update_hints()
 
-func register_hint(id: String, stand: Node3D, title: String, desktop_text: String, vr_text: String, offset = Vector3(0,1.6,0)) -> bool:
+func register_hint(id: String, stand: Node3D, title: String, desktop_text: String, vr_text: String, offset = Vector3(0,1.6,0), visible_distance := FAR_DISTANCE) -> bool:
 	if not is_instance_valid(stand) or not is_instance_valid(visuals): return false
 	if hints.has(id): unregister_hint(id)
 	if hints.size() >= MAX_HINTS: return false
@@ -141,7 +141,7 @@ func register_hint(id: String, stand: Node3D, title: String, desktop_text: Strin
 	material.albedo_color = Color("d0b97c")
 	halo.material_override = material
 	root.add_child(halo)
-	hints[id] = {"stand":weakref(stand),"root":root,"label":label,"halo":halo,"offset":offset,"title":title,"desktop":desktop_text,"vr":vr_text,"status":"","near":false}
+	hints[id] = {"stand":weakref(stand),"root":root,"label":label,"halo":halo,"offset":offset,"title":title,"desktop":desktop_text,"vr":vr_text,"status":"","near":false,"visible_distance":visible_distance}
 	_update_hints()
 	return true
 
@@ -165,7 +165,7 @@ func _update_hints():
 			unregister_hint(id)
 			continue
 		var distance = game.camera.global_position.distance_to(stand.global_position)
-		hint.root.visible = enabled and stand.is_visible_in_tree() and distance < FAR_DISTANCE
+		hint.root.visible = enabled and stand.is_visible_in_tree() and distance < float(hint.visible_distance)
 		if not hint.root.visible: continue
 		hint.root.global_position = stand.global_position
 		hint.label.position = hint.offset

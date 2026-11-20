@@ -2,7 +2,7 @@ extends Node
 ## One strike clock owns the pose, contact event, sparks and sound.
 const STRIKE_PERIOD=0.90
 const CONTACT_PHASE=0.72
-const CONTACT=Vector3(-0.43,1.315,-2.9)
+const CONTACT=Vector3(-0.43,1.29,-2.9)
 const HAMMER_FACE=Vector3(-0.2285,0.48,0)
 var game
 var finishing=false
@@ -30,9 +30,9 @@ func setup(owner_game):
 	var parent=game.adventure.zone_groups.forge_yard
 	billet=Node3D.new()
 	parent.add_child(billet)
-	billet.position=CONTACT-Vector3.UP*0.03
+	billet.position=CONTACT-Vector3.UP*0.035
 	var glow=WorkshopScene.material("df9c55",0.35,0.45,0.6)
-	WorkshopScene.box(billet,Vector3.ZERO,Vector3(0.23,0.06,0.14),glow)
+	preload("res://smithy_art.gd").place(billet, "fixtures/coal_billet")
 	for i in range(6):
 		var part=WorkshopScene.box(billet,Vector3((i-2.5)*0.09,0.025,-0.15),Vector3(0.065,0.025,0.07),glow)
 		fragments.append(part)

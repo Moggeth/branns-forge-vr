@@ -1,5 +1,6 @@
 class_name WorkshopScene
 extends RefCounted
+const SmithyArt = preload("res://smithy_art.gd")
 const ForgeMaterials = preload("res://forge_materials.gd")
 
 # Procedural art only. Main owns movement, combat, voice and forge state.
@@ -56,6 +57,13 @@ static func label(parent: Node3D, text_value: String, pos: Vector3, size_value: 
 	parent.add_child(node)
 	return node
 
+static func button_face(target: Node3D, size: Vector3) -> void:
+	var model := SmithyArt.place(target, "smithy/sign", Vector3.ZERO, Vector3(size.x,size.y,size.z/0.08))
+	var face := model.find_child("Sign_LetterField", true, false) as MeshInstance3D
+	if face != null and face.mesh.get_surface_count() == 1:
+		face.material_override = face.mesh.surface_get_material(0)
+		target.set_meta("button_face", face)
+
 static func station_sign(parent: Node3D, title: String, subtitle: String, pos: Vector3, accent: Material) -> void:
 	# Keep the three workshop tasks recognizable from the arrival area.
 	box(parent, pos, Vector3(2.6, 0.53, 0.10), material("263a37"))
@@ -85,16 +93,8 @@ static func light(parent: Node3D, pos: Vector3, color: Color, energy: float, rad
 
 static func build(root: Node3D) -> Dictionary:
 	var wood: Material = ForgeMaterials.material("timber","876c54")
-	var timber: Material = material("33271f")
-	var oak: Material = ForgeMaterials.material("timber","b5936e")
-	var stone: Material = ForgeMaterials.material("stone","92938b")
-	var alternate_stone: Material = material("73736a")
-	var plaster: Material = material("a99a79")
 	var iron: Material = ForgeMaterials.material("iron","a3b3bc")
 	var brass: Material = material("c49746", 0.6, 0.4)
-	var cream: Material = material("e0d1a8")
-	var ember: Material = material("ff791f", 0.0, 0.6, 2.0)
-	var teal: Material = material("426f68")
 	var world: WorldEnvironment = WorldEnvironment.new()
 	var env: Environment = Environment.new()
 	var sky := Sky.new()
@@ -125,87 +125,40 @@ static func build(root: Node3D) -> Dictionary:
 	sun.name = "AdventureSun"
 	root.add_child(sun)
 	var adventure: Dictionary = preload("res://world_zones.gd").build(root)
-	# Masonry furnace, black opening, molten coals and chimney bands.
-	box(root, Vector3(-3.1,0.45,-4.7), Vector3(2.0,0.9,1.25), stone)
-	box(root, Vector3(-3.1,1.24,-5.0), Vector3(1.65,1.0,0.6), timber)
-	for side in [-1,1]:
-		box(root, Vector3(-3.1+side*0.85,1.25,-4.7), Vector3(0.3,1.1,1.0), stone)
-	box(root, Vector3(-3.1,1.87,-4.7), Vector3(2.0,0.3,1.2), stone)
-	box(root, Vector3(-3.1,2.6,-4.9), Vector3(1.15,1.3,0.8), iron)
-	box(root, Vector3(-3.1,0.97,-4.65), Vector3(1.3,0.1,0.75), ember)
-	for i in range(7):
-		ball(root, Vector3(-3.62+i*0.17,1.06,-4.42), Vector3(0.17,0.14,0.19), ember)
-	light(root, Vector3(-3.1,1.4,-3.9), Color("ff8835"), 2.4, 6.0)
-	var smoke=root.find_child("ForgeSmoke",true,false)
-	if smoke!=null: smoke.ember=ember
-	# Stump and forged anvil with tapered horn.
-	cylinder(root, Vector3(-0.35,0.35,-2.9),0.46,0.7,wood)
-	cylinder(root, Vector3(-0.35,0.17,-2.9),0.475,0.07,iron)
-	box(root, Vector3(-0.35,0.77,-2.9),Vector3(0.65,0.14,0.43),iron)
-	box(root, Vector3(-0.35,0.94,-2.9),Vector3(0.35,0.28,0.28),iron)
-	box(root, Vector3(-0.35,1.13,-2.9),Vector3(0.83,0.16,0.43),iron)
-	var horn: MeshInstance3D = cylinder(root, Vector3(0.22,1.11,-2.9),0.18,0.45,iron,0.02)
-	horn.rotation.z = -PI/2.0
+	var furnace := SmithyArt.place(root, "smithy/furnace", Vector3(-3.1,0,-4.7))
+	furnace.add_child(preload("res://assets/smithy/smithy/forge_fire.gd").new())
+	collision(root, Vector3(-3.1,0.92,-4.7), Vector3(1.90,1.84,1.16), "stone")
+	SmithyArt.place(root, "smithy/anvil", Vector3(-0.35,0,-2.9))
 	# Keep the wooden stump distinct from the metal working face for contacts.
 	collision(root, Vector3(-0.35,0.35,-2.9),Vector3(0.95,0.7,0.95),"wood")
-	collision(root, Vector3(-0.35,0.95,-2.9),Vector3(1.25,0.50,0.8),"metal")
-	preload("res://workshop_details.gd").anvil(root)
-	var brann: Node3D = Node3D.new()
+	collision(root, Vector3(-0.35,0.96,-2.9),Vector3(1.25,0.52,0.8),"metal")
+	var brann := SmithyArt.place(root, "brann/brann", Vector3(0,0,-4))
 	brann.name = "BrannCopperpot"
-	brann.position = Vector3(0,0,-4)
-	brann.set_meta("kind","brann")
-	brann.set_meta("surface_material","flesh")
-	root.add_child(brann)
-	var skin: Material = material("d3a279")
-	var beard: Material = material("a95628")
-	var dark_beard: Material = material("733b23")
-	var apron: Material = material("674333")
-	var shirt: Material = material("53736d")
-	var boots: Material = material("302923")
-	for side in [-1,1]:
-		preload("res://workshop_details.gd").boot(brann,side)
-		cylinder(brann,Vector3(side*0.18,0.46,0),0.13,0.42,timber,0.16)
-		ball(brann,Vector3(side*0.18,0.49,0.08),Vector3(0.22,0.23,0.14),timber)
-	ball(brann,Vector3(0,0.92,0),Vector3(0.85,0.85,0.52),shirt)
-	preload("res://workshop_details.gd").apron_wrap(brann,apron)
-	box(brann,Vector3(0,1.11,0.28),Vector3(0.34,0.22,0.07),apron)
-	box(brann,Vector3(0,0.72,0.31),Vector3(0.28,0.16,0.025),wood)
-	for side in [-1,1]:
-		box(brann,Vector3(side*0.2,1.18,0.19),Vector3(0.075,0.38,0.065),apron).rotation.z = side*0.22
-		ball(brann,Vector3(side*0.315,1.56,0),Vector3(0.15,0.23,0.14),skin)
-	ball(brann,Vector3(0,1.53,0),Vector3(0.63,0.66,0.53),skin)
-	ball(brann,Vector3(0,1.32,0.21),Vector3(0.56,0.4,0.28),dark_beard).set_meta("beard",true)
-	for i in range(5):
-		var bx: float = (i-2)*0.098
-		ball(brann,Vector3(bx,1.27+abs(i-2)*0.035,0.28),Vector3(0.155,0.39-abs(i-2)*0.055,0.18),beard).set_meta("beard",true)
-	ball(brann,Vector3(0,1.51,0.315),Vector3(0.16,0.17,0.2),skin)
-	for side in [-1,1]:
-		ball(brann,Vector3(side*0.125,1.61,0.25),Vector3(0.09,0.075,0.035),cream)
-		ball(brann,Vector3(side*0.12,1.61,0.27),Vector3(0.034,0.045,0.02),boots).set_meta("pupil",true)
-		var brow: MeshInstance3D = box(brann,Vector3(side*0.13,1.68,0.26),Vector3(0.16,0.045,0.045),dark_beard)
-		brow.rotation.z = side*-0.09
-		ball(brann,Vector3(side*0.075,1.42,0.315),Vector3(0.22,0.1,0.095),beard)
-	cylinder(brann,Vector3(0,1.825,-0.01),0.28,0.14,teal,0.21)
-	cylinder(brann,Vector3(0,1.77,0),0.31,0.055,timber)
-	preload("res://workshop_details.gd").brann(brann)
-	# Local shoulder pivot enables convincing work animation in main.gd.
-	var speech_head=Node3D.new()
-	speech_head.position=Vector3(0,1.48,0)
-	brann.add_child(speech_head)
-	var speech_beard=Node3D.new()
-	speech_head.add_child(speech_beard)
-	for part in brann.get_children():
-		if part is MeshInstance3D and part.position.y>1.23:
-			part.reparent(speech_beard if part.get_meta("beard",false) else speech_head)
-	brann.set_meta("speech_head",speech_head)
-	brann.set_meta("speech_beard",speech_beard)
-	var presence_rune=ball(brann,Vector3(0,1.12,0.34),Vector3(0.075,0.09,0.035),material("74837c"))
-	brann.set_meta("presence_rune",presence_rune)
-	brann.set_meta("presence_label",label(brann,"",Vector3(0,1.01,0.38),16))
-	var arm: Node3D = Node3D.new()
-	arm.position = Vector3(-0.43,1.12,0)
-	brann.add_child(arm)
-	preload("res://workshop_details.gd").arm(arm,shirt,skin)
+	brann.set_meta("kind", "brann")
+	brann.set_meta("surface_material", "flesh")
+	var head := brann.find_child("HeadPivot", true, false) as Node3D
+	var beard := brann.find_child("BeardPivot", true, false) as Node3D
+	var arm := brann.find_child("StrikePivot", true, false) as Node3D
+	if arm.get_parent() != brann: arm.reparent(brann)
+	var speech_driver := Node3D.new()
+	beard.get_parent().add_child(speech_driver)
+	beard.reparent(speech_driver)
+	brann.set_meta("speech_head", head)
+	brann.set_meta("speech_beard", speech_driver)
+	brann.set_meta("rest_arm", brann.find_child("RestPivot", true, false))
+	var eyes: Array[Node3D] = []
+	for eye_name in ["EyeL", "EyeR"]:
+		var eye := head.find_child(eye_name, true, false) as Node3D
+		if eye != null: eyes.append(eye)
+	brann.set_meta("eyes", eyes)
+	var presence_anchor := brann.find_child("PresenceAnchor", true, false) as Node3D
+	presence_anchor.position = Vector3(0,1.12,0.36)
+	var rune := brann.find_child("PresenceIndicator", true, false) as MeshInstance3D
+	var glow := (rune.mesh.surface_get_material(0) as StandardMaterial3D).duplicate() as StandardMaterial3D
+	rune.set_surface_override_material(0, glow)
+	brann.set_meta("presence_rune", rune)
+	brann.set_meta("presence_glow", glow)
+	brann.set_meta("presence_label", label(brann,"",Vector3(0,0.96,0.43),16))
 	var smith_hammer: Node3D = make_hammer(wood,iron,brass)
 	smith_hammer.position = Vector3(0,-0.45,0.16)
 	smith_hammer.rotation.x = PI/2.0
@@ -213,22 +166,21 @@ static func build(root: Node3D) -> Dictionary:
 	smith_hammer.position-=smith_hammer.basis*Vector3(0,0.13,0)
 	arm.add_child(smith_hammer)
 	brann.set_meta("smith_hammer",smith_hammer)
-	var resting_arm=Node3D.new()
-	brann.add_child(resting_arm)
-	resting_arm.position=Vector3(0.44,1.12,0)
-	preload("res://workshop_details.gd").arm(resting_arm,shirt,skin)
 	collision(brann,Vector3(0,0.9,0),Vector3(0.95,1.8,0.65),"flesh")
-	label(brann,"BRANN · TALK",Vector3(0,2.2,0),31)
-	var question: Label3D = label(brann,"?",Vector3(0,2.65,0),110,Color("ffdc45"))
+	var smith_name := label(brann,"Brann Copperpot",Vector3(0,2.10,0),23)
+	smith_name.pixel_size = 0.0038
+	smith_name.visibility_range_begin = 2.5
+	smith_name.visibility_range_end = 7.5
+	var question: Label3D = label(brann,"Reward ready",Vector3(0,2.25,0),18,Color("ffce79"))
+	question.pixel_size = 0.0034
+	question.visibility_range_end = 8.5
 	question.visible = false
 	var rack: Node3D = Node3D.new()
 	rack.position = preload("res://smithy_layout.gd").STARTER_BENCH + Vector3.UP
 	rack.name = "FinishedWeaponRack"
 	root.add_child(rack)
-	box(rack,Vector3(0,-0.06,0),Vector3(1.4,0.12,0.9),oak)
+	SmithyArt.place(rack, "smithy/bench", Vector3(0,-1,0), Vector3(0.85,1.0,1.0))
 	collision(rack,Vector3(0,-0.06,0),Vector3(1.4,0.12,0.9),"wood")
-	for side in [-1,1]:
-		box(rack,Vector3(side*0.55,-0.52,0),Vector3(0.1,0.92,0.66),wood)
 	var hammer: Node3D = make_hammer(wood,iron,brass)
 	hammer.position = rack.position + Vector3.UP * 0.02
 	hammer.set_meta("kind","weapon")
@@ -242,8 +194,7 @@ static func build(root: Node3D) -> Dictionary:
 	board.name = "CommissionLedger"
 	board.position = Vector3(1.9,1.83,-5.38)
 	root.add_child(board)
-	box(board,Vector3.ZERO,Vector3(2.12,2.32,0.12),wood)
-	box(board,Vector3(0,0,0.07),Vector3(1.99,2.19,0.03),material("293a38"))
+	SmithyArt.place(board, "fixtures/furniture_plaque", Vector3(0,0,0.025), Vector3(2.12,2.32,1.25))
 	label(board,"BRANN’S LEDGER",Vector3(0,0.91,0.10),31).pixel_size = 0.0032
 	var bounty_label := label(board,"",Vector3(0,0.42,0.10),23)
 	bounty_label.pixel_size = 0.00285
@@ -262,13 +213,12 @@ static func build(root: Node3D) -> Dictionary:
 		button.set_meta("hint_position",board.global_position + Vector3(0,1.25,0.22))
 		button.set_meta("kind","button")
 		button.set_meta("surface_material","wood")
-		box(button,Vector3.ZERO,Vector3(0.88,0.23,0.10),teal if i < 2 else wood)
+		button_face(button,Vector3(0.88,0.23,0.10))
 		label(button,captions[i],Vector3(0,0,0.058),18).pixel_size = 0.0028
 		collision(button,Vector3.ZERO,Vector3(0.88,0.23,0.11))
 		buttons.append(button)
 	# Physical commissioning controls are accessible by a controller ray in VR.
-	box(root,Vector3(-6.9,1.9,-4.55),Vector3(3.4,2.7,0.18),wood)
-	box(root,Vector3(-6.9,1.9,-4.44),Vector3(3.2,2.5,0.04),material("29473e"))
+	SmithyArt.place(root, "fixtures/furniture_plaque", Vector3(-6.9,1.9,-4.51), Vector3(3.4,2.7,1.7))
 	label(root,"TOOLS · POINT + TRIGGER",Vector3(-6.9,3.0,-4.39),27)
 	var tool_ids := ["apprentice_hammer","woodland_axe","quarry_pick","bomb_glove","grappling_hook","spore_lantern","crystal_resonator","ember_gauntlet"]
 	var tool_names := ["COPPERPOT'S PROMISE","ORCHARD'S EDGE","STONEWHISPER","POCKET THUNDER","SWALLOWLINE","MOONCAP LANTERN","HOLLOW'S SONG","THE LAST HEARTH"]
@@ -280,7 +230,7 @@ static func build(root: Node3D) -> Dictionary:
 		button.set_meta("action","tool:"+tool_ids[i])
 		button.set_meta("hint_position",Vector3(-6.9,0.25,-4.02))
 		root.add_child(button)
-		box(button,Vector3.ZERO,Vector3(1.54,0.38,0.16),teal)
+		button_face(button,Vector3(1.54,0.38,0.16))
 		label(button,tool_names[i],Vector3(0,0.055,0.10),19)
 		button.set_meta("availability_label",label(button,"",Vector3(0,-0.095,0.105),15,Color("ddbb74")))
 		collision(button,Vector3.ZERO,Vector3(1.56,0.40,0.19))
@@ -292,7 +242,7 @@ static func build(root: Node3D) -> Dictionary:
 	upgrade.set_meta("action","upgrade")
 	upgrade.set_meta("hint_position",Vector3(-6.9,0.25,-4.02))
 	root.add_child(upgrade)
-	box(upgrade,Vector3.ZERO,Vector3(3.16,0.30,0.18),wood)
+	button_face(upgrade,Vector3(3.16,0.30,0.18))
 	label(upgrade,"KINDLE THE NEXT FORGE TIER",Vector3(0,0,0.11),22)
 	collision(upgrade,Vector3.ZERO,Vector3(3.2,0.32,0.21))
 	buttons.append(upgrade)
@@ -310,14 +260,7 @@ static func build(root: Node3D) -> Dictionary:
 		dummy.position = Vector3(x,0,2.2)
 		dummy.set_meta("kind","dummy")
 		root.add_child(dummy)
-		cylinder(dummy,Vector3(0,0.1,0),0.48,0.2,wood)
-		cylinder(dummy,Vector3(0,0.86,0),0.09,1.65,wood)
-		ball(dummy,Vector3(0,1.32,0),Vector3(0.66,0.77,0.47),material("b39657"))
-		ball(dummy,Vector3(0,1.92,0),Vector3(0.38,0.4,0.35),material("c9b177"))
-		box(dummy,Vector3(0,1.55,0),Vector3(1.15,0.13,0.13),wood)
-		ball(dummy,Vector3(0,1.37,0.225),Vector3(0.3,0.3,0.025),material("a14c38"))
-		ball(dummy,Vector3(0,1.37,0.25),Vector3(0.14,0.14,0.02),cream)
-		detail_dummy(dummy,wood,cream)
+		SmithyArt.place(dummy, "smithy/dummy")
 		collision(dummy,Vector3(0,1.2,0),Vector3(1.15,1.8,0.6),"wood")
 		label(dummy,"TEST YOUR CRAFT",Vector3(0,2.4,0),25)
 		dummies.append(dummy)
@@ -325,10 +268,8 @@ static func build(root: Node3D) -> Dictionary:
 	result.merge(adventure)
 	return result
 
-static func make_hammer(wood: Material, iron: Material, brass: Material) -> Node3D:
-	var node: Node3D = Node3D.new()
-	preload("res://workshop_details.gd").hammer(node,0.48)
-	return node
+static func make_hammer(_wood: Material, _iron: Material, _brass: Material) -> Node3D:
+	return (load("res://assets/smithy/brann/hammer.glb") as PackedScene).instantiate() as Node3D
 
 static func make_rat(index: int) -> Node3D:
 	var node: Node3D = Node3D.new()

@@ -53,7 +53,10 @@ def apply_collision_intent(manifest):
         for name, shapes in SOLIDS.items() if name in used
     }
     for placement in manifest["placements"]:
-        if placement["asset"] in SOLIDS:
+        # The three distant observatory cliffs are scenery beyond the 28 m zone.
+        # Their proxies otherwise reach into the neighbouring Bellworks court.
+        skyline = placement["asset"] == "cliff_c" and placement["position"][2] < -30
+        if placement["asset"] in SOLIDS and not skyline:
             placement["collision"] = "asset_default"
         else:
             placement.pop("collision", None)

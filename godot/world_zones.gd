@@ -406,6 +406,7 @@ static func build(root: Node3D) -> Dictionary:
 		elif spec[0] not in ["sky_garden","crystal_hollow","ember_foundry","cloudbreak_keep","orchard_highlands"]:
 			floor_patch(p,Vector3.ZERO,Vector2(extent*2.0,extent*2.0),spec[4])
 	data.zones.forge_yard.spawn = Smithy.SPAWN
+	data.zones.forge_yard.environment = {"ambient_color":"c7d4dd","ambient_energy":0.75,"sun_color":"ffedd1","sun_energy":1.25,"sky_top":"6194df","sky_horizon":"c7d6e5","fog_color":"bfd0d9","fog_density":0.0}
 	data.zones.crystal_hollow.environment = {"ambient_color":"738bbf","ambient_energy":0.32,"sun_color":"b3cdf7","sun_energy":0.05,"sky_top":"202a46","sky_horizon":"303d59","fog_color":"35486a","fog_density":0.012}
 	data.zones.ember_foundry.environment = {"ambient_color":"a77678","ambient_energy":0.38,"sun_color":"ffad6b","sun_energy":0.70,"sky_top":"704869","sky_horizon":"d58a67","fog_color":"8e5e70","fog_density":0.006}
 	data.zones.enchanted_kitchen.environment = {"ambient_color":"ddd2b9","ambient_energy":0.32,"sun_color":"ffe2ad","sun_energy":0.95,"sky_top":"438dd5","sky_horizon":"82b8e2","fog_color":"c5ba9e","fog_density":0.001}
@@ -506,15 +507,20 @@ static func _register_decorative_timber(data: Dictionary, zone: String) -> void:
 static func forge(p: Node3D) -> void:
 	# The authored shell keeps Brann, the boards and all upgrade anchors where
 	# they are.  Only broad architectural members receive simple collision.
-	ForgeMaterials.dress(box(p,Vector3(0,-0.01,-3.8),Vector3(17,0.08,7.8),"bca47e"),"stone","c5b8a1")
-	for asset in ["res://assets/forge-yard/forge_shelter.glb","res://assets/forge-yard/forge_detail_kit.glb"]:
-		var scene: PackedScene = load(asset)
-		if scene == null:
-			push_error("FORGE_ARCHITECTURE missing="+asset)
-			continue
-		var architecture := scene.instantiate()
-		architecture.name = "Authored_"+asset.get_file().get_basename()
-		p.add_child(architecture)
+	var working_floor := box(p,Vector3(0,-0.01,-3.8),Vector3(17,0.08,7.8),"bca47e")
+	var floor_finish := StandardMaterial3D.new()
+	floor_finish.albedo_texture = preload("res://assets/smithy/fixtures/ground_path_color.png")
+	floor_finish.normal_enabled = true
+	floor_finish.normal_texture = preload("res://assets/smithy/fixtures/ground_path_normal.png")
+	floor_finish.roughness_texture = preload("res://assets/smithy/fixtures/ground_path_roughness.png")
+	floor_finish.uv1_triplanar = true
+	floor_finish.uv1_world_triplanar = true
+	floor_finish.uv1_scale = Vector3.ONE * 0.55
+	working_floor.material_override = floor_finish
+	var smithy = preload("res://smithy_art.gd")
+	smithy.place(p, "grounds/main_hall")
+	smithy.place(p, "fixtures/armory_lamp", Vector3(1.9,4.0,-4.72))
+	glow_light(p, Vector3(1.9,3.4,-4.72),"ffbe78",0.42,2.5)
 	for x in [-8.3,-4.6,4.6,8.3]:
 		for z in [-7.35,-0.45]: body(p,Vector3(x,2.0,z),Vector3(0.45,4.0,0.45),"solid")
 	for x in [-8.3,8.3]: body(p,Vector3(x,2.0,-3.9),Vector3(0.45,4.0,0.45),"solid")
@@ -523,8 +529,7 @@ static func forge(p: Node3D) -> void:
 	for x in [-1.3,1.3]: body(p,Vector3(x,1.3,2.7),Vector3(0.34,2.6,0.36),"solid")
 	# A real rear doorway lets the final foundry connect to the original forge.
 	var gate=Node3D.new(); p.add_child(gate); gate.name="FoundryGate"; gate.add_to_group("foundry_gate")
-	ForgeMaterials.dress(box(gate,Vector3(0,1.4,-7.6),Vector3(2.9,2.8,0.16),"73553c"),"timber","8c6e55")
-	for y in [0.6,2.2]: box(gate,Vector3(0,y,-7.48),Vector3(2.95,0.13,0.10),"b49b67")
+	smithy.place(gate, "fixtures/foundry_door", Vector3(0,0,-7.6))
 	body(gate,Vector3(0,1.4,-7.6),Vector3(2.9,2.8,0.2),"solid","wood")
 	label(gate,"THE HEARTH BEYOND\nAwakens with the Everburning Forge",Vector3(0,3.16,-7.35),17)
 	var smoke=preload("res://forge_atmosphere.gd").new()
@@ -533,18 +538,33 @@ static func forge(p: Node3D) -> void:
 	smoke.position=Vector3(-3.1,7.99,-4.9)
 	# The authored lantern meshes provide the silhouettes; two cheap lights give
 	# the front posts a warm pool without doubling the geometry.
-	for x in [-8.3,8.3]: glow_light(p,Vector3(x,3.0,-0.45),"ffd08b",0.4,3.2)
-	glow_light(p,Vector3(-3.1,1.6,-3.9),"ff9a43",1.8,7.0)
-	# Low garden walls, apple trees, winding flagstone approaches.
+	for x in [-8.3,-4.6,4.6,8.3]: glow_light(p,Vector3(x,2.65,-0.45),"ffbc72",0.55,3.0)
+	# The furnace companion owns the hearth light and its ember field.
+	# Garden masonry shares one batch across the two boundaries.
+	var wall_poses: Array[Transform3D] = []
 	for side in [-1,1]:
 		for j in range(7):
 			# The east wall opens onto the armory and its level cross-aisle.
 			var wall_x := -14.0 if side < 0 else 34.4
-			box(p,Vector3(wall_x,0.6,-11+j*3),Vector3(0.65,1.2,2.85),"a2a38c")
+			wall_poses.append(Transform3D(Basis(Vector3.UP,PI if side > 0 else 0.0),Vector3(wall_x,0,-11+j*3)))
+			body(p,Vector3(wall_x,0.56,-11+j*3),Vector3(0.56,1.12,2.96),"solid","stone")
 		for j in range(3):
 			if j!=1 and (side < 0 or j == 0): tree(p,Vector3(side*(11.0+j%2),0,-9+j*6),4.5+j*0.5,false,j==2) # Keep the future workshop wings clear.
 		flowers(p,Vector3(side*12,0,-10),35,1.8)
-	path(p,Vector3(0,0,8),Vector3(0,0,0))
+	smithy.repeat_model(p, "grounds/garden_wall", wall_poses)
+	var borders: Array[Transform3D] = []
+	for position in [Vector3(-12,0,-9),Vector3(-13,0,-6),Vector3(-12.3,0,4.8),Vector3(12.4,0,-9.2),Vector3(32.5,0,11.7),Vector3(30.6,0,-6.7),Vector3(-9.2,0,13.3),Vector3(8.8,0,13.5)]:
+		borders.append(Transform3D(Basis(Vector3.UP,position.x),position))
+	smithy.repeat_model(p, "landscape/meadow_edge", borders)
+	smithy.paved_court(p)
+	smithy.place(p, "grounds/medallion", Vector3(0,0.045,4))
+	var sign := smithy.place(p, "grounds/signpost", Vector3(7.05,0,2.6)) as Node3D
+	sign.rotation.y = -0.6
+	var writing := label(sign,"ARMORY  →",Vector3(0.40,1.33,0.037),18)
+	writing.pixel_size = 0.0027
+	writing.visibility_range_end = 8.0
+	smithy.place(p, "grounds/yard_dressing", Vector3(-9.4,0,3.6))
+
 	# The seven authored gates carry their own destination names; a second
 	# floating waystone caption here overlapped them from the garden path.
 

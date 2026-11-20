@@ -7,7 +7,8 @@ var last_scan=0.0
 
 func register_button(target:Node3D):
 	if entries.has(target.get_instance_id()): return
-	for child in target.get_children():
+	var faces := [target.get_meta("button_face")] if target.has_meta("button_face") else target.get_children()
+	for child in faces:
 		if child is MeshInstance3D and child.material_override is StandardMaterial3D:
 			var material=child.material_override.duplicate()
 			child.material_override=material

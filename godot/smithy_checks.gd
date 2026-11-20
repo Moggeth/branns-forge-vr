@@ -95,7 +95,8 @@ func _run() -> void:
 	check(last.is_visible_in_tree() and first.is_visible_in_tree(), "Changing folios must preserve a held weapon and expose the selected rack")
 	check(first in game.held.values() and not collection.return_item(first.get_meta("id")), "Returning a weapon cannot steal it from a hand")
 	var home = collection.homes[last.get_meta("id")]
-	var canvas_ray := PhysicsRayQueryParameters3D.create(home.stand.to_global(Vector3(0,0.46,1.0)),home.stand.to_global(Vector3(0,0.46,0.4)),1)
+	var control: Node3D = home.recall
+	var canvas_ray := PhysicsRayQueryParameters3D.create(control.to_global(Vector3(0,0,0.75)),control.global_position,1)
 	var hit := game.get_world_3d().direct_space_state.intersect_ray(canvas_ray)
 	check(not hit.is_empty() and game._owner(hit.collider).get_meta("action","") == "collection:"+str(home.id), "An active stand's return control owns the ray over stored folios")
 	game.held.erase(str(hand.get_instance_id()))
@@ -107,6 +108,13 @@ func _run() -> void:
 	for i in 3: await physics_frame
 	check(first.is_visible_in_tree() and first.global_position.distance_to(address + Vector3.UP*0.98)<0.02, "Restoring a folio preserves pose and address")
 	check(collection.homes.starter_hammer.item.is_visible_in_tree(), "The first hammer remains at Brann's bench")
+	game._speech_tick(0.016)
+	game.presence.next_blink = 0.01
+	game.presence.tick(0.08)
+	var eyelid := game.scene.brann.find_child("LidL",true,false) as Node3D
+	check(eyelid.rotation.x > 1.0, "Brann closes his sculpted lids during a blink")
+	game.presence.tick(0.10)
+	check(absf(eyelid.rotation.x) < 0.002, "Brann opens his eyes fully after the blink")
 	game.workshop_delivery.working_pose(0.0)
 	var hammer: Node3D = game.scene.brann.get_meta("smith_hammer")
 	check(hammer.to_global(game.workshop_delivery.HAMMER_FACE).distance_to(game.workshop_delivery.CONTACT) < 0.005, "Brann's hammer face must meet the billet")
@@ -120,5 +128,17 @@ func _run() -> void:
 	await game.workshop_delivery.present(first, "smithy-fixture-delivery")
 	check(game.workshop_delivery.strike_count >= before + 3 and collection.is_docked(first), "A commission strikes three times and reaches its assigned stand")
 	check(first.get_meta("delivery_ready") and first.is_in_group("pickup"), "A completed delivery can be picked up again")
+	game.workshop._apply_tier(4)
+	for i in 3: await physics_frame
+	walk_segment(Vector3(-1.65,0,-1.3),Vector3(-1.65,0,-5.55),"west hearth aisle")
+	walk_segment(Vector3(-1.65,0,-5.55),Vector3(0,0,-6.85),"foundry doorway approach")
+	walk_segment(Vector3(0,0,-6.85),Vector3(0,0,-9.25),"through the unlocked foundry door")
+	for gate in game.adventure.zone_groups.forge_yard.get_children():
+		if not gate.get_meta("action","") in ["museum:enter","playful_encounter:enter"]: continue
+		walk_segment(gate.to_global(Vector3(0,0,0.6)),gate.to_global(Vector3(0,0,-0.6)),str(gate.get_meta("action")))
+		var ray := PhysicsRayQueryParameters3D.create(gate.to_global(Vector3(0,1.15,0.9)),gate.to_global(Vector3(0,1.15,-0.2)),1)
+		ray.collide_with_areas = true
+		var pocket_hit := game.get_world_3d().direct_space_state.intersect_ray(ray)
+		check(not pocket_hit.is_empty() and game._owner(pocket_hit.collider) == gate, "Pocket doorway responds to the travel ray")
 	print("SMITHY_RESULT ", JSON.stringify({"homes":collection.homes.size(),"bays":collection.bays.size(),"stand_capacity":Layout.SLOTS_PER_FOLIO,"route_probes":route_probes,"failures":failures}))
 	quit(0 if failures.is_empty() else 1)

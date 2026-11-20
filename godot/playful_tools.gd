@@ -44,15 +44,14 @@ func setup(owner_game):
 	stand=Node3D.new(); stand.name="SunskipperStand"
 	game.adventure.zone_groups.forge_yard.add_child(stand)
 	stand.global_position=HOME-Vector3.UP*1.15
-	WorldZones.cyl(stand,Vector3(0,.5,0),.28,1.0,"556864")
-	WorldZones.cyl(stand,Vector3(0,1.04,0),.44,.12,"b28b50")
-	WorldZones.cyl(stand,Vector3(0,.05,0),.45,.1,"334d48")
-	var body=WorldZones.body(stand,Vector3(0,.53,0),Vector3(.58,1.06,.58),"playful_ring_stand")
+	preload("res://smithy_art.gd").place(stand,"smithy/cradle",Vector3.ZERO,Vector3(0.69,1.04,0.90))
+	var body=WorldZones.body(stand,Vector3(0,.46,0),Vector3(1.02,.92,.66),"playful_ring_stand")
 	body.set_meta("playful_ring_stand",true)
-	title=WorldZones.label(stand,"SUNSKIPPER",Vector3(0,1.8,0),30,"fff0a2")
-	title.billboard=BaseMaterial3D.BILLBOARD_ENABLED
-	var controls=WorldZones.label(stand,"Grip / E: take or throw\nTrigger / click: toss power\nBank your wrist: curve\nEmpty-hand trigger: elastic recall",Vector3(0,1.51,0),17,"baf1e2")
-	controls.billboard=BaseMaterial3D.BILLBOARD_ENABLED
+	title=WorkshopScene.label(stand,"SUNSKIPPER",Vector3(0,.83,.351),20)
+	title.pixel_size = .0026
+	var controls := WorkshopScene.label(stand,"Grip to take · release to throw\nTrigger for power or recall" if game.vr else "E to take or drop · X to throw\nClick for power or recall",Vector3(0,.58,.36),15)
+	controls.pixel_size = .0020
+	preload("res://smithy_layout.gd").set_label_ranges(stand)
 	court_stand=Node3D.new(); court_stand.name="SunskipperCourtStand"; game.add_child(court_stand)
 	court_stand.global_position=COURT_HOME-Vector3.UP*1.15
 	WorldZones.cyl(court_stand,Vector3(0,.5,0),.28,1.0,"556864")
@@ -86,7 +85,7 @@ func setup(owner_game):
 	_home()
 	var feedback=game.get("playful_feedback")
 	if feedback!=null:
-		feedback.register_hint("sunskipper",stand,"SUNSKIPPER","E: take / throw | Click: power / recall","Grip: take / throw | Trigger: power / recall",Vector3(0,2.15,0))
+		feedback.register_hint("sunskipper",stand,"SUNSKIPPER","E: take / drop · X: throw · Click: power / recall","Grip: take / throw | Trigger: power / recall",Vector3(0,1.48,0),2.6)
 	print("PLAYFUL_TOOLS ready home=",HOME," mode=",MODES[mode])
 
 func _tone(pitch:float)->AudioStreamWAV:

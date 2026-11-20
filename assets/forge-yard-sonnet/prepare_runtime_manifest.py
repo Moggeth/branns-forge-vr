@@ -19,7 +19,8 @@ COLLISION = {
 def build() -> dict:
     source = json.loads((SOURCE / "placement_forge_yard.json").read_text(encoding="utf-8"))
     assert source["schema"] == 1 and source["zone"] == "forge_yard"
-    assets = {entry["id"]: entry["file"] for entry in source["assets"]}
+    used = {entry["asset"] for entry in source["placements"]}
+    assets = {entry["id"]: entry["file"] for entry in source["assets"] if entry["id"] in used}
     placements = []
     for entry in source["placements"]:
         asset = entry["asset"]
@@ -36,7 +37,7 @@ def build() -> dict:
             "collision": "asset_default" if asset in SOLIDS else "none",
         }
         placements.append(placement)
-    assert len(placements) == 34 and len(assets) == 7
+    assert set(assets) == {"garden_bed_a", "garden_planter_b", "path_edge_stones", "cordwood_ore_rack"}
     return {
         "schema": 1,
         "zone": "forge_yard",

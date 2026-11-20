@@ -31,16 +31,29 @@ func _bake() -> void:
 	var output := ProjectSettings.globalize_path("res://portal_kit/views")
 	DirAccess.make_dir_recursive_absolute(output)
 	var failures: Array[String] = []
-	for id in preload("res://portal_kit/portal_kit.gd").ZONES:
-		await game.adventure.travel(id)
-		var zone: Dictionary = game.scene.zones[id]
-		camera.global_position = zone.capture_position
-		camera.look_at(zone.capture_target, Vector3.UP)
+	var zones: Dictionary = preload("res://portal_kit/portal_kit.gd").ZONES
+	var viewpoints := {"museum":[Vector3(-119.1,1.65,0.6),Vector3(-120,1.3,13.5)],
+		"bellworks":[Vector3(122.6,1.8,70.9),Vector3(120,1.5,62.0)]}
+	var destinations := zones.keys() + viewpoints.keys()
+	for argument in OS.get_cmdline_user_args():
+		if argument.begins_with("--views="): destinations = Array(argument.trim_prefix("--views=").split(","))
+	for id in destinations:
+		await game.adventure.travel("forge_yard" if viewpoints.has(id) else id)
+		var zone: Dictionary = game.scene.zones[game.adventure.zone]
+		if viewpoints.has(id):
+			camera.global_position = viewpoints[id][0]
+			camera.look_at(viewpoints[id][1],Vector3.UP)
+		elif id == "sandstone_quarry":
+			camera.global_position = zone.center + Vector3(3.1,3.3,6.8)
+			camera.look_at(zone.center + Vector3(-3,1.8,-6),Vector3.UP)
+		else:
+			camera.global_position = zone.capture_position
+			camera.look_at(zone.capture_target,Vector3.UP)
 		game.camera.global_transform = camera.global_transform
 		for i in 6: await process_frame
 		await RenderingServer.frame_post_draw
 		var shot := view.get_texture().get_image()
 		shot.convert(Image.FORMAT_RGB8)
 		if shot.save_webp(output.path_join(id + ".webp"), true, 0.89) != OK: failures.append(id)
-	print("PORTAL_VIEWS_BAKED ", JSON.stringify({"destinations":12,"failures":failures}))
+	print("PORTAL_VIEWS_BAKED ", JSON.stringify({"destinations":destinations.size(),"failures":failures}))
 	quit(0 if failures.is_empty() else 1)

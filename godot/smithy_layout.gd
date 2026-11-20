@@ -37,6 +37,7 @@ static func stand_yaw(index: int) -> float:
 	return 0.0 if posmod(index, SLOTS_PER_BAY) < 3 else PI
 
 static func clear_dressing(point: Vector3) -> bool:
+	if absf(absf(point.x) - 11.0) < 2.2 and absf(point.z - 1.0) < 2.15: return true
 	if point.z >= 3.0 and point.z < 14.6 and absf(point.x) <= 12.6: return true
 	if point.x > 2.5 and point.z > 1.0 and point.z < 6.8: return true
 	for i in DESTINATIONS.size():
@@ -50,5 +51,5 @@ static func set_label_ranges(branch: Node3D) -> void:
 		var at := label.global_position
 		if not YARD_BOUNDS.has_point(Vector2(at.x,at.z)) or label.visibility_range_end > 0: continue
 		var letter_height := label.pixel_size * label.font_size
-		label.visibility_range_end = clampf(letter_height * 72.0, 3.4, 13.0)
+		label.visibility_range_end = clampf(letter_height * 105.0, 5.5, 18.0) if label.font_size < 26 else 16.0
 		label.visibility_range_end_margin = 0.6

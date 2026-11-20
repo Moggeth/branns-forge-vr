@@ -60,18 +60,11 @@ func _panel(pos:Vector3)->Node3D:
 	return panel
 
 func _gate(parent,pos,action,title,hint)->Node3D:
-	var gate=Node3D.new(); parent.add_child(gate); gate.position=pos
-	gate.set_meta("kind","button"); gate.set_meta("action","museum:"+action)
-	for side in [-1,1]:
-		WorldZones.box(gate,Vector3(side*.82,1.25,0),Vector3(.22,2.5,.3),"596f6a")
-		WorldZones.box(gate,Vector3(side*.82,2.4,0),Vector3(.34,.14,.4),"c7a76b")
-	WorldZones.box(gate,Vector3(0,2.58,0),Vector3(1.9,.22,.3),"596f6a")
-	var glass=WorldZones.box(gate,Vector3(0,1.3,0),Vector3(1.45,2.3,.055),"538b84",.25)
-	glass.material_override=glass.material_override.duplicate()
-	glass.material_override.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA; glass.material_override.albedo_color.a=.35
-	WorkshopScene.collision(gate,Vector3(0,1.25,0),Vector3(1.65,2.5,.13))
-	_text(gate,title,Vector3(0,2.1,.18),25,700)
-	_text(gate,hint,Vector3(0,.85,.18),19,600)
+	var gate := preload("res://smithy_art.gd").doorway(parent, "grounds/museum_gate", pos, "museum:"+action)
+	var title_plate = _text(gate,title,Vector3(0,3.17,0.12),25,700)
+	title_plate.visibility_range_end = 14.0
+	var controls = _text(gate,hint,Vector3(0,2.26,0.16),19,600)
+	controls.visibility_range_end = 3.5
 	return gate
 
 func _build_hall():

@@ -1,6 +1,7 @@
 extends Node
 ## Physical armory. Saved IDs keep their insertion order across deliveries and sessions.
 ## Folios share one walkable footprint. Held, belted and dropped equipment lives outside the racks.
+const Art = preload("res://smithy_art.gd")
 const Layout = preload("res://smithy_layout.gd")
 const SAVE="user://collection_homes.json"
 var game
@@ -36,7 +37,7 @@ func build_directory() -> void:
 	directory.name = "ArmoryDirectory"
 	directory.position = Layout.ARMORY_ENTRY + Vector3(-1.9, 0, 1.95)
 	directory.rotation.y = -PI / 2
-	var backing := WorkshopScene.box(directory, Vector3(0, 1.52, 0), Vector3(1.82, 0.94, 0.16), WorkshopScene.material("3b4744"))
+	var backing := Art.place(directory, "fixtures/furniture_plaque", Vector3(0,1.52,0), Vector3(1.82,0.94,1.0))
 	backing.name = "LedgerBoard"
 	WorkshopScene.collision(directory, backing.position, Vector3(1.82, 0.94, 0.16), "wood")
 	var title := WorkshopScene.label(directory, "THE ARMORY", Vector3(0,1.80,0.10), 35)
@@ -49,7 +50,7 @@ func build_directory() -> void:
 		button.position = Vector3(direction * 0.43, 1.24, 0.12)
 		button.set_meta("kind", "button")
 		button.set_meta("action", "armory:previous" if direction < 0 else "armory:next")
-		WorkshopScene.box(button, Vector3.ZERO, Vector3(0.76,0.20,0.075), WorkshopScene.material("6b5041"))
+		WorkshopScene.button_face(button, Vector3(0.76,0.20,0.075))
 		var caption := WorkshopScene.label(button, "‹ PREVIOUS" if direction < 0 else "NEXT ›", Vector3(0,0,0.05), 18)
 		caption.pixel_size = 0.0026
 		WorkshopScene.collision(button, Vector3.ZERO, Vector3(0.76,0.20,0.08))
@@ -63,6 +64,23 @@ func ensure_bay(index: int) -> void:
 	root.add_child(bay)
 	bay.position = Layout.bay_center(index)
 	bays[index] = bay
+	Art.place(bay, "smithy/hall_bay")
+	WorkshopScene.light(bay, Vector3(0,3.28,0), Color("ffbd78"), 0.62, 3.5)
+	# Corner posts flank the cross-aisles. The case and its collision are shared by every folio.
+	for x in [-2.84,2.84]:
+		for z in [-2.84,2.84]:
+			WorkshopScene.collision(bay, Vector3(x,1.45,z), Vector3(0.24,2.9,0.24), "wood")
+	var stones: Array[Transform3D] = []
+	for x in [-2,0,2]:
+		for z in [-2,0,2]: stones.append(Transform3D(Basis.IDENTITY, Vector3(x,0.009,z)))
+	Art.repeat_model(bay, "smithy/court_tile", stones)
+	var cradles: Array[Transform3D] = []
+	for slot in Layout.SLOTS_PER_BAY:
+		var address := index * Layout.SLOTS_PER_BAY + slot
+		var offset := Layout.stand_position(address) - bay.position
+		cradles.append(Transform3D(Basis(Vector3.UP,Layout.stand_yaw(address)),offset))
+		WorkshopScene.collision(bay, offset+Vector3.UP*0.44, Vector3(1.48,0.88,0.72),"wood")
+	Art.repeat_model(bay, "smithy/cradle", cradles)
 
 func folio_group(page: int) -> Node3D:
 	if folios.has(page): return folios[page]
@@ -130,27 +148,20 @@ func ensure_home(id:String,title:String)->Dictionary:
 		stand.position = slot_position(index)
 		stand.rotation.y = Layout.stand_yaw(index)
 		ensure_bay(floori(float(posmod(index, Layout.SLOTS_PER_FOLIO)) / Layout.SLOTS_PER_BAY))
-	var wood=WorkshopScene.material("76553b")
-	var slate=WorkshopScene.material("334c48")
-	if not starter:
-		WorkshopScene.cylinder(stand,Vector3(0,0.39,0),0.30,0.78,wood,0.38)
-		preload("res://workshop_details.gd").clipped_box(stand,Vector3(0,0.82,0),Vector3(1.35,0.10,0.85),slate)
-		WorkshopScene.collision(stand,Vector3(0,0.42,0),Vector3(1.35,0.84,0.85),"wood")
-		for x in [-0.22,0.22]:
-			WorkshopScene.box(stand,Vector3(x,0.92,0),Vector3(0.06,0.10,0.3),WorkshopScene.material("b08c52",0.5))
-	WorkshopScene.box(stand,Vector3(0,0.72,0.46),Vector3(1.30,0.25,0.035),slate)
-	var label=WorkshopScene.label(stand,title if starter else "%02d · %s" % [index+1,title],Vector3(0,0.77,0.485),20)
+	var face_z := 0.46 if starter else 0.383
+	if starter: Art.place(stand, "fixtures/furniture_plaque", Vector3(0,0.76,face_z-0.004), Vector3(1.2,0.28,0.35))
+	var label=WorkshopScene.label(stand,title if starter else "%02d · %s" % [index+1,title],Vector3(0,0.81,face_z+0.009),20)
 	label.pixel_size=0.002; label.width=610; label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
-	var status=WorkshopScene.label(stand,"Loading…",Vector3(0,0.66,0.488),15); status.pixel_size=0.002
-	var button=Node3D.new(); stand.add_child(button); button.position=Vector3(0,0.46,0.50)
+	var status=WorkshopScene.label(stand,"Loading…",Vector3(0,0.74,face_z+0.010),15); status.pixel_size=0.002
+	var button=Node3D.new(); stand.add_child(button); button.position=Vector3(0,0.49,face_z+0.035)
 	button.set_meta("kind","button"); button.set_meta("action","collection:"+id)
-	WorkshopScene.box(button,Vector3.ZERO,Vector3(0.80,0.16,0.08),WorkshopScene.material("496f62"))
+	WorkshopScene.button_face(button,Vector3(0.80,0.16,0.08))
 	var caption=WorkshopScene.label(button,"RETURN TO STAND",Vector3(0,0,0.046),16); caption.pixel_size=0.002
 	WorkshopScene.collision(button,Vector3.ZERO,Vector3(0.82,0.18,0.09))
 	var instructions=str(preload("res://item_interactions.gd").CONTROLS.get(id,"Grip: take · Trigger: activate invention"))
-	var hint=WorkshopScene.label(stand,instructions,Vector3(0,0.23,0.56),14)
+	var hint=WorkshopScene.label(stand,instructions,Vector3(0,0.30,face_z+0.01),14)
 	hint.pixel_size=0.002; hint.width=620; hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
-	var home={"stand":stand,"item":null,"status":status,"id":id,"page":page,"slot":index,"hint":hint}
+	var home={"stand":stand,"item":null,"status":status,"id":id,"page":page,"slot":index,"hint":hint,"recall":button}
 	homes[id]=home
 	Layout.set_label_ranges(stand)
 	update_directory()
@@ -189,14 +200,7 @@ func glove_display()->Node3D:
 	var item=Node3D.new()
 	item.set_meta("id","bomb_glove"); item.set_meta("kind","weapon")
 	item.set_meta("display_name","Pocket Thunder"); item.add_to_group("pickup")
-	var leather=WorkshopScene.material("537a73")
-	var copper=WorkshopScene.material("c59a5a",0.6)
-	for side in [-1,1]:
-		WorkshopScene.box(item,Vector3(side*0.14,0.16,0),Vector3(0.13,0.18,0.055),leather)
-		WorkshopScene.box(item,Vector3(side*0.14,0.055,0),Vector3(0.15,0.05,0.07),copper)
-		for i in range(4): WorkshopScene.ball(item,Vector3(side*0.14+(i-1.5)*0.032,0.27,0),Vector3(0.029,0.09,0.046),leather)
-		WorkshopScene.ball(item,Vector3(side*0.23,0.16,0),Vector3(0.065,0.10,0.05),leather)
-		WorkshopScene.ball(item,Vector3(side*0.14,0.16,-0.035),Vector3.ONE*0.055,copper)
+	Art.place(item, "fixtures/gloves")
 	WorkshopScene.collision(item,Vector3(0,0.17,0),Vector3(0.53,0.35,0.12))
 	return item
 
