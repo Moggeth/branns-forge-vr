@@ -28,6 +28,8 @@ func _run() -> void:
 	for recipe in game.state.recipes:
 		recipe.available = true
 	game.collection.sync()
+	game.rig.hide()
+	game.player_avatar.hide()
 	var view := SubViewport.new()
 	view.size = Vector2i(1120, 700)
 	view.world_3d = game.get_world_3d()
