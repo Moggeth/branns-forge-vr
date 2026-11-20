@@ -156,7 +156,7 @@
     {
       "asset": "ridge_a",
       "position": [
-        18.495,
+        38.495,
         -0.2,
         13.437
       ],
@@ -171,7 +171,7 @@
     {
       "asset": "ridge_b",
       "position": [
-        22.952,
+        42.952,
         -0.2,
         0.0
       ],
@@ -186,7 +186,7 @@
     {
       "asset": "ridge_a",
       "position": [
-        19.311,
+        39.311,
         -0.2,
         -14.03
       ],
@@ -276,7 +276,7 @@
     {
       "asset": "ridge_far",
       "position": [
-        29.11,
+        49.11,
         -0.5,
         24.426
       ],
@@ -291,7 +291,7 @@
     {
       "asset": "ridge_far",
       "position": [
-        37.423,
+        57.423,
         -0.5,
         -6.599
       ],
@@ -306,7 +306,7 @@
     {
       "asset": "ridge_far",
       "position": [
-        19.0,
+        39.0,
         -0.5,
         -32.909
       ],
@@ -321,7 +321,7 @@
     {
       "asset": "garden_bed_a",
       "position": [
-        -12.4,
+        -12.8,
         0.0,
         3.2
       ],
@@ -338,7 +338,7 @@
       "position": [
         -12.9,
         0.0,
-        -3.5
+        -10.6
       ],
       "yaw_degrees": 0.0,
       "scale": [
@@ -351,9 +351,9 @@
     {
       "asset": "garden_planter_b",
       "position": [
-        -14.2,
+        -14.1,
         0.0,
-        7.2
+        13.3
       ],
       "yaw_degrees": -40.0,
       "scale": [
@@ -366,11 +366,11 @@
     {
       "asset": "garden_bed_a",
       "position": [
-        -5.8,
+        -9.1,
         0.0,
-        -10.6
+        -13.2
       ],
-      "yaw_degrees": 0.0,
+      "yaw_degrees": 90.0,
       "scale": [
         1.0,
         1.0,
@@ -383,7 +383,7 @@
       "position": [
         -9.75,
         0.0,
-        -4.2
+        -9.2
       ],
       "yaw_degrees": -90.0,
       "scale": [
@@ -398,7 +398,7 @@
       "position": [
         -3.05,
         0.0,
-        1.6
+        1.0
       ],
       "yaw_degrees": 90.0,
       "scale": [
@@ -411,11 +411,11 @@
     {
       "asset": "path_edge_stones",
       "position": [
-        -3.05,
+        -7.0,
         0.0,
-        4.6
+        6.3
       ],
-      "yaw_degrees": 90.0,
+      "yaw_degrees": 0.0,
       "scale": [
         1.0,
         1.0,
@@ -428,7 +428,7 @@
       "position": [
         -3.05,
         0.0,
-        7.6
+        7.0
       ],
       "yaw_degrees": 90.0,
       "scale": [
@@ -441,7 +441,7 @@
     {
       "asset": "garden_bed_a",
       "position": [
-        12.4,
+        33.9,
         0.0,
         3.2
       ],
@@ -458,7 +458,7 @@
       "position": [
         12.9,
         0.0,
-        -3.5
+        -10.6
       ],
       "yaw_degrees": 0.0,
       "scale": [
@@ -471,9 +471,9 @@
     {
       "asset": "garden_planter_b",
       "position": [
-        14.2,
+        32.7,
         0.0,
-        7.2
+        13.3
       ],
       "yaw_degrees": 40.0,
       "scale": [
@@ -486,11 +486,11 @@
     {
       "asset": "garden_bed_a",
       "position": [
-        5.8,
+        9.1,
         0.0,
-        -10.6
+        -13.2
       ],
-      "yaw_degrees": 0.0,
+      "yaw_degrees": 90.0,
       "scale": [
         1.0,
         1.0,
@@ -503,7 +503,7 @@
       "position": [
         9.75,
         0.0,
-        -2.6
+        -9.2
       ],
       "yaw_degrees": 90.0,
       "scale": [
@@ -518,7 +518,7 @@
       "position": [
         3.05,
         0.0,
-        1.6
+        1.0
       ],
       "yaw_degrees": 90.0,
       "scale": [
@@ -531,11 +531,11 @@
     {
       "asset": "path_edge_stones",
       "position": [
-        3.05,
+        7.0,
         0.0,
-        4.6
+        6.3
       ],
-      "yaw_degrees": 90.0,
+      "yaw_degrees": 0.0,
       "scale": [
         1.0,
         1.0,
@@ -548,7 +548,7 @@
       "position": [
         3.05,
         0.0,
-        7.6
+        7.0
       ],
       "yaw_degrees": 90.0,
       "scale": [
@@ -561,9 +561,9 @@
     {
       "asset": "garden_planter_b",
       "position": [
+        18.4,
         0.0,
-        0.0,
-        -11.6
+        -10.8
       ],
       "yaw_degrees": 15.0,
       "scale": [

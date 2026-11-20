@@ -219,14 +219,14 @@ func button(action: String) -> bool:
 		travel(action.trim_prefix("travel:"))
 		return true
 	if action.begins_with("tool:"):
-		select_tool(action.trim_prefix("tool:"),game.hands[1] if game.vr and game.hands.size()>1 else game.desktop_hand)
+		select_tool(action.trim_prefix("tool:"),game.hands[1] if game.vr and game.hands.size()>1 else game.desktop_hand, true)
 		return true
 	if action == "upgrade":
 		game._notice("Bring materials from your hip pouch to the Living Workshop buckets on the right, then grip and pull the lever.",12)
 		return true
 	return false
 
-func select_tool(id: String, hand: Node3D):
+func select_tool(id: String, hand: Node3D, from_tool_board: bool = false):
 	if operation: return
 	if not TOOL_NAMES.has(id): return
 	var tier = 1 if ORDER.find(id)<4 else (2 if ORDER.find(id)<6 else (3 if id=="crystal_resonator" else 4))
@@ -239,7 +239,8 @@ func select_tool(id: String, hand: Node3D):
 	if game.online and not owned:
 		operation = true
 		await game._send_context()
-		var response = await game._request("/api/vr/craft",{"id":id})
+		var route := "/api/vr/collection-take" if from_tool_board else "/api/vr/craft"
+		var response = await game._request(route,{"id":id})
 		operation = false
 		if response.has("error"):
 			game._notice(str(response.error))
@@ -1047,7 +1048,7 @@ func upgrade():
 			await game.workshop._send_action("commit",{"tier":tier})
 			return
 
-func travel(id:String):
+func travel(id: String, via_gateway: bool = false):
 	if not game.scene.get("zones",{}).has(id): return
 	arrival_serial += 1
 	var ticket := arrival_serial
@@ -1080,7 +1081,10 @@ func travel(id:String):
 	var previous_zone: String = zone
 	if previous_zone != id:
 		var leaving_visual := _portal_visual(previous_zone, id)
-		if leaving_visual != null: leaving_visual.play_entrance()
+		if leaving_visual != null and via_gateway:
+			leaving_visual.play_entrance()
+			await game.get_tree().create_timer(0.18).timeout
+			if ticket != arrival_serial: return
 	if game.orchard_planet_motion.active():
 		game.orchard_planet_motion.leave()
 		game.orchard_planet.leave()

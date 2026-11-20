@@ -7,7 +7,6 @@ const HAMMER_FACE=Vector3(-0.2285,0.48,0)
 var game
 var finishing=false
 var revealing=false
-var next_slot=0
 var delivered={}
 var queue=[]
 var billet:Node3D
@@ -155,11 +154,12 @@ func present(item:Node3D, key:String):
 	item.set_meta("delivery_ready",false)
 	queue.append(key)
 	item.visible=false
-	item.remove_from_group("pickup")
+	if item.is_in_group("pickup"): item.remove_from_group("pickup")
 	game._set_collisions(item,false)
 	while finishing or queue[0]!=key: await get_tree().process_frame
 	finishing=true
-	item.reparent(game.adventure.zone_groups.forge_yard)
+	if item.get_parent() != game.adventure.zone_groups.forge_yard:
+		item.reparent(game.adventure.zone_groups.forge_yard)
 	item.position=Vector3(-0.05,1.42,-2.9)
 	item.rotation=Vector3(0,0,PI/2)
 	game._notice("Brann is putting the finishing touches on "+str(item.get_meta("display_name","your tool"))+".",5)
@@ -170,25 +170,26 @@ func present(item:Node3D, key:String):
 	flourish(item.global_position,14,Color("a9e9d4"),0.65)
 	play_sound(reveal_sound,item.global_position,-14.0)
 	revealing=true
-	var destination=game.scene.rack.global_position+Vector3((next_slot%4)*0.30-0.45,0.1,floorf(next_slot/4.0)*0.32)
-	if game.collection!=null:
-		var home=game.collection.ensure_home(str(item.get_meta("id","")),str(item.get_meta("display_name","Your creation")))
-		destination=home.stand.global_position+Vector3.UP*0.98
-	next_slot+=1
-	var full_scale=item.scale
-	item.scale=full_scale*0.8
-	var tween=create_tween()
-	tween.tween_property(item,"global_position",item.global_position+Vector3.UP*0.3,0.35).set_trans(Tween.TRANS_SINE)
-	tween.parallel().tween_property(item,"scale",full_scale,0.35)
-	tween.tween_property(item,"global_position",destination+Vector3.UP*0.25,1.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	tween.parallel().tween_property(item,"rotation",Vector3.ZERO,1.15)
-	tween.tween_property(item,"global_position",destination,0.4).set_trans(Tween.TRANS_SINE)
-	await tween.finished
+	var title := str(item.get_meta("display_name", "Your creation"))
+	var home: Dictionary = game.collection.ensure_home(str(item.get_meta("id")), title)
+	var finished_scale := item.scale
+	var reveal := create_tween()
+	reveal.tween_property(item, "global_position", item.global_position + Vector3.UP * 0.20, 0.40).set_trans(Tween.TRANS_SINE)
+	reveal.tween_interval(0.42)
+	# The enchanted handoff is local at both ends. A long straight tween through
+	# the workshop walls used to carry the weapon through the player's body.
+	reveal.tween_property(item, "scale", finished_scale * 0.05, 0.22).set_trans(Tween.TRANS_QUAD)
+	await reveal.finished
+	item.scale = finished_scale
+	item.set_meta("delivery_ready", true)
 	item.add_to_group("pickup")
-	game._set_collisions(item,true)
-	item.set_meta("delivery_ready",true)
-	if game.collection!=null: game.collection.register(item)
-	game._notice(str(item.get_meta("display_name","Your tool"))+" is on its named collection stand in the yard. Grip it to collect.",10)
+	if home.item == item:
+		game.collection.return_item(str(home.id))
+	else:
+		game.collection.register(item)
+	if item.is_visible_in_tree():
+		flourish(item.global_position, 10, Color("a9e9d4"), 0.48)
+	game._notice("%s is ready at %s." % [title, game.collection.location(home)], 10)
 	print("WORKSHOP_DELIVERY bench_ready=",key)
 	queue.pop_front()
 	revealing=false

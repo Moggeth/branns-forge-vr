@@ -230,7 +230,7 @@ func _ready():
 		rat.set_meta("home", rat.position)
 	rig = Node3D.new()
 	add_child(rig)
-	rig.position = Vector3(0, 0, 1)
+	rig.position = scene.zones.forge_yard.spawn
 	var xr = XRServer.find_interface("OpenXR")
 	vr = xr != null and xr.is_initialized()
 	if vr:
@@ -410,9 +410,6 @@ func _ready():
 		add_child(lantern)
 		lantern.setup(self,variant.id,variant.name,variant.asset)
 		forge_lanterns.append(lantern)
-	if forge_lanterns.size()==2:
-		var comparison_label=WorkshopScene.label(collection.root,"LANTERN STUDY · TWO ARTISTS\nSame controls · grip to compare · shutter opens by hand",Vector3(12.0,2.3,7.0),18)
-		comparison_label.rotation.y=-PI/2
 	discoveries=preload("res://discoveries.gd").new(); add_child(discoveries); discoveries.setup(self,self)
 	travel_navigation=preload("res://travel_navigation.gd").new(); add_child(travel_navigation); travel_navigation.setup(self)
 	world_reset=preload("res://world_reset.gd").new(); add_child(world_reset)
@@ -804,8 +801,8 @@ func _capture():
 		if sample!=null:
 			sample.set_meta("display_name","Siegebird")
 			collection.register(sample)
-		camera.global_position=Vector3(-0.5,3.6,0.2)
-		camera.look_at(Vector3(5.8,1.0,6.0))
+		camera.global_position=preload("res://smithy_layout.gd").ARMORY_ENTRY + Vector3(-2.0,1.7,0.3)
+		camera.look_at(preload("res://smithy_layout.gd").bay_center(0)+Vector3.UP*1.15)
 		camera.fov=68
 	if OS.get_cmdline_user_args().has("--capture-forge-detail"):
 		camera.global_position=Vector3(1.4,2.05,0.3)
@@ -1159,11 +1156,11 @@ func _update_text():
 	var bounty = "Workshop Tier %d · %s" % [state.get("tier",1),display_item]
 	scene.bounty_label.text = preload("res://progression_ui.gd").summary(state)
 	preload("res://progression_ui.gd").update_cards(scene.buttons,state)
-	scene.voice_label.text = "Brann's voice: " + voice.capitalize() + "  ·  Voice button cycles"
+	scene.voice_label.text = "Voice · " + voice.capitalize()
 	hud.text = "BRANN'S FORGE  ·  " + bounty + ("  ·  " + quests.level_line() if quests!=null and not quests.data.is_empty() else "")
 	if not vr: info.text=desktop_hint_override if not desktop_hint_override.is_empty() else _desktop_hint()
 	if elapsed > status_until:
-		var equipped = "Grip a weapon on the rack"
+		var equipped = "Grip the hammer or visit the east armory"
 		if not held.is_empty():
 			var weapon = held.values()[0]
 			if is_instance_valid(weapon):
@@ -1857,6 +1854,9 @@ func _button(action: String):
 		playful_encounters.act(action.trim_prefix("playful_encounter:")); return
 	if workshop!=null and workshop.action(action): return
 	if enchantments!=null and enchantments.action(action): return
+	if action in ["armory:previous", "armory:next"]:
+		collection.turn_folio(-1 if action == "armory:previous" else 1)
+		return
 	if action.begins_with("collection:"):
 		collection.return_item(action.trim_prefix("collection:"))
 		return
@@ -1882,7 +1882,7 @@ func _button(action: String):
 			_notice("Voice: " + next.capitalize() + ". Applies to the next conversation.")
 			_poll()
 		"commission":
-			_notice("Tell Brann your invention idea. Finished tools arrive on their named collection stands.", 12)
+			_notice("Tell Brann your invention idea. Finished tools arrive at their named armory stands.", 12)
 			_button("retry")
 
 func _targets(origin: Vector3) -> Array:
@@ -2209,7 +2209,7 @@ func _import_item(item: Dictionary):
 	var ratio = (minf(1.0, 0.46 / maxf(longest, 0.01)) if is_wyrm else 1.1 / maxf(longest, 0.01))
 	model.scale *= ratio
 	if not is_wyrm: model.position -= Vector3(bounds.get_center().x, bounds.position.y, bounds.get_center().z) * ratio
-	weapon.position = scene.rack.global_position + Vector3((imported.size() % 4) * 0.38 - 0.5, 0.12, floorf(imported.size() / 4.0) * 0.45)
+	weapon.position = workshop_delivery.CONTACT
 	weapon.reparent(adventure.zone_groups.get("forge_yard",self))
 	weapon.set_meta("kind", "weapon")
 	weapon.set_meta("id", item.id)

@@ -335,6 +335,9 @@ for n, (ob, c) in OBJS.items(): export(n, ob)
 # ---------------------------------------------------------------- placements (Godot coords)
 P = []
 def place(asset, x, y, z, rot=0.0, s=(1, 1, 1)):
+    # Pull the eastern ridgeline behind the armory annex.
+    if asset.startswith("ridge") and x > 12:
+        x += 20.0
     P.append({"id": f"{asset}_{len([p for p in P if p['asset'] == asset]):02d}", "asset": asset,
               "position": [round(x, 3), round(y, 3), round(z, 3)], "rotation_y_deg": round(rot, 2), "scale": [round(v, 3) for v in s]})
 rj = random.Random(7)
@@ -347,16 +350,20 @@ for k in range(10):
 for k in range(7):
     th = -150 + 50 * k; a = math.radians(th)
     place("ridge_far", 38 * math.sin(a), -0.5, 38 * math.cos(a), th + 180 + rj.uniform(-6, 6), (1.35, 1.35 + rj.uniform(0, .25), 1.35))
+# Plant outside the walking lanes and tier-unlocked workshop wings.
 for sx in (-1, 1):
-    place("garden_bed_a", sx * 12.4, 0, 3.2, 90)
-    place("garden_planter_b", sx * 12.9, 0, -3.5)
-    place("garden_planter_b", sx * 14.2, 0, 7.2, 40 * sx)
-    place("garden_bed_a", sx * 5.8, 0, -10.6, 0)
-    place("cordwood_ore_rack", sx * 9.75, 0, -4.2 if sx < 0 else -2.6, -90 if sx < 0 else 90)
-    for zc in (1.6, 4.6, 7.6):
-        place("path_edge_stones", sx * 3.05, 0, zc, 90, (1, 1, 1))
-place("garden_planter_b", 0, 0, -11.6, 15)
-place("garden_bed_a", -12.4, 0, 8.6 - 0, 90) if False else None
+    place("garden_bed_a", -12.8 if sx < 0 else 33.9, 0, 3.2, 90)
+    place("garden_planter_b", sx * 12.9, 0, -10.6)
+    place("garden_planter_b", -14.1 if sx < 0 else 32.7, 0, 13.3, 40 * sx)
+    place("garden_bed_a", sx * 9.1, 0, -13.2, 90)
+    place("cordwood_ore_rack", sx * 9.75, 0, -9.2, -90 if sx < 0 else 90)
+    for zc in (1.0, 4.0, 7.0):
+        # Break the edging at the cross-court to the range and armory.
+        if zc == 4.0:
+            place("path_edge_stones", sx * 7.0, 0, 6.3, 0)
+        else:
+            place("path_edge_stones", sx * 3.05, 0, zc, 90)
+place("garden_planter_b", 18.4, 0, -10.8, 15)
 
 # ---------------------------------------------------------------- layout scene + render
 lay = coll_new("Layout_instances")

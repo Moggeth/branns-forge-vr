@@ -1,5 +1,6 @@
 class_name WorldZones
 extends RefCounted
+const Smithy = preload("res://smithy_layout.gd")
 const TreeAdapter = preload("res://tree_adapter.gd")
 const LandmarkKit = preload("res://landmark_kit.gd")
 const ForgeMaterials = preload("res://forge_materials.gd")
@@ -225,7 +226,7 @@ static func lantern(p: Node3D, pos: Vector3) -> void:
 
 static func portal(root: Node3D, data: Dictionary, zone: String, pos: Vector3, target: String) -> void:
 	var n := entity(root,zone,"portal",pos,"adventure_portal")
-	var facing=Vector3(0,pos.y,-4) if zone=="forge_yard" else Vector3(data.zones[zone].center.x,pos.y,data.zones[zone].center.z)
+	var facing=Smithy.GATE_FOCUS if zone=="forge_yard" else Vector3(data.zones[zone].center.x,pos.y,data.zones[zone].center.z)
 	n.look_at(facing,Vector3.UP,true)
 	n.set_meta("target_zone",target)
 	n.set_meta("action","travel:"+target)
@@ -332,7 +333,7 @@ static func anchor(root: Node3D, data: Dictionary, zone: String, pos: Vector3, d
 static func batch_decorations(p: Node3D) -> void:
 	# Solid architectural decoration gets collision before visual batching.
 	for child in p.get_children():
-		if not child is MeshInstance3D: continue
+		if not child is MeshInstance3D or child.has_meta("backdrop"): continue
 		var bounds: AABB=child.transform*child.mesh.get_aabb()
 		if bounds.size.x<0.28 or bounds.size.y<0.10 or bounds.size.z<0.28 or bounds.get_center().y<0.15: continue
 		var solid:=StaticBody3D.new()
@@ -395,8 +396,14 @@ static func build(root: Node3D) -> Dictionary:
 		data.zones[spec[0]] = {"name":spec[1],"center":center,"spawn":center+Vector3(0,0,8),"bounds":Rect2(Vector2(center.x-extent,center.z-extent),Vector2.ONE*extent*2.0),"tier":spec[3],"root":p}
 		data.zones[spec[0]]["environment"] = {"ambient_color":"c5d7df","ambient_energy":0.38,"sun_color":"ffe6bd","sun_energy":1.05,"sky_top":"438dd5","sky_horizon":"82b8e2","fog_color":"adc5d8","fog_density":0.001}
 		# Orchard ground/collision is compiled from the shared heightfield at runtime.
-		if spec[0] not in ["sky_garden","crystal_hollow","ember_foundry","cloudbreak_keep","orchard_highlands"]: floor_patch(p,Vector3.ZERO,Vector2(extent*2.0,extent*2.0),spec[4])
-	data.zones.forge_yard.spawn = Vector3(0,0,0)
+		if spec[0] == "forge_yard":
+			var bounds := Smithy.YARD_BOUNDS
+			var middle := bounds.get_center()
+			data.zones.forge_yard.bounds = bounds
+			floor_patch(p, Vector3(middle.x, 0, middle.y), bounds.size, spec[4])
+		elif spec[0] not in ["sky_garden","crystal_hollow","ember_foundry","cloudbreak_keep","orchard_highlands"]:
+			floor_patch(p,Vector3.ZERO,Vector2(extent*2.0,extent*2.0),spec[4])
+	data.zones.forge_yard.spawn = Smithy.SPAWN
 	data.zones.crystal_hollow.environment = {"ambient_color":"738bbf","ambient_energy":0.32,"sun_color":"b3cdf7","sun_energy":0.05,"sky_top":"202a46","sky_horizon":"303d59","fog_color":"35486a","fog_density":0.012}
 	data.zones.ember_foundry.environment = {"ambient_color":"a77678","ambient_energy":0.38,"sun_color":"ffad6b","sun_energy":0.70,"sky_top":"704869","sky_horizon":"d58a67","fog_color":"8e5e70","fog_density":0.006}
 	data.zones.enchanted_kitchen.environment = {"ambient_color":"ddd2b9","ambient_energy":0.32,"sun_color":"ffe2ad","sun_energy":0.95,"sky_top":"438dd5","sky_horizon":"82b8e2","fog_color":"c5ba9e","fog_density":0.001}
@@ -431,10 +438,10 @@ static func build(root: Node3D) -> Dictionary:
 	load("res://world_expeditions.gd").populate(root,data)
 	# A compact waystone garden gives every initial zone immediate access. Tools
 	# govern opportunities within locations; inventive alternate routes remain valid.
-	var destinations := ["pinewood_ruins","sandstone_quarry","enchanted_kitchen","mushroom_glade","crystal_hollow","sky_garden","ember_foundry"]
+	var destinations := Smithy.DESTINATIONS
 	for i in range(destinations.size()):
 		var target: String = destinations[i]
-		portal(root,data,"forge_yard",Vector3(-10.5+i*3.5,0,10.8),target)
+		portal(root, data, "forge_yard", Smithy.gate_position(i), target)
 		var c: Vector3 = data.zones[target].center
 		portal(root,data,target,c+Vector3(7.5,0,9.5),"forge_yard")
 	# An outer ring makes exploration feel like a journey. Its return gates lead
@@ -466,7 +473,7 @@ static func build(root: Node3D) -> Dictionary:
 						if grapple.get_meta("zone", "") != id: continue
 						for piece in grapple.get_children():
 							if piece is VisualInstance3D: piece.visible = false
-		GroundKit.populate(z.root,id,float(z.bounds.size.x)*0.5)
+		GroundKit.populate(z.root,id,minf(z.bounds.size.x, z.bounds.size.y)*0.5)
 		if id == "orchard_highlands": OrchardDressing.populate(z.root)
 		# These masses are one or two batched surfaces inside their own container.
 		# The container prevents decoration batching from adding convex canopy-like
@@ -528,14 +535,14 @@ static func forge(p: Node3D) -> void:
 	glow_light(p,Vector3(-3.1,1.6,-3.9),"ff9a43",1.8,7.0)
 	# Low garden walls, apple trees, winding flagstone approaches.
 	for side in [-1,1]:
-		for j in range(7): box(p,Vector3(side*14,0.6,-11+j*3),Vector3(0.65,1.2,2.85),"a2a38c")
+		for j in range(7):
+			# The east wall opens onto the armory and its level cross-aisle.
+			var wall_x := -14.0 if side < 0 else 34.4
+			box(p,Vector3(wall_x,0.6,-11+j*3),Vector3(0.65,1.2,2.85),"a2a38c")
 		for j in range(3):
-			if j!=1: tree(p,Vector3(side*(11.0+j%2),0,-9+j*6),4.5+j*0.5,false,j==2) # Keep the future workshop wings clear.
-		flowers(p,Vector3(side*9,0,4),35,2.7)
+			if j!=1 and (side < 0 or j == 0): tree(p,Vector3(side*(11.0+j%2),0,-9+j*6),4.5+j*0.5,false,j==2) # Keep the future workshop wings clear.
+		flowers(p,Vector3(side*12,0,-10),35,1.8)
 	path(p,Vector3(0,0,8),Vector3(0,0,0))
-	for v in [Vector3(-6,0,1.3),Vector3(6.7,0,2.0)]: crate(p,v,0.95)
-	for x in [-5,0,5]:
-		box(p,Vector3(x,0.015,6.9),Vector3(2.5,0.02,0.6),"b9a679")
 	# The seven authored gates carry their own destination names; a second
 	# floating waystone caption here overlapped them from the garden path.
 
@@ -910,7 +917,9 @@ static func backdrop(p: Node3D, id: String) -> void:
 		var height: float = 7.0+float((i*7)%5)*1.7
 		var v := Vector3(cos(a)*radius,height*0.28-1.0,sin(a)*radius)
 		var color: String = ["735e72","826779","936b78"][i%3] if hot else (["b97c58","cf986d","d7ad7e"][i%3] if sand else ["7f99aa","8ca5b1","a1b4b7"][i%3])
-		rock(p,v,Vector3(11.5,height,10.0),color)
+		# Distant silhouettes can extend over a neighbouring playable zone. They
+		# are scenery and must never generate invisible collision in that zone.
+		rock(p,v,Vector3(11.5,height,10.0),color).set_meta("backdrop",true)
 		if not hot and not sand:
 			rock(p,v+Vector3(0,height*0.30,0),Vector3(6.0,height*0.2,5.3),"bac8c0")
 			var foreground_position := Vector3(cos(a)*19,0.4,sin(a)*19)

@@ -47,10 +47,6 @@ func setup(owner_game):
 	root=Node3D.new(); root.name="LivingWorkshop"; game.adventure.zone_groups.forge_yard.add_child(root)
 	_build_table(); _build_pouch()
 	stage_groups=ART.stages(game); _apply_tier(1)
-	var board=game.scene.get("board")
-	if is_instance_valid(board): board.visible=false; game._set_collisions(board,false)
-	for button in game.scene.get("buttons",[]):
-		if is_instance_valid(button) and button.global_position.x>3: button.visible=false; game._set_collisions(button,false)
 	for i in range(8): impact_streams.append(load("res://audio/forge-impact-%d.wav"%(i+1)))
 	reveal_stream=load("res://audio/forge-reveal.wav")
 	for i in range(3):

@@ -407,7 +407,7 @@ func action(value):
 		return
 	if value.begins_with("travel:"):
 		cancel_forming()
-		game.adventure.travel(value.trim_prefix("travel:"))
+		game.adventure.travel(value.trim_prefix("travel:"), true)
 		opened=false
 		menu.visible=false
 		game._set_collisions(menu,false)

@@ -222,45 +222,49 @@ static func build(root: Node3D) -> Dictionary:
 	var question: Label3D = label(brann,"?",Vector3(0,2.65,0),110,Color("ffdc45"))
 	question.visible = false
 	var rack: Node3D = Node3D.new()
-	rack.position = Vector3(2,1,-3)
+	rack.position = preload("res://smithy_layout.gd").STARTER_BENCH + Vector3.UP
 	rack.name = "FinishedWeaponRack"
 	root.add_child(rack)
 	box(rack,Vector3(0,-0.06,0),Vector3(1.4,0.12,0.9),oak)
 	collision(rack,Vector3(0,-0.06,0),Vector3(1.4,0.12,0.9),"wood")
 	for side in [-1,1]:
 		box(rack,Vector3(side*0.55,-0.52,0),Vector3(0.1,0.92,0.66),wood)
-	label(rack,"PICK UP TOOLS",Vector3(0,0.72,-0.3),25)
 	var hammer: Node3D = make_hammer(wood,iron,brass)
-	hammer.position = Vector3(2,1.06,-2.95)
+	hammer.position = rack.position + Vector3.UP * 0.02
 	hammer.set_meta("kind","weapon")
 	hammer.set_meta("id","starter_hammer")
 	hammer.name = "StarterHammer"
 	root.add_child(hammer)
 	collision(hammer,Vector3(0,0.29,0),Vector3(0.42,0.68,0.24))
-	label(root,"GRIP THE HAMMER",Vector3(2,0.65,-2.35),22)
 	var board: Node3D = Node3D.new()
-	board.position = Vector3(5.4,1.9,-5.55)
+	# Put talk, voice and commissions beside the smith. Previously the donation
+	# table covered the entire board and disabled its buttons by world X.
+	board.name = "CommissionLedger"
+	board.position = Vector3(1.9,1.83,-5.38)
 	root.add_child(board)
-	box(board,Vector3.ZERO,Vector3(3.9,3.3,0.15),wood)
-	box(board,Vector3(0,0,0.085),Vector3(3.7,3.1,0.035),material("223d3a"))
-	label(board,"THE WORKSHOP PATH",Vector3(0,1.36,0.12),32)
-	var bounty_label: Label3D = label(board,"Hunt rats · collect 5 tails\nBring them to Brann for a favour",Vector3(0,0.29,0.12),27)
-	var status_label: Label3D = label(board,"The forge is ready.",Vector3(0,-0.91,0.12),20)
-	var voice_label: Label3D = label(board,"Voice: Vesper",Vector3(0,-1.36,0.12),18,Color("ddbb74"))
+	box(board,Vector3.ZERO,Vector3(2.12,2.32,0.12),wood)
+	box(board,Vector3(0,0,0.07),Vector3(1.99,2.19,0.03),material("293a38"))
+	label(board,"BRANN’S LEDGER",Vector3(0,0.91,0.10),31).pixel_size = 0.0032
+	var bounty_label := label(board,"",Vector3(0,0.42,0.10),23)
+	bounty_label.pixel_size = 0.00285
+	var status_label := label(board,"",Vector3(0,-0.10,0.10),18)
+	status_label.pixel_size = 0.0024
+	var voice_label := label(board,"",Vector3(0,-0.31,0.10),17,Color("ddbb74"))
+	voice_label.pixel_size = 0.0025
 	var buttons: Array[Node3D] = []
-	var actions: Array[String] = ["retry","voice","upgrade","commission"]
-	var captions: Array[String] = ["TALK TO BRANN","CHANGE VOICE","UPGRADE","INVENT AN ITEM"]
-	for i in range(4):
-		var button: Node3D = Node3D.new()
-		button.position = Vector3(3.95+i*0.98,0.22,-4.75)
+	var actions := ["retry","voice","upgrade","commission"]
+	var captions := ["TALK TO BRANN","CHANGE VOICE","FORGE TIERS","INVENT AN ITEM"]
+	for i in actions.size():
+		var button := Node3D.new()
+		board.add_child(button)
+		button.position = Vector3(-0.47+(i%2)*0.94,-0.55-floorf(float(i)/2)*0.30,0.12)
 		button.set_meta("action",actions[i])
-		button.set_meta("hint_position",Vector3(5.4,3.75,-4.65))
+		button.set_meta("hint_position",board.global_position + Vector3(0,1.25,0.22))
 		button.set_meta("kind","button")
 		button.set_meta("surface_material","wood")
-		root.add_child(button)
-		box(button,Vector3.ZERO,Vector3(0.9,0.31,0.2),teal if i < 2 else wood)
-		label(button,captions[i],Vector3(0,0,0.115),20)
-		collision(button,Vector3.ZERO,Vector3(0.92,0.33,0.24))
+		box(button,Vector3.ZERO,Vector3(0.88,0.23,0.10),teal if i < 2 else wood)
+		label(button,captions[i],Vector3(0,0,0.058),18).pixel_size = 0.0028
+		collision(button,Vector3.ZERO,Vector3(0.88,0.23,0.11))
 		buttons.append(button)
 	# Physical commissioning controls are accessible by a controller ray in VR.
 	box(root,Vector3(-6.9,1.9,-4.55),Vector3(3.4,2.7,0.18),wood)
@@ -292,9 +296,6 @@ static func build(root: Node3D) -> Dictionary:
 	label(upgrade,"KINDLE THE NEXT FORGE TIER",Vector3(0,0,0.11),22)
 	collision(upgrade,Vector3.ZERO,Vector3(3.2,0.32,0.21))
 	buttons.append(upgrade)
-	station_sign(root,"CHOOSE TOOLS","Point and trigger",Vector3(-6.9,3.65,-4.48),teal)
-	station_sign(root,"TALK TO BRANN","Forge and invent",Vector3(0,3.45,-4.48),brass)
-	station_sign(root,"GROW THE FORGE","Offer materials",Vector3(5.4,3.65,-4.48),ember)
 	var rats: Array[Node3D] = []
 	for i in range(7):
 		var rat: Node3D = make_rat(i)
@@ -304,9 +305,9 @@ static func build(root: Node3D) -> Dictionary:
 		root.add_child(rat)
 		rats.append(rat)
 	var dummies: Array[Node3D] = []
-	for x in [-6.7,7.6]:
+	for x in [-7.2,-5.2]:
 		var dummy: Node3D = Node3D.new()
-		dummy.position = Vector3(x,0,2.7 if x < 0 else -2.1)
+		dummy.position = Vector3(x,0,2.2)
 		dummy.set_meta("kind","dummy")
 		root.add_child(dummy)
 		cylinder(dummy,Vector3(0,0.1,0),0.48,0.2,wood)

@@ -6,7 +6,7 @@ class Adventure:
 	var game
 	var zone:="a"
 	var calls:=[]
-	func travel(target: String) -> void:
+	func travel(target: String, _via_gateway: bool = false) -> void:
 		calls.append(target)
 		zone=target
 		game.rig.global_position=Vector3(20,0,0.8) if target=="b" else Vector3(0,0,0.8)
