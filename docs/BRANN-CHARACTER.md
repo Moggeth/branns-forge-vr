@@ -2,6 +2,8 @@
 
 Open **Brann’s Forge Launcher → Adventure** on desktop or in VR. Walk up to the anvil in Forge Yard. Brann turns his eyes and head toward the visitor, greets them, and settles into a listening pose. During his reply, the voice amplitude drives the lips, eyelids remain independent, and the upper body follows an authored gesture. From farther away, he shifts his weight and occasionally inspects his hammer. A working or finishing commission plays his forge cycle. Brann draws back, brings the hammer down onto the billet, and recoils after contact. The finished item still goes to its assigned stand.
 
+[Before and after in Godot](../assets/smithy-source/brann/review/character-review.jpg) · [11-second in-game animation reel](../assets/smithy-source/brann/review/brann-motion.mp4)
+
 ## Editing the character
 
 - The editable, packed Blender project and deterministic builder are in [assets/smithy-source/brann](../assets/smithy-source/brann/). The game loads `godot/assets/smithy/brann/brann.glb`. The small copper clasp carries the existing conversation status colors.
