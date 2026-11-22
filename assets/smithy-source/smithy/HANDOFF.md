@@ -1,8 +1,10 @@
 # Brann's Forge smithy kit: handoff
 
 ## Rebuild
+
+Run from this directory with Blender 4.5 on PATH. The builder writes the outputs alongside the script.
 ```
-& "C:/Users/mog/OneDrive/Documents/Coding/Personal/Python/things_are_different_now/branns-forge-vr/tools/blender-4.5.13-windows-x64/blender.exe" -b --factory-startup --python output/build_smithy.py
+blender --background --factory-startup --python build_smithy.py
 ```
 A single deterministic builder (seeded) writes every `.glb`, the `textures/*.png` sources and `preview.png`, which shows a front view and an oblique view side by side. The preview includes three hall bays repeated along X. Set `SMITHY_NO_PREVIEW=1` to export only. The script needs only Blender and the numpy that ships with it.
 

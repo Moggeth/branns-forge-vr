@@ -1,5 +1,5 @@
 # Brann's Forge VR smithy kit builder. Blender 4.5 headless:
-#   blender.exe -b --factory-startup --python output/build_smithy.py
+#   blender --background --factory-startup --python build_smithy.py
 # All placement below is authored in GODOT coordinates (x right, y up, +z toward viewer)
 # and converted to Blender (x, -z, y). glTF export (+Y up) then restores Godot axes exactly.
 import bpy, bmesh, math, os, random
