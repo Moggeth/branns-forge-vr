@@ -148,7 +148,7 @@ func _check() -> void:
 	view.budget = 10.0
 	view.ready_at["golem"] = view.ui_elapsed + 4.0
 	result = Guide.build(game)
-	if _state(result.costs, "Stone Sentinel").find("Recharges") < 0:
+	if _state(result.costs, "Stone Sentinel (War Director)").find("Recharges") < 0:
 		failures.append("Director card cooldown missing")
 	view.ready_at.clear()
 	for i in 4: director.warnings.append({"type": "skeletons"})

@@ -3,11 +3,11 @@ extends SceneTree
 class Facade:
 	extends RefCounted
 	var inspect_enabled=false
+	var active={"living-climb-arena":{"manifest":{"region":{"spawn":[24,0,18]}}}}
 	var requests=[]
 	func request_version(entry): requests.append(["retrieve",entry])
 	func rollback(id,version): requests.append(["rollback",id,version])
 	func publish(package): requests.append(["publish",package.id,package.version])
-	func visit_arena(): requests.append(["visit"])
 	func safe_travel(destination): requests.append(["travel",destination]); return true
 class Feedback:
 	extends RefCounted
@@ -54,12 +54,13 @@ func _run():
 	museum.act("lens")
 	if not game.living.inspect_enabled: failures.append("lens toggle")
 	museum.act("visit")
-	if game.living.requests[-1]!=["visit"]: failures.append("arena interaction")
+	if game.living.requests[-1]!=["travel",Vector3(24,0,18)]: failures.append("active experiment landing")
 	museum.act("enter")
 	if game.living.requests[-1]!=["travel",Vector3(-120,0,0)]: failures.append("museum entry")
 	museum.act("leave")
 	if game.living.requests[-1]!=["travel",Vector3(-9,0,2)]: failures.append("museum exit")
-	await museum._publish_demo(demos[-1])
+	var revised: Dictionary = demos.filter(func(v): return v.id=="living-lantern-seed" and v.version==2).front()
+	await museum._publish_demo(revised)
 	var publishes=game.living.requests.filter(func(value): return value[0]=="publish")
 	if publishes.size()!=3 or publishes[-2][2]!=1 or publishes[-1][2]!=2: failures.append("demo version history/dependencies order")
 	if museum.stands.size()!=6: failures.append("unbounded museum exhibit nodes")

@@ -47,10 +47,6 @@ func setup(owner_game):
 	root=Node3D.new(); root.name="LivingWorkshop"; game.adventure.zone_groups.forge_yard.add_child(root)
 	_build_table(); _build_pouch()
 	stage_groups=ART.stages(game); _apply_tier(1)
-	var board=game.scene.get("board")
-	if is_instance_valid(board): board.visible=false; game._set_collisions(board,false)
-	for button in game.scene.get("buttons",[]):
-		if is_instance_valid(button) and button.global_position.x>3: button.visible=false; game._set_collisions(button,false)
 	for i in range(8): impact_streams.append(load("res://audio/forge-impact-%d.wav"%(i+1)))
 	reveal_stream=load("res://audio/forge-reveal.wav")
 	for i in range(3):
@@ -70,11 +66,9 @@ func _button(parent,action,pos,size,caption):
 
 func _build_table():
 	table=Node3D.new(); root.add_child(table); table.name="WorkshopTable"; table.position=Vector3(5.4,0.95,-4.7)
-	preload("res://workshop_details.gd").clipped_box(table,Vector3.ZERO,Vector3(4.8,0.16,1.7),WorkshopScene.material("775639"))
-	for x in [-2.05,2.05]:
-		for z in [-0.6,0.6]: WorkshopScene.box(table,Vector3(x,-0.46,z),Vector3(0.15,0.9,0.15),WorkshopScene.material("523c2c"))
+	preload("res://smithy_art.gd").place(table, "smithy/bench", Vector3(0,-0.95,0), Vector3(2.3,1.06,1.90))
 	WorkshopScene.collision(table,Vector3(0,-0.44,0),Vector3(4.8,1.04,1.7))
-	WorkshopScene.box(table,Vector3(0,1.0,-0.78),Vector3(4.6,0.43,0.08),WorkshopScene.material("344d49"))
+	preload("res://smithy_art.gd").place(table, "fixtures/furniture_plaque", Vector3(0,1.0,-0.78), Vector3(4.6,0.43,0.8))
 	labels.title=ART.text(table,"GROW THE FORGE",Vector3(0,1.1,-0.72),42)
 	labels.status=ART.text(table,"1 POUCH   2 BUCKETS   3 LEVER",Vector3(0,0.93,-0.72),25)
 	for i in range(4):
@@ -89,20 +83,13 @@ func _build_table():
 	labels.cost=ART.text(table,"",Vector3(-1.7,0.43,0.50),19); labels.cost.pixel_size=0.0035; labels.cost.width=450
 	option_button=_button(table,"workshop:option",Vector3(-1.65,0.19,0.66),Vector3(1.0,0.18,0.16),"SWAP COST")
 	lever=Node3D.new(); table.add_child(lever); lever.position=Vector3(2.02,0.13,0.36)
-	WorkshopScene.cylinder(lever,Vector3(0,0.25,0),0.026,0.5,WorkshopScene.material("c7a25d",0.65))
+	preload("res://smithy_art.gd").place(lever, "fixtures/lever")
 	knob=Node3D.new(); lever.add_child(knob); knob.position=Vector3(0,0.5,0)
-	WorkshopScene.box(knob,Vector3.ZERO,Vector3(0.22,0.075,0.075),WorkshopScene.material("d1ad6a",0.5))
 	ART.text(table,"3 · GRIP + PULL",Vector3(2.0,-0.06,0.88),19).pixel_size=0.0035
 
 func _build_pouch():
 	pouch=Node3D.new(); game.grips.belt.add_child(pouch); pouch.name="MaterialPouch"; pouch.position=pouch_home
-	WorkshopScene.ball(pouch,Vector3(0,-0.08,0),Vector3(0.30,0.31,0.20),WorkshopScene.material("77543a"))
-	WorkshopScene.cylinder(pouch,Vector3(0,0.055,0),0.105,0.035,WorkshopScene.material("94734b"))
-	WorkshopScene.cylinder(pouch,Vector3(0,0.074,0),0.080,0.008,WorkshopScene.material("342f28"))
-	for side in [-1,1]:
-		WorldZones.line(pouch,Vector3(side*0.08,0.065,0.045),Vector3(side*0.10,-0.025,0.10),0.008,"d0b777")
-		WorkshopScene.ball(pouch,Vector3(side*0.10,-0.035,0.10),Vector3.ONE*0.025,WorkshopScene.material("d0b777"))
-	WorkshopScene.box(pouch,Vector3(0,0.04,-0.092),Vector3(0.23,0.09,0.018),WorkshopScene.material("ac8854"))
+	preload("res://smithy_art.gd").place(pouch, "fixtures/pouch")
 	var clasp=_button(pouch,"workshop:pouch",Vector3(0,0.10,-0.08),Vector3(0.12,0.10,0.05),"LIFT"); clasp.rotation.x=-PI/3
 	pouch_contents=Node3D.new(); pouch.add_child(pouch_contents); pouch_contents.position=Vector3(0,0.25,-0.02)
 	pouch_label=ART.text(pouch_contents,"",Vector3(0,0.26,0),18); pouch_label.pixel_size=0.0023; pouch_label.billboard=BaseMaterial3D.BILLBOARD_ENABLED; pouch_label.width=390

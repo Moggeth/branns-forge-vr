@@ -18,7 +18,7 @@ func setup(owner_game):
 	flesh=WorkshopScene.material("f4ad4c",0.0,0.83)
 	flesh.cull_mode=BaseMaterial3D.CULL_DISABLED
 	lantern=WorkshopScene.material("ffb63d",0.0,0.45,2.8)
-	var positions=[Vector3(-9.3,0,3.6),Vector3(-8.6,0,4.6),Vector3(-9.7,0,5.3),Vector3(9.3,0,4.1)]
+	var positions=[Vector3(-9.3,0,3.6),Vector3(-8.6,0,4.6),Vector3(-9.7,0,5.3),Vector3(-10.6,0,4.6)]
 	for i in positions.size(): _spawn(i,positions[i])
 	var sign=Node3D.new(); game.adventure.zone_groups.forge_yard.add_child(sign); sign.position=Vector3(-10.55,0,3.2)
 	WorldZones.box(sign,Vector3(0,0.55,0),Vector3(0.08,1.1,0.08),"694427")

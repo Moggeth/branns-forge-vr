@@ -48,7 +48,7 @@ static func emit(root: Node3D, document: Dictionary, asset_dir: String) -> Dicti
 		var visual := scene.instantiate() as Node3D
 		if visual == null: return {"error":"non-3D GLB: " + scene_path}
 		var parts: Array = []
-		_collect(visual, Transform3D.IDENTITY, parts)
+		collect_mesh_parts(visual, Transform3D.IDENTITY, parts)
 		visual.free()
 		if parts.is_empty(): return {"error":"GLB has no meshes: " + scene_path}
 		if bool(document.get("vertex_color_multiply", false)):
@@ -270,13 +270,13 @@ static func _ground_finish(zone_id: String, asset_id: String, parts: Array) -> v
 		part.mesh = mesh
 		parts[index] = part
 
-static func _collect(node: Node3D, pose: Transform3D, parts: Array) -> void:
+static func collect_mesh_parts(node: Node3D, pose: Transform3D, parts: Array) -> void:
 	for child in node.get_children():
 		if not child is Node3D: continue
 		var local: Transform3D = pose * child.transform
 		if child is MeshInstance3D and child.mesh != null:
 			parts.append({"name":child.name,"mesh":child.mesh,"pose":local,"material":child.material_override})
-		_collect(child, local, parts)
+		collect_mesh_parts(child, local, parts)
 
 static func _scale_vector(value: Variant) -> Vector3:
 	var result := Vector3.ZERO

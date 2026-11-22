@@ -63,6 +63,7 @@ static func _allowed(id:String,p:Vector3,trail:Array=[])->bool:
 	if id == "orchard_highlands" and p.distance_to(Vector3(7.5, 0, 19.5)) < 2.5: return false
 	if id=="forge_yard":
 		if p.length()<6.5 or (absf(p.x)<9.5 and p.z<1.2) or p.z>8.3: return false
+		if preload("res://smithy_layout.gd").clear_dressing(p): return false
 	if id=="orchard_highlands":
 		if absf(p.x)<3.7 and p.z>-40 and p.z<24: return false
 		if absf(p.x-33.0)<3.5 and p.z>-35 and p.z<17: return false

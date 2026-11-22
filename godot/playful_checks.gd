@@ -22,7 +22,10 @@ func run(game):
 	game._trigger(game.desktop_hand,true)
 	check(tools.mode==(mode+1)%3,"Main trigger changes ring power")
 	game._grip(game.desktop_hand,true)
-	check(tools.state=="flying","Desktop E releases ring through main grip route")
+	check(tools.state=="dropped","Desktop E drops the ring")
+	tools.retrieve(game.desktop_hand)
+	game._desktop_release(true)
+	check(tools.state=="flying","Desktop X throws the ring through the main release route")
 	var click=InputEventMouseButton.new(); click.button_index=MOUSE_BUTTON_LEFT; click.pressed=true
 	check(not game.adventure.keyboard(click),"Desktop bomb handler yields to recall")
 	game._trigger(game.desktop_hand,true)
@@ -30,7 +33,7 @@ func run(game):
 	for i in range(80): tools.tick(.02)
 	check(tools.busy(game.desktop_hand),"Recall catches in original empty hand")
 	# One real swept flight through the game's authored target; no synthetic score call.
-	game.adventure.release(game.desktop_hand,true)
+	game._desktop_release(true)
 	var target=trial.bells[0]
 	tools.ring.global_position=target.global_position+Vector3(0,0,2)
 	tools.velocity=Vector3(0,0,-10)
@@ -92,7 +95,7 @@ func run(game):
 		game.camera.look_at(game.camera.global_position+directions[stage])
 		game.desktop_hand.global_transform=game.camera.global_transform
 		tools._home(); tools.last_camera_position=game.camera.global_position; tools.mode=1
-		tools.retrieve(game.desktop_hand); game._grip(game.desktop_hand,true)
+		tools.retrieve(game.desktop_hand); game._desktop_release(true)
 		for step in range(220):
 			tools.tick(.02)
 			if tools.state=="held": break
@@ -115,14 +118,14 @@ func run(game):
 	game.living.safe_travel(Vector3(-3,0,8))
 	var entry=game.living.active["demo-ember-return"].entities.ring
 	game.living.components._hold_entry(entry,game.desktop_hand)
-	game.adventure.release(game.desktop_hand,true)
+	game._desktop_release(true)
 	check(game.living.claims_trigger(game.desktop_hand),"Released Living ring retains recall trigger")
 	check(not game.adventure.keyboard(click),"Desktop bomb handler yields to Living recall")
 	check(game._trigger_allowed(game.desktop_hand,true),"Living recall is allowed through grip gate")
 	game._trigger(game.desktop_hand,true)
 	var flight=game.living.components.projectiles.flights.get(entry.node.get_instance_id(),{})
 	check(flight.get("mode")=="returning" and game.adventure.formation.is_empty(),"Main trigger recalls Living projectile without bomb")
-	game.living.components.projectiles._home(flight)
+	if not flight.is_empty(): game.living.components.projectiles._home(flight)
 	game.qol.action("fair:tuning")
 	check(game.qol.page=="tuning" and game.tuning.group_filter=="playful" and game.tuning.slider_nodes.size()==5,"Focused playful sliders fit palm page")
 	var context=game._playful_context()

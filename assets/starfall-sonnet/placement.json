@@ -435,8 +435,7 @@
     -34.0
    ],
    "yaw_degrees": 0,
-   "scale": 1.6,
-   "collision": "asset_default"
+   "scale": 1.6
   },
   {
    "asset": "cliff_c",
@@ -446,8 +445,7 @@
     -35.0
    ],
    "yaw_degrees": 10,
-   "scale": 1.7,
-   "collision": "asset_default"
+   "scale": 1.7
   },
   {
    "asset": "cliff_c",
@@ -457,8 +455,7 @@
     -38.0
    ],
    "yaw_degrees": 0,
-   "scale": 1.9,
-   "collision": "asset_default"
+   "scale": 1.9
   },
   {
    "asset": "cliff_c",

@@ -12,6 +12,8 @@ uniform float accent_amount = 0.28;
 uniform float normal_strength = 0.55;
 uniform float contrast = 1.18;                    // value contrast about mid-grey, per family
 uniform vec4 drift_amount = vec4(0.0);          // rgb = hue multiplier of large patches, a = strength
+uniform bool soften_boundary = false;
+uniform vec4 ground_bounds = vec4(0.0);
 uniform float rain_wetness = 0.0;
 uniform float snow_cover = 0.0;
 varying vec3 world_at;
@@ -26,6 +28,14 @@ float smooth_noise(vec2 p) {
 void vertex() { world_at = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
 void fragment() {
 	vec2 at = world_at.xz;
+	if (soften_boundary) {
+		vec2 inset = min(at - ground_bounds.xy, ground_bounds.zw - at);
+		float depth = min(inset.x, inset.y);
+		if (depth < 6.0) {
+			float verge = smoothstep(0.45, 5.0, depth + (smooth_noise(at * 0.65) - 0.5) * 2.4);
+			if (hash21(floor(at * 15.0)) >= verge) { discard; }
+		}
+	}
 	float broad = smooth_noise(at * 0.038 + 4.7);
 	float middle = smooth_noise(at * 0.16 - 7.2);
 	vec2 warp = vec2(smooth_noise(at * 0.11), smooth_noise(at * 0.11 + 17.0)) * 0.38;

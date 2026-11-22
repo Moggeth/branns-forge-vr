@@ -78,6 +78,15 @@ static func material(zone_id: String) -> ShaderMaterial:
 	finish.set_shader_parameter("normal_strength", 0.48 if main in ["meadow", "snow"] else 0.30 if main == "loam" else 0.65)
 	finish.set_shader_parameter("rain_wetness", _wetness)
 	finish.set_shader_parameter("snow_cover", _snow)
+	if zone_id == "forge_yard":
+		var yard := preload("res://smithy_layout.gd").YARD_BOUNDS
+		finish.set_shader_parameter("soften_boundary", true)
+		finish.set_shader_parameter("ground_bounds",Vector4(yard.position.x,yard.position.y,yard.end.x,yard.end.y))
+		finish.set_shader_parameter("base_albedo", load("res://assets/smithy/grounds/court_ground.png"))
+		finish.set_shader_parameter("base_normal", load("res://assets/smithy/grounds/court_ground_normal.png"))
+		finish.set_shader_parameter("accent_amount", 0.13)
+		finish.set_shader_parameter("contrast", 1.0)
+		finish.set_shader_parameter("drift_amount", Color(1,1,1,0))
 	_materials[zone_id] = finish
 	return finish
 

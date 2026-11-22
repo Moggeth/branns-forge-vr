@@ -11,7 +11,7 @@ func hint_text(action:String)->String:
 	var vr=game!=null and game.get("vr")==true
 	match action.trim_prefix("demo:"):
 		"ring":
-			return "SUNSKIPPER · Grip takes; release throws. Trigger: power/recall.\nFollow the bell board from behind the gold line.\nNext: Bankshot Bell. Bounce off its wall, then hit the target." if vr else "SUNSKIPPER · E takes/throws. Click: power/recall.\nFollow the bell board from behind the gold line.\nNext: Bankshot Bell. Bounce off its wall, then hit the target."
+			return "SUNSKIPPER · Grip takes; release throws. Trigger: power/recall.\nFollow the bell board from behind the gold line.\nNext: Bankshot Bell. Bounce off its wall, then hit the target." if vr else "SUNSKIPPER · E takes or drops. X throws. Click recalls or changes power.\nFollow the bell board from behind the gold line.\nNext: Bankshot Bell. Bounce off its wall, then hit the target."
 		"cargo":
 			return "COPPER KITE · Grip equips; trigger pulls/drops.\nA flings. Settle SUN, LEAF and MOON in their nests.\nThen grip and pull the bloom lever." if vr else "COPPER KITE · E equips; click pulls/drops.\nX flings. Settle SUN, LEAF and MOON in their nests.\nThen click GROW COPPER BLOOM."
 		"garden":

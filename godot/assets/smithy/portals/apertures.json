@@ -1,0 +1,140 @@
+{
+ "delivered": "veil_mesh_per_glb",
+ "units": "metres, Godot local (x right, y up, +z toward viewer)",
+ "theme_index": {
+  "pinewood_ruins": 0,
+  "sandstone_quarry": 1,
+  "enchanted_kitchen": 2,
+  "mushroom_glade": 3,
+  "crystal_hollow": 4,
+  "sky_garden": 5,
+  "ember_foundry": 6,
+  "forge_yard": 7,
+  "orchard_highlands": 8,
+  "gloamfen": 9,
+  "starfall_ridge": 10,
+  "cloudbreak_keep": 11
+ },
+ "apertures": {
+  "pinewood_ruins": {
+   "center_x": 0.0,
+   "bottom_y": 0.0,
+   "top_y": 2.48,
+   "half_width": 0.72,
+   "spring_y": 1.7,
+   "shape": "ellipse",
+   "arch_rise": 0.78,
+   "veil_mesh": "Veil"
+  },
+  "sandstone_quarry": {
+   "center_x": 0.0,
+   "bottom_y": 0.0,
+   "top_y": 2.22,
+   "half_width": 0.7,
+   "spring_y": 1.6,
+   "shape": "flat",
+   "corner_radius": 0.12,
+   "veil_mesh": "Veil"
+  },
+  "enchanted_kitchen": {
+   "center_x": 0.0,
+   "bottom_y": 0.0,
+   "top_y": 2.5,
+   "half_width": 0.7,
+   "spring_y": 1.8,
+   "shape": "round",
+   "arch_rise": 0.7,
+   "veil_mesh": "Veil"
+  },
+  "mushroom_glade": {
+   "center_x": 0.0,
+   "bottom_y": 0.0,
+   "top_y": 2.5,
+   "half_width": 0.74,
+   "spring_y": 1.6,
+   "shape": "ellipse",
+   "arch_rise": 0.9,
+   "veil_mesh": "Veil"
+  },
+  "crystal_hollow": {
+   "center_x": 0.0,
+   "bottom_y": 0.0,
+   "top_y": 2.7399,
+   "half_width": 0.7,
+   "spring_y": 1.75,
+   "shape": "pointed",
+   "arc_radius": 1.05,
+   "veil_mesh": "Veil"
+  },
+  "sky_garden": {
+   "center_x": 0.0,
+   "bottom_y": 0.0,
+   "top_y": 2.53,
+   "half_width": 0.68,
+   "spring_y": 1.85,
+   "shape": "round",
+   "arch_rise": 0.68,
+   "veil_mesh": "Veil"
+  },
+  "ember_foundry": {
+   "center_x": 0.0,
+   "bottom_y": 0.0,
+   "top_y": 2.2,
+   "half_width": 0.7,
+   "spring_y": 1.7,
+   "shape": "flat",
+   "corner_radius": 0.12,
+   "veil_mesh": "Veil"
+  },
+  "forge_yard": {
+   "center_x": 0.0,
+   "bottom_y": 0.0,
+   "top_y": 2.52,
+   "half_width": 0.72,
+   "spring_y": 1.8,
+   "shape": "round",
+   "arch_rise": 0.72,
+   "veil_mesh": "Veil"
+  },
+  "orchard_highlands": {
+   "center_x": 0.0,
+   "bottom_y": 0.0,
+   "top_y": 2.45,
+   "half_width": 0.72,
+   "spring_y": 1.75,
+   "shape": "ellipse",
+   "arch_rise": 0.7,
+   "veil_mesh": "Veil"
+  },
+  "gloamfen": {
+   "center_x": 0.0,
+   "bottom_y": 0.0,
+   "top_y": 2.7167,
+   "half_width": 0.68,
+   "spring_y": 1.7,
+   "shape": "pointed",
+   "arc_radius": 1.1,
+   "veil_mesh": "Veil"
+  },
+  "starfall_ridge": {
+   "center_x": 0.0,
+   "bottom_y": 0.0,
+   "top_y": 2.5,
+   "half_width": 0.7,
+   "spring_y": 1.8,
+   "shape": "round",
+   "arch_rise": 0.7,
+   "veil_mesh": "Veil"
+  },
+  "cloudbreak_keep": {
+   "center_x": 0.0,
+   "bottom_y": 0.0,
+   "top_y": 2.45,
+   "half_width": 0.7,
+   "spring_y": 1.75,
+   "shape": "round",
+   "arch_rise": 0.7,
+   "veil_mesh": "Veil"
+  }
+ }
+}

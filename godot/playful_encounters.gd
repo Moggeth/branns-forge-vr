@@ -81,7 +81,7 @@ func _build():
 	gate.rotation.y=-PI/2
 	_gate(court,Vector3(5,0,6),"leave","BACK TO BRANN")
 	if game.get("playful_feedback")!=null:
-		game.playful_feedback.register_hint("bellworks",board,"BELLWORKS FAIR","Take the Sunskipper beside the board. E throws; left click recalls.","Grip the Sunskipper. Release to throw; trigger recalls.",Vector3(0,1.5,0))
+		game.playful_feedback.register_hint("bellworks",board,"BELLWORKS FAIR","Take the Sunskipper beside the board. X throws. Left click recalls.","Grip the Sunskipper. Release to throw; trigger recalls.",Vector3(0,1.5,0))
 
 func _button(parent,pos,action,title,width)->Node3D:
 	var node=Node3D.new(); parent.add_child(node); node.position=pos
@@ -93,17 +93,13 @@ func _button(parent,pos,action,title,width)->Node3D:
 	return node
 
 func _gate(parent,pos,action,title)->Node3D:
-	var node=Node3D.new(); parent.add_child(node); node.position=pos
-	node.set_meta("kind","button"); node.set_meta("action","playful_encounter:"+action)
-	for side in [-1,1]: ART.box(node,Vector3(side*.85,1.3,0),Vector3(.17,2.6,.2),"bd9357")
-	ART.box(node,Vector3(0,2.65,0),Vector3(1.9,.2,.22),"e4bf75")
-	var glass=ART.box(node,Vector3(0,1.3,0),Vector3(1.5,2.4,.04),"ae8646",.1)
-	glass.material_override=glass.material_override.duplicate()
-	glass.material_override.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA
-	glass.material_override.albedo_color.a=.3
-	SCENE.collision(node,Vector3(0,1.3,0),Vector3(1.6,2.6,.12))
-	var title_label=ART.label(node,title,Vector3(0,2.1,.08),26); title_label.pixel_size=.003
-	ART.label(node,"Point + trigger / click\nFree ring-throwing trials",Vector3(0,1,.08),18).pixel_size=.003
+	var node := preload("res://smithy_art.gd").doorway(parent, "grounds/fair_gate", pos, "playful_encounter:"+action)
+	var title_label = ART.label(node,title,Vector3(0,3.17,0.12),26)
+	title_label.pixel_size = 0.003
+	title_label.visibility_range_end = 14.0
+	var use_hint = ART.label(node,"Point and activate to travel",Vector3(0,2.26,0.16),18)
+	use_hint.pixel_size = 0.003
+	use_hint.visibility_range_end = 3.5
 	return node
 
 func act(action:String):

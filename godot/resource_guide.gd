@@ -143,6 +143,7 @@ static func _build_items(game: Node, state: Dictionary, items: Array) -> void:
 		var acquired: bool = index < 4 or bool(owned.get(id, false)) or bool(recipe.get("owned", false))
 		var state_text := "Held" if held != null and str(held.get_meta("id", "")) == id else (
 			"Owned" if acquired else ("Available · free to craft" if int(state.get("tier", 1)) >= tier else "Locked · workshop tier %d" % tier))
+		state_text = _docked_address(game, str(id), state_text)
 		var controls := _built_in_controls(id, game.vr, recipe)
 		items.append({"name": str(game.adventure.TOOL_NAMES.get(id, id)), "state": state_text,
 			"description": controls})
@@ -158,8 +159,9 @@ static func _build_items(game: Node, state: Dictionary, items: Array) -> void:
 		if instructions == "": instructions = str(spec.get("requestedFunction", "")).strip_edges()
 		if instructions == "": instructions = str(spec.get("description", "")).strip_edges()
 		if instructions == "": instructions = "Brann has not supplied use instructions for this delivery; inspect or refine it at the workshop."
+		var status := "Held" if held != null and str(held.get_meta("id", "")) == id else ("Ready to equip" if ready else "Brann is finishing it")
 		items.append({"name": str(spec.get("name", id)),
-			"state": "Held" if held != null and str(held.get_meta("id", "")) == id else ("Ready to equip" if ready else "Brann is finishing it"),
+			"state": _docked_address(game, id, status),
 			"description": instructions})
 	if game.collection != null:
 		for id in game.collection.homes.keys():
@@ -194,6 +196,14 @@ static func _build_items(game: Node, state: Dictionary, items: Array) -> void:
 	if held != null:
 		_native_item(game, held, str(held.get_meta("id", held.name)), seen_ids, items)
 
+static func _docked_address(game: Node, id: String, state: String) -> String:
+	if game.collection == null or state == "Held": return state
+	var home: Dictionary = game.collection.homes.get(id, {})
+	var item: Node3D = home.get("item")
+	if is_instance_valid(item) and game.collection.is_docked(item):
+		return state + " · " + str(game.collection.location(home))
+	return state
+
 static func _native_item(game: Node, value: Variant, fallback_id: String,
 		seen_ids: Dictionary, items: Array, explicit_description: String = "") -> void:
 	if not value is Node3D or not is_instance_valid(value): return
@@ -201,9 +211,9 @@ static func _native_item(game: Node, value: Variant, fallback_id: String,
 	var id := str(item.get_meta("id", fallback_id))
 	if seen_ids.has(id): return
 	seen_ids[id] = true
-	var state := "Held" if item in game.held.values() else (
+	var state: String = "Held" if item in game.held.values() else (
 		"On belt" if game.grips != null and game.grips.is_stowed(item) else (
-			"At collection stand" if game.collection != null and item.get_parent() == game.collection.root else "In world"))
+			game.collection.location(game.collection.homes[id]) if game.collection != null and game.collection.is_docked(item) else "In world"))
 	var description := explicit_description
 	if description == "":
 		description = str(item.get_meta("use_instructions", item.get_meta("description", ""))).strip_edges()
@@ -318,6 +328,8 @@ static func _build_director_costs(game: Node, view: Node, costs: Array) -> void:
 			elif float(view.budget) < float(card.cost): status = "Need %.1f more Sparks" % (float(card.cost) - float(view.budget))
 			elif int(card.count) > 0 and live + int(card.count) > 9: status = "Too many enemies on the field"
 			else: status = "Ready · choose an approach"
-		costs.append({"name": str(card.name).capitalize(),
+		var card_title := str(card.name).capitalize()
+		if kind == "golem": card_title += " (War Director)"
+		costs.append({"name": card_title,
 			"cost": "%d Sparks · %.0f s cooldown" % [int(card.cost), float(card.cooldown)],
 			"state": status, "description": "War Director Sparks are separate from Orchard Mana."})

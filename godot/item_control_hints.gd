@@ -7,7 +7,7 @@ const DESKTOP={
 	"starter_hammer":"LMB strike · RMB Forge Pulse (3s)",
 	"apprentice_hammer":"LMB strike · RMB Forge Pulse (3s)",
 	"woodland_axe":"LMB swing/chop · hold RMB through LMB contact for Power Cleave",
-	"quarry_pick":"LMB work one seam · RMB resonance (8s) · E collect loose chunks",
+	"quarry_pick":"LMB work one seam · RMB charge resonance, then strike within 8s · E collect loose chunks",
 	"grappling_hook":"LMB attach, hold to reel, release to pause · RMB detach",
 	"spore_lantern":"Carry for light · RMB plant a slowing spore garden (6s)",
 	"crystal_resonator":"LMB strike · RMB resonance fan/open seals (3s)",

@@ -50,11 +50,27 @@ func run(game):
 		if not ResourceLoader.exists("res://assets/orchard/"+str(asset_id)+".glb"):
 			failures.append("missing orchard art "+str(asset_id))
 	for id in game.adventure.ZONES:
+		# The round planet supplies its own horizon through the curvature of its surface.
+		if id == "orchard_planet":
+			var planet = game.orchard_planet
+			if planet == null or planet.radius <= 0.0 or zones.get(id,{}).get("root") != planet.root:
+				failures.append("missing spherical planet surface")
+			continue
 		var horizon: Node3D = zones.get(id,{}).get("horizon")
 		if horizon==null or not is_instance_valid(horizon):
 			failures.append("missing horizon "+id)
 			continue
-		if id=="orchard_highlands":
+		if id == "forge_yard":
+			var meshes := horizon.find_children("*","MeshInstance3D",true,false)
+			var triangles := 0
+			if meshes.size() != 5: failures.append("forge valley terrain, trees, rocks, flowers or stream missing")
+			for part: MeshInstance3D in meshes:
+				if not part.is_in_group("distant_horizon"): failures.append("forge valley mesh in weather scan")
+				var mesh := part.mesh as ArrayMesh
+				for surface in mesh.get_surface_count():
+					triangles += maxi(mesh.surface_get_array_index_len(surface),mesh.surface_get_array_len(surface)) / 3
+			if triangles < 1000 or triangles > 45000: failures.append("forge valley triangle budget " + str(triangles))
+		elif id=="orchard_highlands":
 			var orchard_horizon_tris:=0
 			if horizon.get_child_count()!=3: failures.append("orchard horizon band count")
 			for band_index in 3:

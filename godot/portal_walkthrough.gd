@@ -85,7 +85,7 @@ func tick(game, delta: float) -> void:
 func _travel(game, id: int, target: String) -> void:
 	latched_portal_id=id
 	cooldown_remaining=COOLDOWN
-	game.adventure.travel(target)
+	game.adventure.travel(target, true)
 	reset(game)
 
 static func _vr_committed(portal: Node3D, head: Vector3, torso: Vector3, direction: float) -> bool:

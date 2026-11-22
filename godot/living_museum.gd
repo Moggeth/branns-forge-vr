@@ -28,13 +28,12 @@ func setup(owner_game):
 		if saved is Array: home_order=saved
 	root=Node3D.new(); root.name="HallOfInventions"
 	game.adventure.zone_groups.forge_yard.add_child(root)
-	# The forge's west collection stands and destination portals already fill the
-	# proposed corner. A pocket hall preserves both instead of burying them.
+	# The museum retains its own exhibits and version history across armory deliveries.
 	root.position=Vector3(-120,0,0)
 	_build_hall()
 	entry_gate=_gate(game.adventure.zone_groups.forge_yard,Vector3(-11,0,1),"enter","HALL OF INVENTIONS","History & experiments · point and trigger")
 	entry_gate.rotation.y=PI/2
-	_gate(root,Vector3(4.1,0,0.2),"leave","BACK TO BRANN","Current tools: named collection stands")
+	_gate(root,Vector3(4.1,0,0.2),"leave","BACK TO BRANN","Equipment · east armory")
 	print("LIVING_MUSEUM_READY page_size=6 model_loading=on_request audio_recording=false")
 
 func _text(parent,text,pos,size=22,width=650)->Label3D:
@@ -61,18 +60,11 @@ func _panel(pos:Vector3)->Node3D:
 	return panel
 
 func _gate(parent,pos,action,title,hint)->Node3D:
-	var gate=Node3D.new(); parent.add_child(gate); gate.position=pos
-	gate.set_meta("kind","button"); gate.set_meta("action","museum:"+action)
-	for side in [-1,1]:
-		WorldZones.box(gate,Vector3(side*.82,1.25,0),Vector3(.22,2.5,.3),"596f6a")
-		WorldZones.box(gate,Vector3(side*.82,2.4,0),Vector3(.34,.14,.4),"c7a76b")
-	WorldZones.box(gate,Vector3(0,2.58,0),Vector3(1.9,.22,.3),"596f6a")
-	var glass=WorldZones.box(gate,Vector3(0,1.3,0),Vector3(1.45,2.3,.055),"538b84",.25)
-	glass.material_override=glass.material_override.duplicate()
-	glass.material_override.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA; glass.material_override.albedo_color.a=.35
-	WorkshopScene.collision(gate,Vector3(0,1.25,0),Vector3(1.65,2.5,.13))
-	_text(gate,title,Vector3(0,2.1,.18),25,700)
-	_text(gate,hint,Vector3(0,.85,.18),19,600)
+	var gate := preload("res://smithy_art.gd").doorway(parent, "grounds/museum_gate", pos, "museum:"+action)
+	var title_plate = _text(gate,title,Vector3(0,3.17,0.12),25,700)
+	title_plate.visibility_range_end = 14.0
+	var controls = _text(gate,hint,Vector3(0,2.26,0.16),19,600)
+	controls.visibility_range_end = 3.5
 	return gate
 
 func _build_hall():
@@ -91,7 +83,7 @@ func _build_hall():
 	var entrance=Node3D.new(); root.add_child(entrance); entrance.rotation.y=PI
 	var hall_name=_text(entrance,"THE HALL OF INVENTIONS",Vector3(0,3.4,0),56,2400); hall_name.pixel_size=0.004
 	_text(entrance,"Every idea leaves a trace",Vector3(0,3.05,0),32,1400)
-	_text(entrance,"Version archive here · current equipment remains on the collection stands beside Brann",Vector3(0,2.76,0),21,2200)
+	_text(entrance,"Version archive · collect your working equipment in the east armory",Vector3(0,2.76,0),21,2200)
 	var archive=_panel(Vector3(-2.45,1.7,3.6))
 	labels.title=_text(archive,"THE ARCHIVE",Vector3(0,1.03,0.1),29,1250)
 	labels.detail=_text(archive,"Your creations and their history will appear here.",Vector3(0,0.40,0.1),21,1170)
@@ -212,7 +204,7 @@ func _refresh():
 		var state=str(deployment.get("status","archived")) if int(deployment.get("version",-1))==int(item.get("version",1)) else "archived"
 		stand.title.text="%03d · %s\nv%d"%[page*PAGE_SIZE+i+1,str(item.get("name",item.id)),int(item.get("version",1))]
 		stand.status.text=state.to_upper(); stand.token.visible=true
-		stand.excerpt.text=str(item.get("provenance",{}).get("prompt","Recovered design record")).left(150) if key(item)==selected_key else ("Retrieve the creation at its collection stand" if item.get("kind","")=="legacy" else "Retrieve activates this version in its world location")
+		stand.excerpt.text=str(item.get("provenance",{}).get("prompt","Recovered design record")).left(150) if key(item)==selected_key else ("Retrieve the creation at its armory stand" if item.get("kind","")=="legacy" else "Retrieve activates this version in its world location")
 		stand.token.material_override=WorldZones.mat("81cfa5" if state=="applied" else ("e7bd72" if state in ["staged","deferred"] else "a5b0b9"))
 	var demo_pages=maxi(1,ceili(demos.size()/4.0)); demo_page=clampi(demo_page,0,demo_pages-1)
 	for i in range(demo_buttons.size()):
