@@ -1676,14 +1676,17 @@ function* buildGame({ canvas, onAction = () => {}, onCast = () => {}, onInput = 
       if(draw?.perfect&&!manned.perfectRang){manned.perfectRang=true;keepAudio.perfectBeat();}
       if(b.hook&&(keys.has('KeyR')||crankHeld))keepAudio.ratchet({local:true,rate:1,reel:true});else if((snapshot.tick??0)<b.readyTick&&(keys.has('KeyR')||crankHeld))keepAudio.ratchet({local:true,rate:1});
       const state=b.hook?(touchEnabled?'Hooked · hold Wind to reel':'Hooked · hold R to reel, click to yank'):draw?(draw.perfect?'Dawnbreak! Let go!':`Drawing · ${Math.round(draw.charge*100)}%`):timberlineReadiness(b).state;
-      timberlineAmmoHud.set({label:b.style==='sunlance'?'Sunlance':'Gnashjaw',bolts:1,state:sight?.visible&&sight.distance?`${state} · ${Math.round(sight.distance)} m`:state,scoped:scopeAmount>.5});return;}
+      timberlineAmmoHud.set({label:b.style==='sunlance'?'Sunlance':'Gnashjaw',bolts:1,state:sight?.visible&&sight.distance?`${state} · ${Math.round(sight.distance)} m`:state,scoped:scopeAmount>.5,...mannedKeys()});return;}
     // A gate Timberline is the keep's: its bolts are free, so the counter just names it.
     const self=snapshot.players.find(p=>p.id===playerId),ammo=b.type==='homeBallista'?{label:'Gate Timberline',bolts:1,total:1}:timberlineAmmo(snapshot,self),ready=timberlineReadiness(b);
     camera.getWorldPosition(sightEye);
     // The forecast arcs only show while sighting along the ladder, and fade in with it.
     if(scopeAmount>0)timberlineSight.update({b,aim:manned,height:(x,z)=>terrainHeight(x,z,snapshot.edits,snapshot.tick??Infinity),eye:sightEye,camera,time:now/1000,editsKey:startingEdits,amount:scopeAmount});else timberlineSight.hide();
-    timberlineAmmoHud.set({...ammo,state:ammo.total?ready.state:'',scoped:scopeAmount>.5});
+    timberlineAmmoHud.set({...ammo,state:ammo.total?ready.state:'',scoped:scopeAmount>.5,...mannedKeys()});
   }
+  // The dismount key and, for the first seconds in the seat, the controls (desktop; touch has its own buttons).
+  function mannedKeys(){if(touchEnabled||!manned)return {};const fresh=(snapshot.tick??0)-(manned.sinceTick??0)<60*7;
+    return {stepOff:'E',keys:fresh?'Click fires · hold R winds · hold right-click sights':''};}
   // Hold R to wind: the operator doubles the reload; a second Hero cranking beside it quadruples it.
   function crankNearby(now){
     if(!active||role!=='hero'||!(keys.has('KeyR')||crankHeld)||now-crankAt<150)return;

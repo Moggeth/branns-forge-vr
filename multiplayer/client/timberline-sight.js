@@ -1,6 +1,7 @@
 // Manned Timberline aiming aid, shown only while sighting along the brass ladder: the two predicted bolt paths drawn
-// as very thin pale lines that fade with distance, ending in a small brass ring where the pair comes down, with its
-// distance and flight time. The forecast replays the same shared
+// as very thin pale lines that fade with distance, ending in a small brass ring where the pair comes down. Its distance
+// and flight time stay in the forecast (tests, tools) but are no longer printed in the world: a floating readout sat right
+// on the target, and range now reads off the flip-up sight itself (client/timberline-flip-sight.js). The forecast replays the same shared
 // v3 flight the authority steps (shared/timberline-flight.js) against the same ground, so it never aims for you:
 // it only shows where the current aim lands. Structures, trees and creatures can still stop the pair earlier.
 import * as THREE from 'three';
@@ -50,10 +51,7 @@ export function createTimberlineSight({scene}){
  const arcs=[arcMesh(TIMBERLINE_SIGHT.maxPoints,uniforms),arcMesh(TIMBERLINE_SIGHT.maxPoints,uniforms)];arcs.forEach((a,i)=>{a.name=`TimberlineSightArc_${'LR'[i]}`;group.add(a);});
  const markTex=markTexture(),mark=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({map:markTex,transparent:true,depthTest:false,depthWrite:false,toneMapped:false}));
  mark.name='TimberlineSightMark';mark.renderOrder=6;group.add(mark);
- const lc=document.createElement('canvas');lc.width=256;lc.height=64;const lx=lc.getContext('2d'),labelTex=new THREE.CanvasTexture(lc);labelTex.colorSpace=THREE.SRGBColorSpace;
- const label=new THREE.Sprite(new THREE.SpriteMaterial({map:labelTex,transparent:true,depthTest:false,depthWrite:false,toneMapped:false}));label.name='TimberlineSightLabel';label.renderOrder=7;group.add(label);
- let lastText='',last=null,key='';const _a=new THREE.Vector3(),_b=new THREE.Vector3(),_t=new THREE.Vector3(),_s=new THREE.Vector3(),_c=new THREE.Vector3();
- function text(t){if(t===lastText)return;lastText=t;lx.clearRect(0,0,256,64);lx.font='600 30px Georgia, serif';lx.textAlign='center';lx.textBaseline='middle';lx.lineWidth=5;lx.strokeStyle='rgba(28,20,10,.7)';lx.strokeText(t,128,32);lx.fillStyle='#f1e2bc';lx.fillText(t,128,32);labelTex.needsUpdate=true;}
+ let last=null,key='';const _a=new THREE.Vector3(),_b=new THREE.Vector3(),_t=new THREE.Vector3(),_s=new THREE.Vector3(),_c=new THREE.Vector3();
  function ribbon(mesh,pts,eye){const pos=mesh.geometry.attributes.position,al=mesh.geometry.attributes.along,n=Math.min(pts.length/3,TIMBERLINE_SIGHT.maxPoints);let along=0;
   for(let i=0;i<n;i++){_a.fromArray(pts,i*3);_b.fromArray(pts,Math.min(n-1,i+1)*3);if(i===n-1)_b.fromArray(pts,i*3).sub(_t.fromArray(pts,Math.max(0,i-1)*3)).add(_a);
    _t.subVectors(_b,_a).normalize();_c.subVectors(_a,eye);const w=TIMBERLINE_SIGHT.core+TIMBERLINE_SIGHT.perMetre*_c.length();_s.crossVectors(_t,_c).normalize().multiplyScalar(w);
@@ -63,15 +61,14 @@ export function createTimberlineSight({scene}){
   // b: the manned structure; aim {yaw,pitch} (the local wanted aim); height(x,z); eye: camera world position.
   update({b,aim,height,eye,camera,time,editsKey='',amount=1}){if(!b||!aim){group.visible=false;return null;}
    const k=`${b.id}:${b.position.join(',')}:${aim.yaw.toFixed(4)}:${aim.pitch.toFixed(4)}:${b.yaw}:${editsKey}`;if(k!==key){key=k;last=forecastTimberline(mannedShot(b,aim),height);}
-   group.visible=true;const fade=THREE.MathUtils.smoothstep(amount,.2,1);uniforms.opacity.value=.95*fade;mark.material.opacity=label.material.opacity=fade;const total=Math.max(ribbon(arcs[0],last.left,eye),ribbon(arcs[1],last.right,eye));uniforms.total.value=total;uniforms.time.value=time*TIMBERLINE_SIGHT.flow;
-   if(last.impact){const c=_c.fromArray(last.impact.centre),l=_a.fromArray(last.impact.left),r=_b.fromArray(last.impact.right),d=c.distanceTo(eye);
-    mark.visible=label.visible=true;const size=Math.max(.5,d*.022);mark.position.copy(c).y+=size*.5;
+   group.visible=true;const fade=THREE.MathUtils.smoothstep(amount,.2,1);uniforms.opacity.value=.95*fade;mark.material.opacity=fade;const total=Math.max(ribbon(arcs[0],last.left,eye),ribbon(arcs[1],last.right,eye));uniforms.total.value=total;uniforms.time.value=time*TIMBERLINE_SIGHT.flow;
+   if(last.impact){const c=_c.fromArray(last.impact.centre),d=c.distanceTo(eye);
+    mark.visible=true;const size=Math.max(.5,d*.022);mark.position.copy(c).y+=size*.5;
     // Stands up facing the operator (a flat ground decal vanishes at grazing angles); the arcs sit left and right like the bolts.
-    mark.quaternion.copy(camera.quaternion);mark.scale.setScalar(size);
-    label.position.copy(c).y+=size*.6+d*.03;const lw=d*.15+.8;label.scale.set(lw,lw/4,1);text(`${Math.round(last.distance)} m · ${last.impact.t.toFixed(1)} s`);}
-   else{mark.visible=false;label.visible=true;label.position.fromArray(last.left.slice(-3));label.scale.set(6,1.5,1);text('Beyond range');}
+    mark.quaternion.copy(camera.quaternion);mark.scale.setScalar(size);}
+   else mark.visible=false;
    return last;},
   hide(){group.visible=false;},
   get forecast(){return last;},
-  dispose(){group.removeFromParent();for(const a of arcs){a.geometry.dispose();a.material.dispose();}mark.geometry.dispose();mark.material.dispose();markTex.dispose();label.material.dispose();labelTex.dispose();}};
+  dispose(){group.removeFromParent();for(const a of arcs){a.geometry.dispose();a.material.dispose();}mark.geometry.dispose();mark.material.dispose();markTex.dispose();}};
 }
