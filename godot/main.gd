@@ -1973,10 +1973,7 @@ func _speech_tick(delta):
 		_poll_speech()
 	var target=speech_target if visiting and elapsed-speech_seen<0.8 else 0.0
 	speech_level=lerpf(speech_level,target,clampf(delta*18,0,1))
-	var head=scene.brann.get_meta("speech_head")
-	var beard=scene.brann.get_meta("speech_beard")
 	presence.tick(delta)
-	beard.position.y=-speech_level*(0.012+0.005*sin(elapsed*25))
 
 func _poll_speech():
 	speech_busy=true
@@ -2749,11 +2746,11 @@ func _brann_checks(failures:Array):
 	response=await _request("/api/vr/speech",{"level":0.8,"active":true})
 	await _poll_speech()
 	_speech_tick(0.1)
-	if scene.brann.get_meta("speech_beard").position.y>=0: failures.append("speech beard did not animate")
+	if scene.brann.face_value(&"MouthOpen") < 0.1: failures.append("Brann did not articulate while speaking")
 	await _request("/api/vr/speech",{"level":0.0,"active":false})
 	await _poll_speech()
 	_speech_tick(0.1)
-	if absf(scene.brann.get_meta("speech_beard").position.y)>0.001: failures.append("speech beard did not stop")
+	if scene.brann.face_value(&"MouthOpen") > 0.12: failures.append("Brann did not settle his mouth after speaking")
 	await _presence_checks(failures)
 
 func _presence_checks(failures):
@@ -2787,7 +2784,7 @@ func _presence_checks(failures):
 	visiting=true
 	camera.global_position=scene.brann.global_position+Vector3(20,4,1)
 	presence.tick(1)
-	if absf(scene.brann.get_meta("speech_head").rotation.y)>0.91: failures.append("head turn not bounded")
+	if absf(scene.brann.gaze_yaw)>0.91: failures.append("head turn not bounded")
 	var clasp: MeshInstance3D = scene.brann.get_meta("presence_rune")
 	if (clasp.global_transform * clasp.mesh.get_aabb()).size.x > 0.12: failures.append("presence clasp oversized")
 	camera.global_transform=before

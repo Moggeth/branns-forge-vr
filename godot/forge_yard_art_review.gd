@@ -39,6 +39,11 @@ func _run() -> void:
 	var camera := Camera3D.new()
 	view.add_child(camera)
 	camera.current = true
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--brann-review-output="):
+			var passed := await _review_brann(game,view,camera,arg.trim_prefix("--brann-review-output="),OS.get_cmdline_user_args().has("--brann-motion"))
+			quit(0 if passed else 1)
+			return
 	var frames := [
 		["arrival", Vector3(0,1.67,2.0), Vector3(-0.2,1.25,-3.6), 72.0],
 		["smithy", Vector3(5.8,2.1,5.8), Vector3(-1.1,1.9,-3.4), 69.0],
@@ -81,7 +86,7 @@ func _run() -> void:
 		if frame[0] == "hammer_strike":
 			game.workshop_delivery.set_process(false)
 			game.workshop_delivery.billet.show()
-			game.workshop_delivery.working_pose(0)
+			game.workshop_delivery.working_pose(game.workshop_delivery.CONTACT_PHASE)
 			game.workshop_delivery.strike()
 		for tick in 4: await process_frame
 		await RenderingServer.frame_post_draw
@@ -122,3 +127,76 @@ func _capture_motion(game: Node3D, view: SubViewport, camera: Camera3D, views: A
 	var strikes: int = game.workshop_delivery.strike_count - strikes_before
 	print("SMITHY_MOTION_REVIEW ",JSON.stringify({"frames":number,"strikes":strikes}))
 	return strikes >= 3
+
+
+const CHARACTER_STILLS := [
+	["front", Vector3(1.03,1.42,2.14), Vector3(0.0,0.99,0.04), 56.0],
+	["portrait", Vector3(0.63,1.63,1.20), Vector3(0.0,1.58,0.08), 33.0],
+	["side", Vector3(-1.58,1.35,0.39), Vector3(0.0,1.03,0.0), 59.0],
+	["rear", Vector3(-1.30,1.37,-0.97), Vector3(0.0,1.06,0.02), 58.0],
+	["listen", Vector3(0.70,1.66,1.46), Vector3(0.08,1.59,0.1), 38.0],
+	["talk", Vector3(0.50,1.63,1.50), Vector3(0.00,1.55,0.1), 42.0],
+	["raise", Vector3(-1.54,1.85,1.71), Vector3(-0.26,1.48,0.34), 61.0],
+	["contact", Vector3(-1.37,1.53,2.06), Vector3(-0.25,1.34,0.57), 55.0],
+	["rebound", Vector3(-1.31,1.56,2.12), Vector3(-0.23,1.33,0.49), 54.0],
+]
+
+
+func _brann_camera(game: Node3D, camera: Camera3D, shot: Array) -> void:
+	var origin: Vector3 = game.scene.brann.global_position
+	camera.global_position = origin + shot[1]
+	camera.look_at(origin + shot[2], Vector3.UP)
+	camera.fov = shot[3]
+	game.camera.global_transform = camera.global_transform
+
+
+## The review sends an offline voice envelope into the same character controller.
+func _review_brann(game: Node3D, view: SubViewport, camera: Camera3D, output: String, motion: bool) -> bool:
+	if DirAccess.make_dir_recursive_absolute(output) != OK: return false
+	game.set_process(false)
+	game.workshop_delivery.set_process(false)
+	var brann = game.scene.brann
+	var rendered := 0
+	if motion:
+		view.size = Vector2i(960, 600)
+		var previous_phase := 0.0
+		for cut in [[1, 41], [4, 59], [5, 69], [7, 96]]:
+			_brann_camera(game,camera,CHARACTER_STILLS[cut[0]])
+			for frame in int(cut[1]):
+				var working: bool = cut[0] == 7
+				var level := 0.0
+				if cut[0] == 5:
+					level = 0.58 + 0.24 * sin(float(frame) * 0.4)
+				game.workshop_delivery.billet.visible = working
+				brann.tick(1.0/24.0,camera.global_position,cut[0] != 1 and not working,level > 0.0,level,false)
+				if working:
+					var phase := fposmod(float(frame)/24.0/game.workshop_delivery.STRIKE_PERIOD,1.0)
+					if previous_phase < brann.STRIKE_PHASE and phase >= brann.STRIKE_PHASE:
+						brann.pose_forge(brann.STRIKE_PHASE)
+						game.workshop_delivery.strike()
+					brann.pose_forge(phase)
+					previous_phase = phase
+				await process_frame
+				await RenderingServer.frame_post_draw
+				if view.get_texture().get_image().save_jpg(output.path_join("%04d.jpg" % rendered),0.94) != OK: return false
+				rendered += 1
+	else:
+		for shot in CHARACTER_STILLS:
+			_brann_camera(game,camera,shot)
+			var speaking: bool = shot[0] == "talk"
+			var engaged: bool = speaking or shot[0] == "listen"
+			var working: bool = shot[0] in ["raise", "contact", "rebound"]
+			game.workshop_delivery.billet.visible = working
+			for frame in 50:
+				brann.tick(1.0/24.0,camera.global_position,engaged,speaking,0.76 if speaking else 0.0,false)
+			if working:
+				var progress: float = {"raise":0.40,"contact":brann.STRIKE_PHASE,"rebound":0.84}[shot[0]]
+				brann.pose_forge(progress)
+				if shot[0] == "contact": game.workshop_delivery.strike()
+			for frame in 3: await process_frame
+			await RenderingServer.frame_post_draw
+			if view.get_texture().get_image().save_png(output.path_join(str(shot[0])+".png")) != OK: return false
+			rendered += 1
+			brann.stop_forging()
+	print("BRANN_VISUAL_REVIEW ", JSON.stringify({"frames":rendered,"motion":motion,"forge_strikes":game.workshop_delivery.strike_count}))
+	return rendered > 0

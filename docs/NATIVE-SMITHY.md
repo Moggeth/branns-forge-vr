@@ -4,6 +4,8 @@ Choose **Adventure** in **Brann’s Forge Launcher**, then desktop or VR. Start 
 
 [Before and after, Brann and the armory](../assets/smithy-source/review/smithy.jpg) · [All nine courtyard gateways](../assets/smithy-source/review/gates.jpg) · [11-second in-game film](../assets/smithy-source/review/smithy-motion.mp4)
 
+[Brann’s rig, animation and verification](BRANN-CHARACTER.md)
+
 ## The yard and the collection
 
 The central paths connect Brann’s anvil, the seven expedition gates and the eastern armory. The western practice lane, Living Museum and Bellworks Fair each have their own approach. Foliage, cradles and the quarry backdrop leave those routes clear. The 206 m valley is scenery. Traversal uses a separate walkable floor.
