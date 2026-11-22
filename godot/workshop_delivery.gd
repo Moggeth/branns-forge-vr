@@ -1,9 +1,8 @@
 extends Node
 ## One strike clock owns the pose, contact event, sparks and sound.
 const STRIKE_PERIOD=0.90
-const CONTACT_PHASE=0.72
+const CONTACT_PHASE := preload("res://brann_character.gd").STRIKE_PHASE
 const CONTACT=Vector3(-0.43,1.29,-2.9)
-const HAMMER_FACE=Vector3(-0.2285,0.48,0)
 var game
 var finishing=false
 var revealing=false
@@ -17,7 +16,6 @@ var progress_fill:MeshInstance3D
 var strike_clock=0.0
 var strike_count=0
 var was_working=false
-var home:Vector3
 var impacts=[]
 var sound_index=0
 var audio_players=[]
@@ -26,7 +24,6 @@ var active_job={}
 
 func setup(owner_game):
 	game=owner_game
-	home=game.scene.brann.position
 	var parent=game.adventure.zone_groups.forge_yard
 	billet=Node3D.new()
 	parent.add_child(billet)
@@ -53,16 +50,9 @@ func setup(owner_game):
 		player.volume_db=-18.0
 		audio_players.append(player)
 
-func working_pose(angle:float):
-	var hammer:Node3D=game.scene.brann.get_meta("smith_hammer")
-	var face:Vector3=hammer.transform*HAMMER_FACE
-	var shoulder:Vector3=game.scene.arm.position
-	var dy=CONTACT.y-(home.y+shoulder.y)
-	var radius=sqrt(face.y*face.y+face.z*face.z)
-	var dz=sqrt(maxf(0.01,radius*radius-dy*dy))
-	var strike_angle=atan2(dz,dy)-atan2(face.z,face.y)
-	game.scene.brann.position=Vector3(CONTACT.x-shoulder.x-face.x,home.y,CONTACT.z-shoulder.z-dz)
-	game.scene.arm.rotation.x=strike_angle+angle
+func working_pose(phase: float) -> void:
+	game.scene.brann.pose_forge(phase)
+
 
 func _process(delta):
 	if game==null: return
@@ -96,15 +86,13 @@ func _process(delta):
 		strike_clock+=delta
 		var after=strike_clock/STRIKE_PERIOD
 		var phase=fposmod(after,1.0)
-		var swing=-0.65*sin(PI*clampf(phase/CONTACT_PHASE,0,1)) if phase<CONTACT_PHASE else 0.0
-		working_pose(swing)
-		if floorf(before-CONTACT_PHASE)<floorf(after-CONTACT_PHASE):
-			# Contact is sampled exactly, even if a low frame rate crosses the strike instant.
-			working_pose(0.0)
+		if floorf(before-CONTACT_PHASE) < floorf(after-CONTACT_PHASE):
+			# Sample the authored contact exactly even if this frame crossed it.
+			working_pose(CONTACT_PHASE)
 			strike()
-	else:
-		game.scene.brann.position=game.scene.brann.position.lerp(home,1.0-exp(-delta*6))
-		game.scene.arm.rotation.x=lerpf(game.scene.arm.rotation.x,sin(game.elapsed)*0.035,1.0-exp(-delta*6))
+		working_pose(phase)
+	elif was_working:
+		game.scene.brann.stop_forging()
 	was_working=working
 
 static func progress_text(job:Dictionary)->String:
@@ -130,15 +118,17 @@ func play_sound(stream:AudioStream,point:Vector3,volume:float):
 
 func strike():
 	strike_count+=1
-	var hammer:Node3D=game.scene.brann.get_meta("smith_hammer")
-	var point=hammer.to_global(HAMMER_FACE)
+	var point: Vector3 = game.scene.brann.strike_point()
+	if not point.is_finite():
+		push_error("Brann's strike marker is missing from the character export.")
+		return
 	# Coprime step visits all eight timbres without immediate repetition.
 	play_sound(impacts[(strike_count*3)%impacts.size()],point,-18.0)
 	if billet.is_visible_in_tree():
 		game.impact_feedback.emit_contact({"target":billet, "point":point, "normal":Vector3.UP,
 			"energy":7.0, "relative_velocity":Vector3(0,-4,1.2), "tool_material":"steel",
 			"material":"metal", "play_sound":false, "leave_mark":false})
-	if strike_count==1: print("FORGE_STRIKE contact_error_m=",point.distance_to(CONTACT)," sound_variants=",impacts.size())
+	if strike_count==1: print("FORGE_STRIKE contact_error_m=",point.distance_to(billet.get_parent_node_3d().to_global(CONTACT))," sound_variants=",impacts.size())
 
 func flourish(point:Vector3,count:int,color:Color,life:float):
 	if not game.adventure.zone_groups.forge_yard.is_visible_in_tree(): return

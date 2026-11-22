@@ -132,40 +132,14 @@ static func build(root: Node3D) -> Dictionary:
 	# Keep the wooden stump distinct from the metal working face for contacts.
 	collision(root, Vector3(-0.35,0.35,-2.9),Vector3(0.95,0.7,0.95),"wood")
 	collision(root, Vector3(-0.35,0.96,-2.9),Vector3(1.25,0.52,0.8),"metal")
-	var brann := SmithyArt.place(root, "brann/brann", Vector3(0,0,-4))
+	var brann := preload("res://brann_character.gd").new()
 	brann.name = "BrannCopperpot"
+	brann.position = Vector3(0,0,-4)
 	brann.set_meta("kind", "brann")
 	brann.set_meta("surface_material", "flesh")
-	var head := brann.find_child("HeadPivot", true, false) as Node3D
-	var beard := brann.find_child("BeardPivot", true, false) as Node3D
-	var arm := brann.find_child("StrikePivot", true, false) as Node3D
-	if arm.get_parent() != brann: arm.reparent(brann)
-	var speech_driver := Node3D.new()
-	beard.get_parent().add_child(speech_driver)
-	beard.reparent(speech_driver)
-	brann.set_meta("speech_head", head)
-	brann.set_meta("speech_beard", speech_driver)
-	brann.set_meta("rest_arm", brann.find_child("RestPivot", true, false))
-	var eyes: Array[Node3D] = []
-	for eye_name in ["EyeL", "EyeR"]:
-		var eye := head.find_child(eye_name, true, false) as Node3D
-		if eye != null: eyes.append(eye)
-	brann.set_meta("eyes", eyes)
-	var presence_anchor := brann.find_child("PresenceAnchor", true, false) as Node3D
-	presence_anchor.position = Vector3(0,1.12,0.36)
-	var rune := brann.find_child("PresenceIndicator", true, false) as MeshInstance3D
-	var glow := (rune.mesh.surface_get_material(0) as StandardMaterial3D).duplicate() as StandardMaterial3D
-	rune.set_surface_override_material(0, glow)
-	brann.set_meta("presence_rune", rune)
-	brann.set_meta("presence_glow", glow)
+	root.add_child(brann)
+	if brann.rune != null: brann.set_meta("presence_rune", brann.rune)
 	brann.set_meta("presence_label", label(brann,"",Vector3(0,0.96,0.43),16))
-	var smith_hammer: Node3D = make_hammer(wood,iron,brass)
-	smith_hammer.position = Vector3(0,-0.45,0.16)
-	smith_hammer.rotation.x = PI/2.0
-	smith_hammer.rotate_object_local(Vector3.UP,PI/2.0)
-	smith_hammer.position-=smith_hammer.basis*Vector3(0,0.13,0)
-	arm.add_child(smith_hammer)
-	brann.set_meta("smith_hammer",smith_hammer)
 	collision(brann,Vector3(0,0.9,0),Vector3(0.95,1.8,0.65),"flesh")
 	var smith_name := label(brann,"Brann Copperpot",Vector3(0,2.10,0),23)
 	smith_name.pixel_size = 0.0038
@@ -264,7 +238,7 @@ static func build(root: Node3D) -> Dictionary:
 		collision(dummy,Vector3(0,1.2,0),Vector3(1.15,1.8,0.6),"wood")
 		label(dummy,"TEST YOUR CRAFT",Vector3(0,2.4,0),25)
 		dummies.append(dummy)
-	var result: Dictionary = {"brann":brann,"arm":arm,"question":question,"rack":rack,"board":board,"hammer":hammer,"rats":rats,"dummies":dummies,"buttons":buttons,"status_label":status_label,"bounty_label":bounty_label,"voice_label":voice_label}
+	var result: Dictionary = {"brann":brann,"question":question,"rack":rack,"board":board,"hammer":hammer,"rats":rats,"dummies":dummies,"buttons":buttons,"status_label":status_label,"bounty_label":bounty_label,"voice_label":voice_label}
 	result.merge(adventure)
 	return result
 

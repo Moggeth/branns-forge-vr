@@ -1,94 +1,58 @@
 extends Node
-## Presentation and proximity are separate from microphone/session authority.
+## Presence and interaction are independent of the speech connection.
+
 var game
-var distance=0.0
-var phase="away"
-var leaving_since=-1.0
-var last_voice="idle"
-var greeting=0.0
-var glance_next=5.0
-var glance_until=0.0
-var glance_side=1.0
-var pupils=[]
-var lids: Array[Node3D] = []
-var chest: Node3D
-var next_blink := 3.0
-var blink := -1.0
-@export var departure_grace_seconds=6.0
-@export var conversation_max_distance=6.0
-@export var gaze_follow_speed=3.0
-@export var glance_interval_seconds=6.5
+var distance := 0.0
+var phase := "away"
+var leaving_since := -1.0
+@export var departure_grace_seconds := 6.0
+@export var conversation_max_distance := 6.0
+
 
 func setup(owner_game):
-	game=owner_game
-	var smith: Node3D = game.scene.brann
-	pupils = smith.get_meta("eyes")
-	chest = smith.find_child("Body", true, false)
-	for lid_name in ["LidL", "LidR"]: lids.append(smith.find_child(lid_name, true, false))
+	game = owner_game
+
 
 func proximity():
-	var p=game.camera.global_position-game.scene.brann.global_position
-	distance=Vector2(p.x,p.z).length()
-	if game.adventure.zone!="forge_yard":
-		game.visiting=false
-		leaving_since=-1
+	var offset: Vector3 = game.camera.global_position - game.scene.brann.global_position
+	distance = Vector2(offset.x,offset.z).length()
+	if game.adventure.zone != "forge_yard":
+		game.visiting = false
+		leaving_since = -1.0
 	elif game.visiting:
-		if distance<2.9: leaving_since=-1
-		elif distance>3.2 and leaving_since<0: leaving_since=game.elapsed
-		if distance>conversation_max_distance or (leaving_since>=0 and game.elapsed-leaving_since>departure_grace_seconds): game.visiting=false
-	elif distance<2.6:
-		game.visiting=true
-		leaving_since=-1
-	phase="leaving" if game.visiting and leaving_since>=0 else ("near" if game.visiting else "away")
+		if distance < 2.9: leaving_since = -1.0
+		elif distance > 3.2 and leaving_since < 0.0: leaving_since = game.elapsed
+		if distance > conversation_max_distance or (leaving_since >= 0.0 and game.elapsed - leaving_since > departure_grace_seconds):
+			game.visiting = false
+	elif distance < 2.6:
+		game.visiting = true
+		leaving_since = -1.0
+	phase = "leaving" if game.visiting and leaving_since >= 0.0 else ("near" if game.visiting else "away")
 
-func tick(delta):
-	var head=game.scene.brann.get_meta("speech_head")
-	var voice=game.state.get("voiceClient",{})
-	var status=str(voice.get("phase","idle")) if voice.get("connected",false) else "error"
-	if not game.visiting: status="idle"
-	if game.speech_level>0.04 and game.visiting: status="speaking"
-	if status=="listening" and last_voice not in ["listening","speaking"]: greeting=game.elapsed
-	last_voice=status
-	if game.elapsed>glance_next:
-		glance_until=game.elapsed+0.75
-		glance_next=game.elapsed+glance_interval_seconds+sin(game.elapsed)*1.5
-		glance_side*=-1
-	var point=game.scene.brann.to_local(game.camera.global_position)-head.position
-	var engaged=game.visiting and point.z>0
-	var yaw=clampf(atan2(point.x,point.z),-0.7,0.7) if engaged else 0.0
-	var pitch=clampf(-atan2(point.y,maxf(0.1,Vector2(point.x,point.z).length())),-0.3,0.3) if engaged else 0.04
-	if engaged and game.elapsed<glance_until: yaw+=glance_side*0.2
-	var nod=sin(clampf((game.elapsed-greeting)*3,0,PI))*0.07 if greeting>0 else 0.0
-	head.rotation.y=lerp_angle(head.rotation.y,yaw,clampf(delta*gaze_follow_speed,0,1))
-	head.rotation.x=lerpf(head.rotation.x,pitch+nod,clampf(delta*gaze_follow_speed,0,1))+sin(game.elapsed*11)*game.speech_level*0.002
-	head.rotation.z=sin(game.elapsed*6)*game.speech_level*0.012
-	for eye in pupils:
-		eye.rotation.y = clampf(yaw - head.rotation.y, -0.30, 0.30)
-		eye.rotation.x = clampf(pitch - head.rotation.x, -0.15, 0.15)
-	var breath := sin(float(game.elapsed) * TAU * 0.22) * 0.012
-	chest.scale = Vector3(1.0 + 0.6*breath, 1.0 + 0.25*breath, 1.0 + breath)
-	next_blink -= delta
-	if next_blink <= 0.0:
-		blink = 0.0
-		next_blink = 4.25 + 1.75 * sin(float(game.elapsed)*0.79)
-	if blink >= 0.0:
-		blink = minf(1.0, blink + delta / 0.16)
-		for lid in lids: lid.rotation.x = 1.35 * sin(PI * blink)
-		if blink >= 1.0: blink = -1.0
-	var color=Color("74837c")
-	var caption=""
+
+func tick(delta: float) -> void:
+	var brann = game.scene.brann
+	var voice = game.state.get("voiceClient",{})
+	var status := str(voice.get("phase","idle")) if voice.get("connected",false) else "error"
+	if not game.visiting: status = "idle"
+	if game.speech_level > 0.04 and game.visiting: status = "speaking"
+	var camera: Vector3 = game.camera.global_position
+	var towards := Vector2(camera.x - brann.global_position.x, camera.z - brann.global_position.z)
+	var engaged: bool = game.visiting and towards.y > 0.05 and towards.length() < conversation_max_distance
+	brann.tick(delta, camera, engaged, status == "speaking", game.speech_level, game.workshop_delivery.revealing)
+	var color := Color("74837c")
+	var caption := ""
 	match status:
-		"opening","connecting": color=Color("ffc573"); caption="One moment…"
-		"listening": color=Color("85e7cb"); caption="I'm listening"
-		"speaking": color=Color("ffd58a")
-		"error": color=Color("c78980"); caption="Tap to talk"
-	if phase=="leaving": caption="Heading out?"
-	var rune=game.scene.brann.get_meta("presence_rune")
-	var pulse=1.0+sin(game.elapsed*4)*0.12 if status in ["opening","connecting"] else 1.0+game.speech_level*0.25
-	rune.scale = Vector3.ONE * pulse
-	var glow: StandardMaterial3D = game.scene.brann.get_meta("presence_glow")
-	glow.albedo_color = color
-	glow.emission_enabled = status != "idle"
-	glow.emission = color
-	glow.emission_energy_multiplier = 0.5
-	game.scene.brann.get_meta("presence_label").text=caption
+		"opening", "connecting": color = Color("ffc573"); caption = "One moment…"
+		"listening": color = Color("85e7cb"); caption = "I'm listening"
+		"speaking": color = Color("ffd58a")
+		"error": color = Color("c78980"); caption = "Tap to talk"
+	if phase == "leaving": caption = "Heading out?"
+	var glow: StandardMaterial3D = brann.rune_material
+	if glow != null:
+		glow.albedo_color = color
+		glow.emission_enabled = status != "idle"
+		glow.emission = color
+		glow.emission_energy_multiplier = 0.5 + 0.25 * game.speech_level
+	var label: Label3D = brann.get_meta("presence_label")
+	if label.text != caption: label.text = caption
